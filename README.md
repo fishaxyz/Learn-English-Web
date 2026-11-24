@@ -6,7 +6,10 @@ An SEO-friendly platform for learning English through Reading, Listening and Voc
 - **[docs/ROADMAP.md](docs/ROADMAP.md)**: the build phases and their acceptance checks.
 - **[docs/adr/](docs/adr/)**: decision records.
 
-Status: **Phase 2** (reading slice). Editors sign in to the dashboard, write and publish reading lessons; learners read them, open words and check their answers.
+Status: **Phase 2** (reading slice) and the learner's vocabulary flow ([ADR 0004](docs/adr/0004-learner-vocabulary-flow.md)).
+
+- **Editors** prepare words and structures in the word bank, then write and publish reading lessons.
+- **Learners** read, choose words and structures to learn, study them highlighted in the text, and keep them in My words.
 
 ## What's here
 

@@ -90,13 +90,27 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   // The page refreshes into its published state (the draft is gone; revision 1 is live).
   await expect(page.getByText(/Published as revision 1\./)).toBeVisible();
 
-  // A learner reads it, opens the word, and answers.
+  // A learner reads it, taps the word, adds it to their list, studies it, and answers.
   await page.goto(`${WEBSITE}/reading/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-  await page.getByRole("button", { name: "commute" }).click();
-  await expect(page.getByRole("dialog", { name: "Meaning of commute" })).toBeVisible();
+  await expect(page.getByText("My list for this reading: 0")).toBeVisible();
+  await page.getByRole("button", { name: "commute", exact: true }).click();
+  const card = page.getByRole("dialog", { name: "About “commute”" });
+  await expect(card.getByText("Her commute is long.")).toBeVisible(); // the sentence from this text
+  await card.getByRole("button", { name: "＋ Add to my list" }).click();
   await page.keyboard.press("Escape");
+  await expect(page.getByText("My list for this reading: 1")).toBeVisible();
+  await page.getByRole("button", { name: "Study my words" }).click();
+  await expect(page.getByRole("button", { name: "commute (in your list)" })).toBeVisible();
   await page.getByRole("radio", { name: "False" }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(page.getByText("You scored 1 out of 1.")).toBeVisible();
+
+  // The word is waiting in "My words", with the sentence it came from.
+  await page
+    .getByRole("link", { name: /^My words/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "My words" })).toBeVisible();
+  await expect(page.getByText("“Her commute is long.”")).toBeVisible();
 });

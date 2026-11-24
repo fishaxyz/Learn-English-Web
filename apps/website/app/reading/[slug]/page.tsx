@@ -1,5 +1,6 @@
 import { ReadingLessonDocument } from "@english/graphql";
-import { ExerciseRenderer, LessonLayout, LexicalCard, LinkedText, minutes } from "@english/ui";
+import { ExerciseRenderer, LessonLayout, minutes } from "@english/ui";
+import { ReadingExperience } from "../../../components/reading-experience";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -82,30 +83,17 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
         }
         after={
           <>
-            {lesson.vocabulary.length ? (
-              <section aria-labelledby="words" className="flex flex-col gap-4">
-                <h2 id="words" className="font-display text-2xl font-semibold">
-                  Words in this text
-                </h2>
-                <ul className="grid gap-4 sm:grid-cols-2">
-                  {lesson.vocabulary.map((sense) => (
-                    <li key={sense.revisionId} className="rounded-2xl border border-line bg-surface p-5">
-                      <LexicalCard sense={sense} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
             {lesson.exerciseSets.map((set) => (
               <ExerciseRenderer key={set.id} set={set} grade={gradeExercises} />
             ))}
           </>
         }
       >
-        {lesson.vocabulary.length ? (
-          <p className="mb-6 font-sans text-sm text-muted">Tip: tap a highlighted word to see what it means.</p>
-        ) : null}
-        <LinkedText body={lesson.body} vocabulary={lesson.vocabulary} />
+        <ReadingExperience
+          body={lesson.body}
+          items={lesson.vocabularyItems}
+          lesson={{ slug: lesson.slug, title: lesson.title }}
+        />
       </LessonLayout>
     </>
   );
