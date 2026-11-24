@@ -6,7 +6,7 @@ An SEO-friendly platform for learning English through Reading, Listening and Voc
 - **[docs/ROADMAP.md](docs/ROADMAP.md)**: the build phases and their acceptance checks.
 - **[docs/adr/](docs/adr/)**: decision records.
 
-Status: **Phase 1** (data model and API). The API serves sample lessons; the website and dashboard screens come in Phase 2.
+Status: **Phase 2** (reading slice). Editors sign in to the dashboard, write and publish reading lessons; learners read them, open words and check their answers.
 
 ## What's here
 
@@ -39,11 +39,14 @@ pnpm docker:ps            # status and health of each service
 pnpm docker:down          # stop (the database volume is kept)
 ```
 
-Load the sample lessons (only once is needed; running it again changes nothing):
+Load the sample lessons, and invite yourself to the dashboard:
 
 ```sh
-pnpm docker:seed
+pnpm docker:seed                                   # safe to run again
+pnpm docker:invite --email you@example.com --role OWNER
 ```
+
+To sign in at <http://localhost:3401>, enter that address. In development (`APP_ENV=development`), the sign-in link is written to `.dev-mailbox/sign-in-links.jsonl` instead of being emailed. Open the newest link in that file.
 
 Then check:
 
@@ -80,6 +83,7 @@ GRAPHQL_API_URL=http://localhost:4400 uv run content-engine-worker
 ```sh
 pnpm check                # format, lint, type checks and tests (TypeScript)
 pnpm build                # production builds of the API, website and dashboard
+pnpm e2e                  # browser test against the running stack (needs the seed and an invited owner@example.test)
 pnpm codegen              # regenerate GraphQL types after editing packages/graphql/schema
 pnpm --filter @english/database db:generate --name=<change>   # a migration after editing the Drizzle schema
 

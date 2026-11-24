@@ -21,15 +21,19 @@
     "docker:ps": "docker compose -f infrastructure/docker-compose.yml --env-file .env ps",
     "docker:seed": "docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm -e NODE_ENV=development api node dist/seed.js",
     "db:migrate": "pnpm --filter @english/database db:migrate",
-    "db:seed": "pnpm --filter @english/api seed"
+    "db:seed": "pnpm --filter @english/api seed",
+    "docker:invite": "docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm api node dist/invite.js",
+    "invite": "pnpm --filter @english/api invite",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@playwright/test": "1.65.0",
     "eslint": "9.39.5",
+    "eslint-config-next": "16.4.6",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
-    "eslint-config-next": "16.4.6",
     "vite": "8.3.7"
   }
 }

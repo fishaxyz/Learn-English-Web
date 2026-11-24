@@ -1,5 +1,5 @@
 import { ReadingLessonDocument } from "@english/graphql";
-import { ExerciseRenderer, LessonLayout, LexicalCard, minutes } from "@english/ui";
+import { ExerciseRenderer, LessonLayout, LexicalCard, LinkedText, minutes } from "@english/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +7,6 @@ import { cache } from "react";
 import { publicQuery, tagForLesson } from "../../../lib/api";
 import { serverEnv } from "../../../lib/env";
 import { gradeExercises } from "./actions";
-import { LessonText } from "./lesson-text";
 
 // Rendered per request (the API isn't reachable at build time); its data is still cached by tag and refreshed on publish.
 export const dynamic = "force-dynamic";
@@ -106,7 +105,7 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
         {lesson.vocabulary.length ? (
           <p className="mb-6 font-sans text-sm text-muted">Tip: tap a highlighted word to see what it means.</p>
         ) : null}
-        <LessonText body={lesson.body} vocabulary={lesson.vocabulary} />
+        <LinkedText body={lesson.body} vocabulary={lesson.vocabulary} />
       </LessonLayout>
     </>
   );

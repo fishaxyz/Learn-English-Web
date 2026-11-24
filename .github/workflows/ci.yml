@@ -69,7 +69,15 @@ jobs:
     needs: [typescript, python]
     steps:
       - uses: actions/checkout@v7
-      - run: cp .env.example .env && echo "REVALIDATION_SECRET=$(openssl rand -base64 32)" >> .env
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The dashboard (running as the image's node user) writes development sign-in links here.
+      - run: mkdir -p .dev-mailbox && chmod 777 .dev-mailbox
+      - run: cp .env.example .env && printf "REVALIDATION_SECRET=%s\nAUTH_SECRET=%s\n" "$(openssl rand -base64 32)" "$(openssl rand -base64 32)" >> .env
       - name: Start every service and wait until all are healthy
         run: docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait --wait-timeout 300
       - name: Load the sample content
@@ -82,6 +90,10 @@ jobs:
           curl -fsS http://127.0.0.1:3400/api/health/ready
           curl -fsS http://127.0.0.1:3401/api/health/ready
           docker compose -f infrastructure/docker-compose.yml --env-file .env ps
+      - name: Invite the end-to-end test's editor
+        run: docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm api node dist/invite.js --email owner@example.test --site localhost --role OWNER
+      - name: End-to-end test (sign in, write, publish, learn)
+        run: pnpm e2e
       - name: Logs, if anything failed
         if: failure()
         run: docker compose -f infrastructure/docker-compose.yml --env-file .env logs --no-color

@@ -8,6 +8,7 @@ await build({
     server: "src/server.ts",
     migrate: "../../packages/database/src/cli/migrate.ts",
     seed: "src/seed/run.ts",
+    invite: "src/seed/invite-cli.ts",
   },
   outdir: "dist",
   bundle: true,

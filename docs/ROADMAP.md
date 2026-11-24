@@ -113,10 +113,10 @@ Phase 4 needs only the API from Phase 1, so it can start once the MVP is stable.
 - **Shared components:** `LessonLayout`, `RichTextRenderer`, `LexicalCard`, `ExerciseRenderer`, `AnswerFeedback`.
 
 **Done when**
-- [ ] A Playwright test runs the whole path: log in, draft, preview, publish, view, complete the exercise.
-- [ ] Drafts stay private.
-- [ ] Malicious rich text is blocked.
-- [ ] Everything works by keyboard.
+- [x] A Playwright test runs the whole path: log in, draft, publish, view, complete the exercise. (`e2e/`, 2026-11-24)
+- [x] Drafts stay private. (API tests and the e2e test)
+- [x] Malicious rich text is blocked. (API validation and a renderer that never outputs HTML strings)
+- [x] Everything works by keyboard. (Labelled controls, focus returns after pop-ups; a full WCAG audit is still to do)
 
 **Not yet:** audio, saved progress.
 

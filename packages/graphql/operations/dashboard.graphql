@@ -111,48 +111,48 @@ query SenseSearch($query: String!) {
 
 mutation CreateResource($input: CreateResourceInput!) {
   createResource(input: $input) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation StartDraft($localizationId: ID!) {
   startDraft(localizationId: $localizationId) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation UpdateDraft($input: UpdateDraftInput!) {
   updateDraft(input: $input) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation SaveExerciseSets($localizationId: ID!, $lockVersion: Int!, $sets: ExercisePayload!) {
   saveExerciseSets(localizationId: $localizationId, lockVersion: $lockVersion, sets: $sets) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation SubmitForReview($localizationId: ID!, $lockVersion: Int!) {
   submitForReview(localizationId: $localizationId, lockVersion: $lockVersion) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation ReturnToDraft($localizationId: ID!, $lockVersion: Int!, $note: String) {
   returnToDraft(localizationId: $localizationId, lockVersion: $lockVersion, note: $note) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation PublishResource($localizationId: ID!, $lockVersion: Int!) {
   publishResource(localizationId: $localizationId, lockVersion: $lockVersion) {
-    id
+    ...EditorialSummary
   }
 }
 
 mutation ArchiveResource($resourceId: ID!) {
   archiveResource(resourceId: $resourceId) {
-    id
+    ...EditorialSummary
   }
 }

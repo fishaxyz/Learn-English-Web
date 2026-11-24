@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "tsx --env-file-if-exists=../../.env src/seed/run.ts"
+    "seed": "tsx --env-file-if-exists=../../.env src/seed/run.ts",
+    "invite": "tsx --env-file-if-exists=../../.env src/seed/invite-cli.ts"
   },
   "dependencies": {
     "@english/config": "workspace:*",

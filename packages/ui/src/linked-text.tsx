@@ -1,13 +1,14 @@
 "use client";
 
 import type { SenseCardFragment } from "@english/graphql";
-import { LexicalTerm, RichTextRenderer } from "@english/ui";
+import { LexicalTerm } from "./lexical";
+import { RichTextRenderer } from "./rich-text";
 
 /**
- * The lesson text, rendered on the server like any page (so it's in the HTML for readers and search engines),
- * then made interactive: linked words open their meaning in place.
+ * A lesson text whose linked words open their meaning in place. Server-rendered like any page (so the text
+ * is in the HTML), then interactive. Shared by the website and the dashboard's preview.
  */
-export function LessonText({ body, vocabulary }: { body: unknown; vocabulary: SenseCardFragment[] }) {
+export function LinkedText({ body, vocabulary }: { body: unknown; vocabulary: SenseCardFragment[] }) {
   const byRevision = new Map(vocabulary.map((s) => [s.revisionId, s]));
   return (
     <RichTextRenderer
