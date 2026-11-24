@@ -89,6 +89,9 @@ services:
       EMAIL_SERVER: ${EMAIL_SERVER:-}
       EMAIL_FROM: ${EMAIL_FROM:-English Skills <no-reply@localhost>}
       WEBSITE_URL: ${WEBSITE_URL:-http://localhost:3400}
+      # Google sign-in: on when both are set (see docs/google-sign-in.md).
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
       AUTH_DEV_MAILBOX: /mailbox/sign-in-links.jsonl
     volumes:
       # Development only: sign-in links appear in ./.dev-mailbox instead of an inbox.

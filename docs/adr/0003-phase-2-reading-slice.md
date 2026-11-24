@@ -19,7 +19,11 @@
   - Production: by email through any SMTP service (`EMAIL_SERVER`).
   - Development (`APP_ENV=development`): written to `.dev-mailbox/`.
   - With no `EMAIL_SERVER` in production, sign-in fails loudly instead of quietly writing links to disk.
-- **Google sign-in** is wired but stays off until `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are set. Google accounts link only to invited users.
+- **Google sign-in** (added on `feature/google-sign-in`) is off until `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are set; setup is in [docs/google-sign-in.md](../google-sign-in.md).
+  - It needs a Google-verified, invited address, and links to that invited user.
+  - Google always shows its account chooser.
+  - Any other provider is refused.
+  - The rules are in `apps/dashboard/lib/sign-in-rules.ts`, which is unit-tested.
 - **How the dashboard talks to the API.** It forwards the session token as a Bearer token, from its server only. The browser holds just the HttpOnly cookie and never calls the API.
 - **The dashboard connects to the database for Auth.js's tables only.** All lesson data still goes through the API.
 

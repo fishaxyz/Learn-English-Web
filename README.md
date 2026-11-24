@@ -48,6 +48,8 @@ pnpm docker:invite --email you@example.com --role OWNER
 
 To sign in at <http://localhost:3401>, enter that address. In development (`APP_ENV=development`), the sign-in link is written to `.dev-mailbox/sign-in-links.jsonl` instead of being emailed. Open the newest link in that file.
 
+To also offer **Continue with Google**, follow [docs/google-sign-in.md](docs/google-sign-in.md).
+
 Then check:
 
 - the website at <http://localhost:3400>;

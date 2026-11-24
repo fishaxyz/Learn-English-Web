@@ -87,7 +87,8 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await page.getByRole("button", { name: "Submit for review" }).click();
   await expect(page.getByText("Sent for review.")).toBeVisible();
   await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page.getByText("Published. It's live on the site.")).toBeVisible();
+  // The page refreshes into its published state (the draft is gone; revision 1 is live).
+  await expect(page.getByText(/Published as revision 1\./)).toBeVisible();
 
   // A learner reads it, opens the word, and answers.
   await page.goto(`${WEBSITE}/reading/${slug}`);

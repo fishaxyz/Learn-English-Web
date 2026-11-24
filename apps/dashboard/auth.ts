@@ -8,6 +8,7 @@ import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { createTransport } from "nodemailer";
 import { db } from "./lib/db";
+import { decideSignIn } from "./lib/sign-in-rules";
 import { serverEnv } from "./lib/env";
 
 /** Only people with a role on at least one site may sign in. Invitations are made with the invite command. */
@@ -72,20 +73,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
             Google({
               clientId: env.AUTH_GOOGLE_ID,
               clientSecret: env.AUTH_GOOGLE_SECRET,
-              // Invited users already exist; Google has verified the address, so link it to them.
+              // Invited people already have a user row (made by the invite). Linking a Google account to it by
+              // email is safe here because decideSignIn requires Google's email_verified and an invitation.
               allowDangerousEmailAccountLinking: true,
+              // Always show Google's account chooser, so a shared computer doesn't sign in the wrong person.
+              authorization: { params: { prompt: "select_account" } },
             }),
           ]
         : []),
     ],
     pages: { signIn: "/sign-in", verifyRequest: "/sign-in/check-email", error: "/sign-in/error" },
     callbacks: {
-      async signIn({ user, email }) {
-        const invited = user.email ? await isInvited(user.email) : false;
-        // Asking for a link: everyone sees "check your email", invited or not, so the form can't be used to
-        // find out who has an account. Only invited people actually get a link.
-        if (email?.verificationRequest) return invited ? true : "/sign-in/check-email";
-        return invited;
+      async signIn({ user, email, account, profile }) {
+        const address = user.email ?? (typeof profile?.email === "string" ? profile.email : null);
+        return decideSignIn({
+          provider: account?.provider ?? "",
+          requestingLink: Boolean(email?.verificationRequest),
+          email: address,
+          emailVerified: typeof profile?.email_verified === "boolean" ? profile.email_verified : null,
+          invited: address ? await isInvited(address) : false,
+        });
       },
     },
   };
