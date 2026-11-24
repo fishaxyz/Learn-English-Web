@@ -36,7 +36,11 @@ const mark = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("italic") }),
   z.strictObject({ type: z.literal("link"), attrs: z.object({ href: safeHref }) }),
   /** A word or phrase linked to one exact sense revision: the vocabulary pop-up (AGENTS.md §5.2). */
-  z.strictObject({ type: z.literal("lexical"), attrs: z.object({ senseRevisionId: uuid }) }),
+  z.strictObject({
+    type: z.literal("lexical"),
+    // `key`: the editor marked it a key word of the text (suggested to learners first).
+    attrs: z.object({ senseRevisionId: uuid, key: z.boolean().optional() }),
+  }),
 ]);
 
 export type RichTextNode = {
@@ -123,7 +127,14 @@ export function wordCount(text: string): number {
 /** At about 200 words a minute, rounded up to whole seconds. */
 export const readingSeconds = (words: number) => Math.ceil((words / 200) * 60);
 
-export type Annotation = { blockId: string; start: number; end: number; surfaceText: string; senseRevisionId: string };
+export type Annotation = {
+  blockId: string;
+  start: number;
+  end: number;
+  surfaceText: string;
+  senseRevisionId: string;
+  isKey: boolean;
+};
 
 /**
  * The document's vocabulary links, as stored in lexical_annotations. Offsets are Unicode code points (not
@@ -143,11 +154,20 @@ export function annotationsOf(doc: RichTextDocument): Annotation[] {
         const length = [...text].length;
         const sense = child.marks?.find((m) => m.type === "lexical")?.attrs;
         const senseId = sense && "senseRevisionId" in sense ? sense.senseRevisionId : null;
+        const isKey = Boolean(sense && "key" in sense && sense.key);
         if (senseId && open && open.senseRevisionId === senseId && open.end === offset) {
           open.end += length;
           open.surfaceText += text;
+          open.isKey ||= isKey;
         } else if (senseId) {
-          open = { blockId: id, start: offset, end: offset + length, surfaceText: text, senseRevisionId: senseId };
+          open = {
+            blockId: id,
+            start: offset,
+            end: offset + length,
+            surfaceText: text,
+            senseRevisionId: senseId,
+            isKey,
+          };
           out.push(open);
         } else {
           open = null;
@@ -161,4 +181,49 @@ export function annotationsOf(doc: RichTextDocument): Annotation[] {
   };
   doc.content.forEach(walk);
   return out;
+}
+
+/** Each block's inline text, in document order (the same text annotation offsets count into). */
+export function blockTexts(doc: RichTextDocument): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (n: RichTextNode) => {
+    const id = n.attrs?.["id"];
+    if (typeof id === "string" && n.content?.some((c) => c.type === "text" || c.type === "hardBreak")) {
+      out.set(
+        id,
+        n.content.map((c) => (c.type === "text" ? (c.text ?? "") : c.type === "hardBreak" ? "\n" : "")).join("")
+      );
+    }
+    n.content?.forEach((c) => {
+      if (c.type !== "text") walk(c);
+    });
+  };
+  doc.content.forEach(walk);
+  return out;
+}
+
+/**
+ * The sentence around a span (offsets in code points): from just after the previous ". ", "! ", "? " or line
+ * break, to the next sentence end. Good enough for showing a word in its context; not a full sentence parser.
+ */
+export function sentenceAround(text: string, start: number, end: number): string {
+  const chars = [...text];
+  let from = start;
+  while (from > 0) {
+    const prev = chars[from - 1] ?? "";
+    if (prev === "\n" || (/\s/.test(prev) && /[.!?]/.test(chars[from - 2] ?? ""))) break;
+    from -= 1;
+  }
+  let to = end;
+  while (to < chars.length) {
+    const c = chars[to] ?? "";
+    if (c === "\n") break;
+    if (/[.!?]/.test(c) && (to + 1 >= chars.length || /[\s"”’)]/.test(chars[to + 1] ?? ""))) {
+      to += 1;
+      while (/["”’)]/.test(chars[to] ?? "")) to += 1;
+      break;
+    }
+    to += 1;
+  }
+  return chars.slice(from, to).join("").trim();
 }

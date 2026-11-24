@@ -15,6 +15,8 @@ export const lexicalEntryKind = pgEnum("lexical_entry_kind", [
   "COLLOCATION",
   "IDIOM",
   "PHRASAL_VERB",
+  /** A grammar or sentence pattern, e.g. "If I were you, I'd + verb". Learners add it whole. */
+  "SENTENCE_PATTERN",
 ]);
 export const lexicalRelationKind = pgEnum("lexical_relation_kind", [
   "SYNONYM",

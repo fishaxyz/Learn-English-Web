@@ -27,7 +27,7 @@ try {
       msg: result.created
         ? "sample content created"
         : "linked" in result && result.linked
-          ? `site exists; added vocabulary links to ${result.linked} sample lesson(s)`
+          ? `site exists; updated ${result.linked} sample item(s)`
           : "site already exists; nothing changed",
       domain: env.SEED_SITE_DOMAIN,
     })

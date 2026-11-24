@@ -45,6 +45,8 @@ export type LexicalEntryKind =
   | 'IDIOM'
   | 'PHRASAL_VERB'
   | 'PHRASE'
+  /** A grammar or sentence pattern, e.g. "If I were you, I'd + verb". Learners add it whole. */
+  | 'SENTENCE_PATTERN'
   | 'WORD';
 
 /** One answer: optionId for single choice, judgement for true/false/not given, gaps for gap fill. */

@@ -11,7 +11,7 @@ import {
   updateDraft,
 } from "../modules/resources/editorial";
 import type { ExerciseSetInput } from "../modules/assessment/schemas";
-import type { RichTextDocument } from "../modules/rich-text";
+import { annotationsOf, type RichTextDocument } from "../modules/rich-text";
 import { one } from "../rows";
 import { COLLECTION, EXAM_LABELS, linkSenses, LISTENING, READING, SENSES, TOPICS } from "./content";
 
@@ -53,7 +53,7 @@ export async function seedLesson(
 /** Seeds one site with sample lessons. Does nothing if the site already exists. */
 export async function seed(db: Database, domain: string, name = "English Skills") {
   const [existing] = await db.select().from(schema.sites).where(eq(schema.sites.domain, domain));
-  if (existing) return { siteId: existing.id, created: false, linked: await addVocabularyLinks(db, existing.id) };
+  if (existing) return { siteId: existing.id, created: false, linked: await upgradeSamples(db, existing.id) };
 
   const site = one(await db.insert(schema.sites).values({ domain, name }).returning());
   await db.insert(schema.topics).values(TOPICS.map((t) => ({ siteId: site.id, ...t })));
@@ -61,23 +61,7 @@ export async function seed(db: Database, domain: string, name = "English Skills"
 
   const senseRevisions = new Map<string, string>();
   for (const s of SENSES) {
-    const [entry] = await db
-      .select({ id: schema.lexicalEntries.id })
-      .from(schema.lexicalEntries)
-      .where(and(eq(schema.lexicalEntries.siteId, site.id), eq(schema.lexicalEntries.displayForm, s.headword)));
-    const senseId = await manageLexicalSense(db, null, {
-      siteId: site.id,
-      ...(entry ? { entryId: entry.id } : { headword: s.headword, kind: s.kind }),
-      senseKey: s.key,
-      partOfSpeech: s.partOfSpeech,
-      definition: s.definition,
-      cefrLevel: s.cefrLevel,
-      usageNote: "usageNote" in s ? s.usageNote : null,
-      register: "register" in s ? s.register : null,
-      examples: s.examples,
-      pronunciations: s.pronunciations,
-    });
-    await publishLexicalSense(db, null, senseId, 0);
+    const senseId = await upsertSense(db, site.id, s);
     const sense = one(await db.select().from(schema.lexicalSenses).where(eq(schema.lexicalSenses.id, senseId)));
     senseRevisions.set(s.key, sense.publishedRevisionId as string);
   }
@@ -111,30 +95,105 @@ export async function seed(db: Database, domain: string, name = "English Skills"
   return { siteId: site.id, created: true, reading, listening, collection, senseRevisions };
 }
 
+/** Creates or updates one sample sense through the normal draft → publish flow. Returns its sense id. */
+async function upsertSense(
+  db: Database,
+  siteId: string,
+  s: (typeof SENSES)[number],
+  senseId?: string,
+  lockVersion?: number
+) {
+  const [entry] = senseId
+    ? []
+    : await db
+        .select({ id: schema.lexicalEntries.id })
+        .from(schema.lexicalEntries)
+        .where(and(eq(schema.lexicalEntries.siteId, siteId), eq(schema.lexicalEntries.displayForm, s.headword)));
+  const id = await manageLexicalSense(db, null, {
+    siteId,
+    ...(senseId
+      ? { senseId, lockVersion: lockVersion ?? null }
+      : entry
+        ? { entryId: entry.id }
+        : { headword: s.headword, kind: s.kind }),
+    senseKey: s.key,
+    partOfSpeech: s.partOfSpeech,
+    definition: s.definition,
+    cefrLevel: s.cefrLevel,
+    usageNote: s.usageNote ?? null,
+    register: s.register ?? null,
+    examples: s.examples,
+    pronunciations: s.pronunciations,
+    translations: s.translations ?? [],
+  });
+  const draft = one(
+    await db
+      .select({ lockVersion: schema.lexicalSenseRevisions.lockVersion })
+      .from(schema.lexicalSenseRevisions)
+      .innerJoin(schema.lexicalSenses, eq(schema.lexicalSenses.draftRevisionId, schema.lexicalSenseRevisions.id))
+      .where(eq(schema.lexicalSenses.id, id))
+  );
+  await publishLexicalSense(db, null, id, draft.lockVersion);
+  return id;
+}
+
 /**
- * For sites seeded before vocabulary links existed: publishes a new revision of the sample lessons with the
- * links, through the normal draft → review → publish flow. Does nothing once a lesson has links, and never
- * touches lessons that aren't the samples.
+ * Brings an existing site's samples up to date, through the same draft → review → publish flow editors use:
+ * missing sample senses, missing translations, then the sample lessons' links (key words, the pattern) pinned to
+ * the current sense revisions. Does nothing when everything already matches; never touches other content.
  */
-async function addVocabularyLinks(db: Database, siteId: string): Promise<number> {
-  const revisions = new Map<string, string>();
-  for (const s of await db.select().from(schema.lexicalSenses).where(eq(schema.lexicalSenses.siteId, siteId))) {
-    if (s.publishedRevisionId) revisions.set(s.senseKey, s.publishedRevisionId);
+async function upgradeSamples(db: Database, siteId: string): Promise<number> {
+  let changed = 0;
+  const current = async () => db.select().from(schema.lexicalSenses).where(eq(schema.lexicalSenses.siteId, siteId));
+
+  for (const s of SENSES) {
+    const sense = (await current()).find((x) => x.senseKey === s.key);
+    if (!sense) {
+      await upsertSense(db, siteId, s);
+      changed += 1;
+      continue;
+    }
+    if (!s.translations?.length || !sense.publishedRevisionId) continue;
+    const glosses = await db
+      .select({ id: schema.lexicalGlosses.id })
+      .from(schema.lexicalGlosses)
+      .where(eq(schema.lexicalGlosses.senseRevisionId, sense.publishedRevisionId));
+    if (glosses.length) continue;
+    const [draft] = sense.draftRevisionId
+      ? await db
+          .select()
+          .from(schema.lexicalSenseRevisions)
+          .where(eq(schema.lexicalSenseRevisions.id, sense.draftRevisionId))
+      : [];
+    await upsertSense(db, siteId, s, sense.id, draft?.lockVersion);
+    changed += 1;
   }
-  let linked = 0;
+
+  const revisions = new Map<string, string>();
+  for (const s of await current()) if (s.publishedRevisionId) revisions.set(s.senseKey, s.publishedRevisionId);
+
   for (const lesson of [READING, LISTENING]) {
     const [loc] = await db
       .select()
       .from(schema.resourceLocalizations)
       .where(and(eq(schema.resourceLocalizations.siteId, siteId), eq(schema.resourceLocalizations.slug, lesson.slug)));
-    if (!loc?.publishedRevisionId || loc.draftRevisionId) continue;
-    const annotated = await db
-      .select({ id: schema.lexicalAnnotations.id })
-      .from(schema.lexicalAnnotations)
-      .where(eq(schema.lexicalAnnotations.revisionId, loc.publishedRevisionId))
-      .limit(1);
-    if (annotated.length) continue;
-    await startDraft(db, null, loc.id);
+    if (!loc?.publishedRevisionId) continue;
+    const body = linkSenses(lesson.body, revisions);
+    const wanted = annotationsOf(body)
+      .map((a) => `${a.senseRevisionId}|${a.isKey}`)
+      .sort()
+      .join();
+    const live = (
+      await db
+        .select()
+        .from(schema.lexicalAnnotations)
+        .where(eq(schema.lexicalAnnotations.revisionId, loc.publishedRevisionId))
+    )
+      .map((a) => `${a.senseRevisionId}|${a.isKey}`)
+      .sort()
+      .join();
+    if (wanted === live) continue;
+    if (!loc.draftRevisionId) await startDraft(db, null, loc.id);
     const started = one(
       await db.select().from(schema.resourceLocalizations).where(eq(schema.resourceLocalizations.id, loc.id))
     );
@@ -144,14 +203,11 @@ async function addVocabularyLinks(db: Database, siteId: string): Promise<number>
         .from(schema.resourceRevisions)
         .where(eq(schema.resourceRevisions.id, started.draftRevisionId as string))
     );
-    await updateDraft(db, null, {
-      localizationId: loc.id,
-      lockVersion: draft.lockVersion,
-      body: linkSenses(lesson.body, revisions),
-    });
+    if (draft.status !== "DRAFT") continue; // someone's review is in progress: leave it alone
+    await updateDraft(db, null, { localizationId: loc.id, lockVersion: draft.lockVersion, body });
     await moveDraft(db, null, loc.id, draft.lockVersion + 1, "IN_REVIEW");
     await publishResource(db, null, loc.id, draft.lockVersion + 2);
-    linked += 1;
+    changed += 1;
   }
-  return linked;
+  return changed;
 }

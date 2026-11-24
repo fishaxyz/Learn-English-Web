@@ -1,5 +1,5 @@
 import type { GraphQLResolveInfo, GraphQLScalarType, GraphQLScalarTypeConfig } from 'graphql';
-import type { SiteModel, TopicModel, ExamLabelModel, PublishedResourceModel, EditorialResourceModel, EditorialLocalizationModel, RevisionModel, ExerciseSetModel, QuestionModel, QuestionOptionModel, LexicalEntryModel, LexicalSenseModel, EditorialSenseModel, SenseRevisionModel, ViewerModel, MembershipModel } from '../models';
+import type { SiteModel, TopicModel, ExamLabelModel, PublishedResourceModel, EditorialResourceModel, EditorialLocalizationModel, RevisionModel, ExerciseSetModel, QuestionModel, QuestionOptionModel, LexicalEntryModel, LexicalSenseModel, EditorialSenseModel, SenseRevisionModel, VocabularyItemModel, ViewerModel, MembershipModel } from '../models';
 import type { GraphQLContext } from '../context';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
@@ -211,6 +211,8 @@ export type LexicalEntryKind =
   | 'IDIOM'
   | 'PHRASAL_VERB'
   | 'PHRASE'
+  /** A grammar or sentence pattern, e.g. "If I were you, I'd + verb". Learners add it whole. */
+  | 'SENTENCE_PATTERN'
   | 'WORD';
 
 export type LexicalExample = {
@@ -237,6 +239,7 @@ export type LexicalSense = {
   register?: Maybe<Scalars['String']['output']>;
   revisionId: Scalars['ID']['output'];
   senseKey: Scalars['String']['output'];
+  translations: Array<Translation>;
   usageNote?: Maybe<Scalars['String']['output']>;
 };
 
@@ -279,6 +282,7 @@ export type ManageLexicalSenseInput = {
   senseId?: InputMaybe<Scalars['ID']['input']>;
   senseKey: Scalars['String']['input'];
   siteId: Scalars['ID']['input'];
+  translations?: Array<TranslationInput>;
   usageNote?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -414,6 +418,10 @@ export type Query = {
   editorialResource?: Maybe<EditorialResource>;
   /** Editorial: a site's resources, newest first (at most 100). */
   editorialResources: Array<EditorialResource>;
+  /** Editorial: one sense with its draft and published revisions. */
+  editorialSense?: Maybe<EditorialSense>;
+  /** Editorial: the site's word bank, drafts included, optionally filtered by headword (at most 200). */
+  editorialSenses: Array<EditorialSense>;
   /** A published exercise set on this site. */
   exerciseSet?: Maybe<ExerciseSet>;
   health: Health;
@@ -436,6 +444,18 @@ export type QueryEditorialResourceArgs = {
 
 export type QueryEditorialResourcesArgs = {
   first?: Scalars['Int']['input'];
+  siteId: Scalars['ID']['input'];
+};
+
+
+export type QueryEditorialSenseArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryEditorialSensesArgs = {
+  first?: Scalars['Int']['input'];
+  query?: InputMaybe<Scalars['String']['input']>;
   siteId: Scalars['ID']['input'];
 };
 
@@ -517,6 +537,8 @@ export type ReadingResource = Resource & {
   topics: Array<Topic>;
   /** The word senses the text links to (its `lexical` marks), at the exact revisions it pinned. */
   vocabulary: Array<LexicalSense>;
+  /** The same links as learners choose them: one item per word or structure, with key flags and sentences. */
+  vocabularyItems: Array<VocabularyItem>;
   wordCount: Scalars['Int']['output'];
 };
 
@@ -579,6 +601,7 @@ export type Revision = {
   updatedAt: Scalars['DateTime']['output'];
   /** The linked word senses, as in the text. */
   vocabulary: Array<LexicalSense>;
+  vocabularyItems: Array<VocabularyItem>;
 };
 
 export type RevisionStatus =
@@ -595,9 +618,11 @@ export type SenseRevision = {
   id: Scalars['ID']['output'];
   lockVersion: Scalars['Int']['output'];
   pronunciations: Array<Pronunciation>;
+  publishedAt?: Maybe<Scalars['DateTime']['output']>;
   register?: Maybe<Scalars['String']['output']>;
   revisionNo: Scalars['Int']['output'];
   status: RevisionStatus;
+  translations: Array<Translation>;
   usageNote?: Maybe<Scalars['String']['output']>;
 };
 
@@ -626,6 +651,17 @@ export type SiteRole =
   | 'REVIEWER'
   | 'VIEWER';
 
+/** Where a vocabulary item appears in a text: a span of one block, and the sentence around it. */
+export type TextOccurrence = {
+  __typename?: 'TextOccurrence';
+  blockId: Scalars['String']['output'];
+  end: Scalars['Int']['output'];
+  sentence: Scalars['String']['output'];
+  /** Unicode code-point offsets into the block's text. */
+  start: Scalars['Int']['output'];
+  text: Scalars['String']['output'];
+};
+
 export type TextSegment = {
   __typename?: 'TextSegment';
   text: Scalars['String']['output'];
@@ -637,6 +673,19 @@ export type Topic = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   slug: Scalars['String']['output'];
+};
+
+/** The meaning in another language. */
+export type Translation = {
+  __typename?: 'Translation';
+  /** BCP 47 language, e.g. vi or pt-BR. */
+  locale: Scalars['String']['output'];
+  text: Scalars['String']['output'];
+};
+
+export type TranslationInput = {
+  locale: Scalars['String']['input'];
+  text: Scalars['String']['input'];
 };
 
 export type TrueFalseNotGivenQuestion = Question & {
@@ -666,6 +715,17 @@ export type Viewer = {
   id: Scalars['ID']['output'];
   memberships: Array<Membership>;
   name?: Maybe<Scalars['String']['output']>;
+};
+
+/**
+ * A word or structure a text links to, as learners choose it: the exact sense revision the text pinned, whether the
+ * editor marked it a key word, and every place it appears (a split pattern has several).
+ */
+export type VocabularyItem = {
+  __typename?: 'VocabularyItem';
+  isKey: Scalars['Boolean']['output'];
+  occurrences: Array<TextOccurrence>;
+  sense: LexicalSense;
 };
 
 
@@ -812,11 +872,15 @@ export type ResolversTypes = {
   Site: ResolverTypeWrapper<SiteModel>;
   SiteRole: SiteRole;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
+  TextOccurrence: ResolverTypeWrapper<TextOccurrence>;
   TextSegment: ResolverTypeWrapper<TextSegment>;
   Topic: ResolverTypeWrapper<TopicModel>;
+  Translation: ResolverTypeWrapper<Translation>;
+  TranslationInput: TranslationInput;
   TrueFalseNotGivenQuestion: ResolverTypeWrapper<QuestionModel>;
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ResolverTypeWrapper<ViewerModel>;
+  VocabularyItem: ResolverTypeWrapper<VocabularyItemModel>;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
@@ -872,11 +936,15 @@ export type ResolversParentTypes = {
   SingleChoiceQuestion: QuestionModel;
   Site: SiteModel;
   String: Scalars['String']['output'];
+  TextOccurrence: TextOccurrence;
   TextSegment: TextSegment;
   Topic: TopicModel;
+  Translation: Translation;
+  TranslationInput: TranslationInput;
   TrueFalseNotGivenQuestion: QuestionModel;
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ViewerModel;
+  VocabularyItem: VocabularyItemModel;
 };
 
 export type ArticleResourceResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ArticleResource'] = ResolversParentTypes['ArticleResource']> = {
@@ -1032,6 +1100,7 @@ export type LexicalSenseResolvers<ContextType = GraphQLContext, ParentType exten
   register?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   revisionId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   senseKey?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  translations?: Resolver<Array<ResolversTypes['Translation']>, ParentType, ContextType>;
   usageNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 };
 
@@ -1091,6 +1160,8 @@ export type PronunciationResolvers<ContextType = GraphQLContext, ParentType exte
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   editorialResource?: Resolver<Maybe<ResolversTypes['EditorialResource']>, ParentType, ContextType, RequireFields<QueryEditorialResourceArgs, 'id'>>;
   editorialResources?: Resolver<Array<ResolversTypes['EditorialResource']>, ParentType, ContextType, RequireFields<QueryEditorialResourcesArgs, 'first' | 'siteId'>>;
+  editorialSense?: Resolver<Maybe<ResolversTypes['EditorialSense']>, ParentType, ContextType, RequireFields<QueryEditorialSenseArgs, 'id'>>;
+  editorialSenses?: Resolver<Array<ResolversTypes['EditorialSense']>, ParentType, ContextType, RequireFields<QueryEditorialSensesArgs, 'first' | 'siteId'>>;
   exerciseSet?: Resolver<Maybe<ResolversTypes['ExerciseSet']>, ParentType, ContextType, RequireFields<QueryExerciseSetArgs, 'id'>>;
   health?: Resolver<ResolversTypes['Health'], ParentType, ContextType>;
   lexicalEntryById?: Resolver<Maybe<ResolversTypes['LexicalEntry']>, ParentType, ContextType, RequireFields<QueryLexicalEntryByIdArgs, 'id'>>;
@@ -1135,6 +1206,7 @@ export type ReadingResourceResolvers<ContextType = GraphQLContext, ParentType ex
   title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   topics?: Resolver<Array<ResolversTypes['Topic']>, ParentType, ContextType>;
   vocabulary?: Resolver<Array<ResolversTypes['LexicalSense']>, ParentType, ContextType>;
+  vocabularyItems?: Resolver<Array<ResolversTypes['VocabularyItem']>, ParentType, ContextType>;
   wordCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -1164,6 +1236,7 @@ export type RevisionResolvers<ContextType = GraphQLContext, ParentType extends R
   topics?: Resolver<Array<ResolversTypes['Topic']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   vocabulary?: Resolver<Array<ResolversTypes['LexicalSense']>, ParentType, ContextType>;
+  vocabularyItems?: Resolver<Array<ResolversTypes['VocabularyItem']>, ParentType, ContextType>;
 };
 
 export interface RichTextScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['RichText'], any> {
@@ -1177,9 +1250,11 @@ export type SenseRevisionResolvers<ContextType = GraphQLContext, ParentType exte
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   lockVersion?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   pronunciations?: Resolver<Array<ResolversTypes['Pronunciation']>, ParentType, ContextType>;
+  publishedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   register?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   revisionNo?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['RevisionStatus'], ParentType, ContextType>;
+  translations?: Resolver<Array<ResolversTypes['Translation']>, ParentType, ContextType>;
   usageNote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 };
 
@@ -1200,6 +1275,14 @@ export type SiteResolvers<ContextType = GraphQLContext, ParentType extends Resol
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 };
 
+export type TextOccurrenceResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TextOccurrence'] = ResolversParentTypes['TextOccurrence']> = {
+  blockId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  end?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  sentence?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  start?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+};
+
 export type TextSegmentResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TextSegment'] = ResolversParentTypes['TextSegment']> = {
   text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -1210,6 +1293,11 @@ export type TopicResolvers<ContextType = GraphQLContext, ParentType extends Reso
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   slug?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+};
+
+export type TranslationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Translation'] = ResolversParentTypes['Translation']> = {
+  locale?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 };
 
 export type TrueFalseNotGivenQuestionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['TrueFalseNotGivenQuestion'] = ResolversParentTypes['TrueFalseNotGivenQuestion']> = {
@@ -1226,6 +1314,12 @@ export type ViewerResolvers<ContextType = GraphQLContext, ParentType extends Res
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   memberships?: Resolver<Array<ResolversTypes['Membership']>, ParentType, ContextType>;
   name?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+};
+
+export type VocabularyItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['VocabularyItem'] = ResolversParentTypes['VocabularyItem']> = {
+  isKey?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  occurrences?: Resolver<Array<ResolversTypes['TextOccurrence']>, ParentType, ContextType>;
+  sense?: Resolver<ResolversTypes['LexicalSense'], ParentType, ContextType>;
 };
 
 export type Resolvers<ContextType = GraphQLContext> = {
@@ -1268,9 +1362,12 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SenseRevision?: SenseRevisionResolvers<ContextType>;
   SingleChoiceQuestion?: SingleChoiceQuestionResolvers<ContextType>;
   Site?: SiteResolvers<ContextType>;
+  TextOccurrence?: TextOccurrenceResolvers<ContextType>;
   TextSegment?: TextSegmentResolvers<ContextType>;
   Topic?: TopicResolvers<ContextType>;
+  Translation?: TranslationResolvers<ContextType>;
   TrueFalseNotGivenQuestion?: TrueFalseNotGivenQuestionResolvers<ContextType>;
   Viewer?: ViewerResolvers<ContextType>;
+  VocabularyItem?: VocabularyItemResolvers<ContextType>;
 };
 

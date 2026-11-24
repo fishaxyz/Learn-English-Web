@@ -18,10 +18,22 @@ const revisionParts = {
   examples: (r: SenseRevisionModel, _: unknown, ctx: GraphQLContext) => ctx.loaders.examplesBySenseRevision.load(r.id),
   pronunciations: (r: SenseRevisionModel, _: unknown, ctx: GraphQLContext) =>
     ctx.loaders.pronunciationsBySenseRevision.load(r.id),
+  translations: (r: SenseRevisionModel, _: unknown, ctx: GraphQLContext) =>
+    ctx.loaders.translationsBySenseRevision.load(r.id),
 };
 
 export const lexiconResolvers: Resolvers = {
   Query: {
+    editorialSenses: async (_, { siteId, query, first }, ctx) => {
+      authorize(await ctx.actor(), siteId, "content.read");
+      return lexicon.editorialSenses(ctx.db, siteId, query, first);
+    },
+    editorialSense: async (_, { id }, ctx) => {
+      const siteId = await lexicon.siteOfSense(ctx.db, id);
+      if (!siteId) return null;
+      authorize(await ctx.actor(), siteId, "content.read");
+      return editorialSense(ctx, id);
+    },
     lexicalSearch: async (_, { query, first }, ctx) => {
       ctx.limit("search");
       return lexicon.lexicalSearch(ctx.db, (await ctx.site()).id, query, first);
@@ -37,6 +49,7 @@ export const lexiconResolvers: Resolvers = {
         ...input,
         examples: input.examples ?? [],
         pronunciations: input.pronunciations ?? [],
+        translations: input.translations ?? [],
       });
       return editorialSense(ctx, senseId);
     },
@@ -62,6 +75,7 @@ export const lexiconResolvers: Resolvers = {
     register: (s) => s.revision.register,
     examples: (s, _, ctx) => ctx.loaders.examplesBySenseRevision.load(s.revision.id),
     pronunciations: (s, _, ctx) => ctx.loaders.pronunciationsBySenseRevision.load(s.revision.id),
+    translations: (s, _, ctx) => ctx.loaders.translationsBySenseRevision.load(s.revision.id),
     entry: async (s, _, ctx) => present(await ctx.loaders.entry.load(s.sense.entryId), "entry"),
   },
   EditorialSense: {

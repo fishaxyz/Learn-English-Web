@@ -84,6 +84,8 @@ export type ManageSense = {
   register?: string | null;
   examples: { sentence: string; explanation?: string | null }[];
   pronunciations: { accent: string; ipa: string }[];
+  /** The meaning in learners' languages, e.g. { locale: "vi", text: "quãng đường đi làm" }. */
+  translations?: { locale: string; text: string }[];
   lockVersion?: number | null;
 };
 
@@ -98,6 +100,16 @@ function check(input: ManageSense) {
   if (input.examples.some((e) => !e.sentence.trim() || e.sentence.length > 500))
     throw invalid("Examples are 1 to 500 characters");
   if (input.pronunciations.length > 6) throw invalid("At most 6 pronunciations");
+  const translations = input.translations ?? [];
+  if (translations.length > 20) throw invalid("At most 20 translations");
+  const locales = new Set<string>();
+  for (const t of translations) {
+    if (!/^[a-z]{2,3}(-[A-Z]{2})?$/.test(t.locale)) throw invalid("Translation languages look like vi, es or pt-BR");
+    if (t.locale === "en") throw invalid("English is the definition; translations are for other languages");
+    if (locales.has(t.locale)) throw invalid(`Two translations for ${t.locale}`);
+    locales.add(t.locale);
+    if (!t.text.trim() || t.text.length > 500) throw invalid("Translations are 1 to 500 characters");
+  }
   for (const p of input.pronunciations) {
     if (!/^[a-z]{2}-[A-Z]{2}$/.test(p.accent)) throw invalid("Accents look like en-GB or en-US");
     if (!p.ipa.trim() || p.ipa.length > 100) throw invalid("IPA is 1 to 100 characters");
@@ -107,6 +119,13 @@ function check(input: ManageSense) {
 async function writeParts(tx: Tx, siteId: string, revisionId: string, input: ManageSense) {
   await tx.delete(schema.lexicalExamples).where(eq(schema.lexicalExamples.senseRevisionId, revisionId));
   await tx.delete(schema.lexicalPronunciations).where(eq(schema.lexicalPronunciations.senseRevisionId, revisionId));
+  await tx.delete(schema.lexicalGlosses).where(eq(schema.lexicalGlosses.senseRevisionId, revisionId));
+  const translations = input.translations ?? [];
+  if (translations.length) {
+    await tx
+      .insert(schema.lexicalGlosses)
+      .values(translations.map((t) => ({ senseRevisionId: revisionId, locale: t.locale, text: t.text.trim() })));
+  }
   if (input.examples.length) {
     await tx.insert(schema.lexicalExamples).values(
       input.examples.map((e, position) => ({
@@ -154,7 +173,7 @@ export async function manageLexicalSense(
           } else {
             if (!input.headword?.trim() || !input.kind)
               throw invalid("A new sense needs an entry, or a headword and kind");
-            if (input.headword.length > 100) throw invalid("Headwords are at most 100 characters");
+            if (input.headword.length > 120) throw invalid("Headwords and patterns are at most 120 characters");
             const entry = one(
               await tx
                 .insert(entries)
@@ -294,4 +313,18 @@ export async function publishLexicalSense(
 export async function siteOfSense(db: Database, senseId: string): Promise<string | null> {
   const [row] = await db.select({ siteId: senses.siteId }).from(senses).where(eq(senses.id, senseId)).limit(1);
   return row?.siteId ?? null;
+}
+
+/** A site's senses for the dashboard's word bank, drafts included: by headword, optionally filtered. */
+export async function editorialSenses(db: Database, siteId: string, query: string | null | undefined, first: number) {
+  const q = normalizeHeadword(query ?? "").slice(0, 100);
+  const contains = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  return db
+    .select({ sense: senses })
+    .from(senses)
+    .innerJoin(entries, eq(entries.id, senses.entryId))
+    .where(and(eq(senses.siteId, siteId), q ? sql`${entries.normalizedHeadword} like ${contains}` : undefined))
+    .orderBy(asc(entries.normalizedHeadword), asc(senses.senseKey))
+    .limit(Math.min(Math.max(first, 1), 200))
+    .then((rows) => rows.map((r) => r.sense));
 }

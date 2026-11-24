@@ -200,8 +200,8 @@ export async function startDraft(db: Database, actorUserId: string | null, local
         insert into collection_items (site_id, revision_id, sense_revision_id, position)
           select site_id, ${d.id}, sense_revision_id, position from collection_items where revision_id = ${p.id}`);
       await tx.execute(sql`
-        insert into lexical_annotations (site_id, revision_id, block_id, start, "end", surface_text, sense_revision_id)
-          select site_id, ${d.id}, block_id, start, "end", surface_text, sense_revision_id
+        insert into lexical_annotations (site_id, revision_id, block_id, start, "end", surface_text, sense_revision_id, is_key)
+          select site_id, ${d.id}, block_id, start, "end", surface_text, sense_revision_id, is_key
           from lexical_annotations where revision_id = ${p.id}`);
       await copyExerciseSets(tx, p.siteId, p.id, d.id);
       await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));

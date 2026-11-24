@@ -28,3 +28,7 @@ export type EditorialSenseModel = Row<typeof schema.lexicalSenses>;
 export type ViewerModel = Row<typeof schema.users>;
 export type SiteRoleValue = (typeof schema.siteRole.enumValues)[number];
 export type MembershipModel = { siteId: string; role: SiteRoleValue };
+
+export type TextOccurrence = { blockId: string; start: number; end: number; text: string; sentence: string };
+/** One word or structure a text links to, as learners choose it. */
+export type VocabularyItemModel = { sense: LexicalSenseModel; isKey: boolean; occurrences: TextOccurrence[] };

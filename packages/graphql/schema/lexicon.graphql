@@ -4,6 +4,40 @@ enum LexicalEntryKind {
   COLLOCATION
   IDIOM
   PHRASAL_VERB
+  "A grammar or sentence pattern, e.g. \"If I were you, I'd + verb\". Learners add it whole."
+  SENTENCE_PATTERN
+}
+
+"The meaning in another language."
+type Translation {
+  "BCP 47 language, e.g. vi or pt-BR."
+  locale: String!
+  text: String!
+}
+
+input TranslationInput {
+  locale: String!
+  text: String!
+}
+
+"Where a vocabulary item appears in a text: a span of one block, and the sentence around it."
+type TextOccurrence {
+  blockId: String!
+  "Unicode code-point offsets into the block's text."
+  start: Int!
+  end: Int!
+  text: String!
+  sentence: String!
+}
+
+"""
+A word or structure a text links to, as learners choose it: the exact sense revision the text pinned, whether the
+editor marked it a key word, and every place it appears (a split pattern has several).
+"""
+type VocabularyItem {
+  sense: LexicalSense!
+  isKey: Boolean!
+  occurrences: [TextOccurrence!]!
 }
 
 type LexicalExample {
@@ -29,6 +63,7 @@ type LexicalSense {
   register: String
   examples: [LexicalExample!]!
   pronunciations: [Pronunciation!]!
+  translations: [Translation!]!
   entry: LexicalEntry!
 }
 
@@ -60,6 +95,8 @@ type SenseRevision {
   lockVersion: Int!
   examples: [LexicalExample!]!
   pronunciations: [Pronunciation!]!
+  translations: [Translation!]!
+  publishedAt: DateTime
 }
 
 type EditorialSense {
@@ -101,8 +138,16 @@ input ManageLexicalSenseInput {
   register: String
   examples: [LexicalExampleInput!]! = []
   pronunciations: [PronunciationInput!]! = []
+  translations: [TranslationInput!]! = []
   "Required when editing an existing draft."
   lockVersion: Int
+}
+
+extend type Query {
+  "Editorial: the site's word bank, drafts included, optionally filtered by headword (at most 200)."
+  editorialSenses(siteId: ID!, query: String, first: Int! = 100): [EditorialSense!]!
+  "Editorial: one sense with its draft and published revisions."
+  editorialSense(id: ID!): EditorialSense
 }
 
 extend type Mutation {

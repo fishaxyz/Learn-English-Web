@@ -58,6 +58,8 @@ type ReadingResource implements Resource {
   exerciseSets: [ExerciseSet!]!
   "The word senses the text links to (its `lexical` marks), at the exact revisions it pinned."
   vocabulary: [LexicalSense!]!
+  "The same links as learners choose them: one item per word or structure, with key flags and sentences."
+  vocabularyItems: [VocabularyItem!]!
   wordCount: Int!
   "At about 200 words a minute."
   estimatedReadingSeconds: Int!
@@ -154,6 +156,7 @@ type Revision {
   topics: [Topic!]!
   "The linked word senses, as in the text."
   vocabulary: [LexicalSense!]!
+  vocabularyItems: [VocabularyItem!]!
   "The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only."
   exercises: ExercisePayload!
   "Pass this back when you change the revision; a mismatch means someone else changed it first."

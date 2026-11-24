@@ -4,25 +4,35 @@ import type { ExerciseSetInput } from "../modules/assessment/schemas";
 import type { RichTextDocument } from "../modules/rich-text";
 
 let block = 0;
-type TextNode = { type: "text"; text: string; marks?: { type: "lexical"; attrs: { senseRevisionId: string } }[] };
+type TextNode = {
+  type: "text";
+  text: string;
+  marks?: { type: "lexical"; attrs: { senseRevisionId: string; key?: boolean } }[];
+};
 
 /**
- * A paragraph from a string. `{{word|sense-key}}` links a word to a sense; until the senses exist, the mark
+ * A paragraph from a string. `{{word|sense-key}}` links a word to a sense, and `{{word|sense-key|key}}` also marks
+ * it a key word; until the senses exist, the mark
  * carries the key, and `linkSenses` swaps in the sense revision id.
  */
 const p = (text: string) => ({
-  type: "paragraph" as const,
+  type: "paragraph",
   attrs: { id: `blk-${++block}` },
   content: text
     .split(/(\{\{[^}]+\}\})/)
     .filter(Boolean)
     .map((part): TextNode => {
-      const link = part.match(/^\{\{([^|]+)\|([^}]+)\}\}$/);
+      const link = part.match(/^\{\{([^|]+)\|([^|}]+)(\|key)?\}\}$/);
       return link
         ? {
             type: "text",
             text: link[1] ?? "",
-            marks: [{ type: "lexical", attrs: { senseRevisionId: `key:${link[2]}` } }],
+            marks: [
+              {
+                type: "lexical",
+                attrs: { senseRevisionId: `key:${link[2]}`, ...(link[3] ? { key: true } : {}) },
+              },
+            ],
           }
         : { type: "text", text: part };
     }),
@@ -48,15 +58,31 @@ export const TOPICS = [
 
 export const EXAM_LABELS = [{ code: "IELTS", name: "IELTS" }];
 
-export const SENSES = [
+type SeedSense = {
+  key: string;
+  headword: string;
+  kind: "WORD" | "PHRASE" | "COLLOCATION" | "IDIOM" | "PHRASAL_VERB" | "SENTENCE_PATTERN";
+  partOfSpeech: string;
+  definition: string;
+  cefrLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  usageNote?: string;
+  register?: string;
+  examples: { sentence: string }[];
+  pronunciations: { accent: string; ipa: string }[];
+  /** Sample translations, written for this project; editors should review them. */
+  translations?: { locale: string; text: string }[];
+};
+
+export const SENSES: SeedSense[] = [
   {
     key: "commute-noun",
     headword: "commute",
-    kind: "WORD" as const,
+    kind: "WORD",
     partOfSpeech: "noun",
     definition: "the journey you make regularly between your home and your place of work or study",
-    cefrLevel: "B1" as const,
+    cefrLevel: "B1",
     examples: [{ sentence: "My commute takes about forty minutes by train." }],
+    translations: [{ locale: "vi", text: "quãng đường đi làm (hoặc đi học) hằng ngày" }],
     pronunciations: [
       { accent: "en-GB", ipa: "/kəˈmjuːt/" },
       { accent: "en-US", ipa: "/kəˈmjuːt/" },
@@ -65,11 +91,12 @@ export const SENSES = [
   {
     key: "bank-noun-money",
     headword: "bank",
-    kind: "WORD" as const,
+    kind: "WORD",
     partOfSpeech: "noun",
     definition: "an organization where people keep their money and that lends money to people and businesses",
-    cefrLevel: "A2" as const,
+    cefrLevel: "A2",
     examples: [{ sentence: "I need to go to the bank before it closes." }],
+    translations: [{ locale: "vi", text: "ngân hàng" }],
     pronunciations: [
       { accent: "en-GB", ipa: "/bæŋk/" },
       { accent: "en-US", ipa: "/bæŋk/" },
@@ -78,36 +105,52 @@ export const SENSES = [
   {
     key: "bank-noun-river",
     headword: "bank",
-    kind: "WORD" as const,
+    kind: "WORD",
     partOfSpeech: "noun",
     definition: "the land along the side of a river",
-    cefrLevel: "B1" as const,
+    cefrLevel: "B1",
     usageNote: "Usually in phrases like the river bank or on the banks of the river.",
     examples: [{ sentence: "We had a picnic on the bank of the river." }],
+    translations: [{ locale: "vi", text: "bờ sông" }],
     pronunciations: [{ accent: "en-GB", ipa: "/bæŋk/" }],
   },
   {
     key: "rush-hour-noun",
     headword: "rush hour",
-    kind: "COLLOCATION" as const,
+    kind: "COLLOCATION",
     partOfSpeech: "noun",
     definition: "the busy times of day when most people are travelling to or from work",
-    cefrLevel: "B1" as const,
+    cefrLevel: "B1",
     examples: [{ sentence: "The trains are always full during rush hour." }],
+    translations: [{ locale: "vi", text: "giờ cao điểm" }],
     pronunciations: [{ accent: "en-GB", ipa: "/ˈrʌʃ ˌaʊə/" }],
   },
   {
     key: "run-late",
     headword: "run late",
-    kind: "PHRASE" as const,
+    kind: "PHRASE",
     partOfSpeech: "verb phrase",
     definition: "to be later than you planned or than you should be",
-    cefrLevel: "B1" as const,
+    cefrLevel: "B1",
     register: "informal",
     examples: [{ sentence: "Sorry, I'm running late – the bus didn't come." }],
+    translations: [{ locale: "vi", text: "bị trễ, đến muộn hơn dự định" }],
     pronunciations: [],
   },
 ];
+
+/** A sentence pattern: learners add it whole (`SENTENCE_PATTERN`). */
+SENSES.push({
+  key: "like-verb-ing",
+  headword: "like + verb-ing",
+  kind: "SENTENCE_PATTERN",
+  partOfSpeech: "pattern",
+  definition: "to enjoy doing something, often as a habit: like (or love, hate, don't mind) + the -ing form of a verb",
+  cefrLevel: "A2" as const,
+  examples: [{ sentence: "I like reading on the train." }, { sentence: "He doesn't like getting up early." }],
+  translations: [{ locale: "vi", text: "thích làm gì (sở thích, thói quen)" }],
+  pronunciations: [],
+});
 
 export const READING = {
   slug: "a-morning-commute",
@@ -116,8 +159,8 @@ export const READING = {
   cefrLevel: "A2" as const,
   topicSlugs: ["daily-life", "travel"],
   body: doc(
-    "Mia lives in a small town and works in the city. Every morning she leaves her flat at seven o'clock and walks to the station. Her {{commute|commute-noun}} takes about forty minutes.",
-    "She usually reads a book on the train. During {{rush hour|rush-hour-noun}} the train is very busy, so she often has to stand. She doesn't mind, because she likes watching the fields and the {{bank|bank-noun-river}} of the river from the window.",
+    "Mia lives in a small town and works in the city. Every morning she leaves her flat at seven o'clock and walks to the station. Her {{commute|commute-noun|key}} takes about forty minutes.",
+    "She usually reads a book on the train. During {{rush hour|rush-hour-noun|key}} the train is very busy, so she often has to stand. She doesn't mind, because she {{likes watching|like-verb-ing}} the fields and the {{bank|bank-noun-river}} of the river from the window.",
     'This morning, the train stopped between two stations. Nobody knew why. After twenty minutes it started again, and Mia arrived at the office late for the first time this year. Her manager just smiled and said, "Trains!"'
   ),
   exercises: [
@@ -148,7 +191,7 @@ export const READING = {
           prompt: { stem: "Why does Mia often stand on the train?" },
           options: ["She likes standing.", "The train is very busy.", "There are no seats on her train."],
           grading: { type: "SINGLE_CHOICE", correctOption: 1 },
-          explanation: "During {{rush hour|rush-hour-noun}} the train is very busy.",
+          explanation: "During {{rush hour|rush-hour-noun|key}} the train is very busy.",
         },
         {
           type: "GAP_FILL",

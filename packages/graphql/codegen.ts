@@ -47,6 +47,7 @@ const config: CodegenConfig = {
           LexicalSense: "../models#LexicalSenseModel",
           EditorialSense: "../models#EditorialSenseModel",
           SenseRevision: "../models#SenseRevisionModel",
+          VocabularyItem: "../models#VocabularyItemModel",
           Viewer: "../models#ViewerModel",
           Membership: "../models#MembershipModel",
         },

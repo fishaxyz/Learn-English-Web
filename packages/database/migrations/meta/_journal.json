@@ -36,6 +36,13 @@
       "when": 1795532322956,
       "tag": "0004_annotations_frozen",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795539701157,
+      "tag": "0005_vocabulary_learning",
+      "breakpoints": true
     }
   ]
 }

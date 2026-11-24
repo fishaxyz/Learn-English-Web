@@ -191,6 +191,34 @@ export function createLoaders(db: Database) {
       (r) => r.revisionId
     ),
 
+    sense: single<string, LexicalSenseModel["sense"]>(
+      (ids) =>
+        db
+          .select()
+          .from(s.lexicalSenses)
+          .where(inArray(s.lexicalSenses.id, [...ids])),
+      (r) => r.id
+    ),
+
+    annotationsByRevision: grouped<string, typeof s.lexicalAnnotations.$inferSelect>(
+      (ids) =>
+        db
+          .select()
+          .from(s.lexicalAnnotations)
+          .where(inArray(s.lexicalAnnotations.revisionId, [...ids])),
+      (r) => r.revisionId
+    ),
+
+    translationsBySenseRevision: grouped<string, typeof s.lexicalGlosses.$inferSelect>(
+      (ids) =>
+        db
+          .select()
+          .from(s.lexicalGlosses)
+          .where(inArray(s.lexicalGlosses.senseRevisionId, [...ids]))
+          .orderBy(asc(s.lexicalGlosses.locale)),
+      (r) => r.senseRevisionId
+    ),
+
     senseRevision: single<string, LexicalSenseModel["revision"]>(
       (ids) =>
         db

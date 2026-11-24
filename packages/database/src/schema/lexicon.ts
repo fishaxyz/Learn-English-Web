@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -220,6 +221,8 @@ export const lexicalAnnotations = pgTable(
     end: integer().notNull(),
     surfaceText: text().notNull(),
     senseRevisionId: uuid().notNull(),
+    /** The editor marked this item as a key word of the text: suggested to learners first. */
+    isKey: boolean().notNull().default(false),
   },
   (t) => [
     foreignKey({
