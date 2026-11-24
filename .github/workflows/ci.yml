@@ -69,7 +69,7 @@ jobs:
     needs: [typescript, python]
     steps:
       - uses: actions/checkout@v7
-      - run: cp .env.example .env
+      - run: cp .env.example .env && echo "REVALIDATION_SECRET=$(openssl rand -base64 32)" >> .env
       - name: Start every service and wait until all are healthy
         run: docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait --wait-timeout 300
       - name: Load the sample content

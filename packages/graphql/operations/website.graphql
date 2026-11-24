@@ -1,0 +1,64 @@
+fragment LessonCard on Resource {
+  __typename
+  id
+  kind
+  slug
+  title
+  summary
+  cefrLevel
+  publishedAt
+  topics {
+    slug
+    name
+  }
+  ... on ReadingResource {
+    estimatedReadingSeconds
+  }
+}
+
+query LessonList($filter: ResourceFilter, $first: Int!, $after: String) {
+  publishedResources(filter: $filter, first: $first, after: $after) {
+    nodes {
+      ...LessonCard
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}
+
+query ReadingLesson($slug: String!) {
+  resourceBySlug(kind: READING, slug: $slug) {
+    ...LessonCard
+    body
+    revisionNo
+    examLabels {
+      code
+      name
+    }
+    exerciseSets {
+      ...ExerciseSetView
+    }
+    ... on ReadingResource {
+      wordCount
+      vocabulary {
+        ...SenseCard
+      }
+    }
+  }
+}
+
+query SiteTopics {
+  topics {
+    slug
+    name
+    description
+  }
+}
+
+mutation GradePractice($input: GradePracticeInput!) {
+  gradePractice(input: $input) {
+    ...PracticeResultView
+  }
+}

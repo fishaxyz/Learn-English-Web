@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { typeDefs } from "@english/graphql";
+// Only the schema text: the API doesn't need the clients' typed documents or urql.
+import { typeDefs } from "@english/graphql/typedefs";
 import { createSchema, createYoga, maskError } from "graphql-yoga";
 import { resolveActor, type Actor } from "./auth/actor";
 import type { ApiDependencies, GraphQLContext } from "./context";

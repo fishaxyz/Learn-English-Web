@@ -9,10 +9,11 @@ const config: CodegenConfig = {
   schema: "schema/**/*.graphql",
   overwrite: true,
   generates: {
-    // Shared types for any client (website, dashboard).
-    "src/generated/schema-types.ts": {
-      plugins: ["typescript"],
-      config: { enumsAsTypes: true, scalars: clientScalars, useTypeImports: true },
+    // One typed document per operation, with the enum and input types they use, in operations/ (website, dashboard).
+    "src/generated/graphql.ts": {
+      documents: "operations/**/*.graphql",
+      plugins: ["typescript-operations", "typed-document-node"],
+      config: { enumsAsTypes: true, scalars: clientScalars, useTypeImports: true, dedupeFragments: true },
     },
     // Resolver signatures for the API, typed against its own request context.
     "../../apps/api/src/generated/resolvers.ts": {

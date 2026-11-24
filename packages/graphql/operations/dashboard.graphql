@@ -1,0 +1,158 @@
+query Viewer {
+  viewer {
+    id
+    email
+    name
+    memberships {
+      role
+      site {
+        id
+        domain
+        name
+      }
+    }
+  }
+}
+
+fragment RevisionFields on Revision {
+  id
+  revisionNo
+  status
+  title
+  summary
+  cefrLevel
+  body
+  lockVersion
+  updatedAt
+  submittedAt
+  publishedAt
+  topics {
+    slug
+    name
+  }
+}
+
+fragment EditorialSummary on EditorialResource {
+  id
+  kind
+  createdAt
+  archivedAt
+  localizations {
+    id
+    locale
+    slug
+    draft {
+      id
+      status
+      title
+      updatedAt
+      lockVersion
+    }
+    published {
+      id
+      title
+      revisionNo
+      publishedAt
+    }
+  }
+}
+
+query EditorialList($siteId: ID!) {
+  editorialResources(siteId: $siteId) {
+    ...EditorialSummary
+  }
+}
+
+query EditorialLesson($id: ID!) {
+  editorialResource(id: $id) {
+    id
+    kind
+    archivedAt
+    site {
+      id
+      domain
+      name
+    }
+    localizations {
+      id
+      locale
+      slug
+      draft {
+        ...RevisionFields
+        exercises
+        vocabulary {
+          ...SenseCard
+        }
+      }
+      published {
+        ...RevisionFields
+      }
+    }
+  }
+}
+
+query EditorTopics {
+  topics {
+    slug
+    name
+  }
+}
+
+query SenseSearch($query: String!) {
+  lexicalSearch(query: $query, first: 10) {
+    id
+    displayForm
+    kind
+    senses {
+      ...SenseCard
+    }
+  }
+}
+
+mutation CreateResource($input: CreateResourceInput!) {
+  createResource(input: $input) {
+    id
+  }
+}
+
+mutation StartDraft($localizationId: ID!) {
+  startDraft(localizationId: $localizationId) {
+    id
+  }
+}
+
+mutation UpdateDraft($input: UpdateDraftInput!) {
+  updateDraft(input: $input) {
+    id
+  }
+}
+
+mutation SaveExerciseSets($localizationId: ID!, $lockVersion: Int!, $sets: ExercisePayload!) {
+  saveExerciseSets(localizationId: $localizationId, lockVersion: $lockVersion, sets: $sets) {
+    id
+  }
+}
+
+mutation SubmitForReview($localizationId: ID!, $lockVersion: Int!) {
+  submitForReview(localizationId: $localizationId, lockVersion: $lockVersion) {
+    id
+  }
+}
+
+mutation ReturnToDraft($localizationId: ID!, $lockVersion: Int!, $note: String) {
+  returnToDraft(localizationId: $localizationId, lockVersion: $lockVersion, note: $note) {
+    id
+  }
+}
+
+mutation PublishResource($localizationId: ID!, $lockVersion: Int!) {
+  publishResource(localizationId: $localizationId, lockVersion: $lockVersion) {
+    id
+  }
+}
+
+mutation ArchiveResource($resourceId: ID!) {
+  archiveResource(resourceId: $resourceId) {
+    id
+  }
+}

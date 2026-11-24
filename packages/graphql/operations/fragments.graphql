@@ -1,0 +1,85 @@
+# Shared by the website and the dashboard.
+
+fragment SenseCard on LexicalSense {
+  id
+  revisionId
+  senseKey
+  partOfSpeech
+  definition
+  cefrLevel
+  usageNote
+  register
+  examples {
+    sentence
+  }
+  pronunciations {
+    accent
+    ipa
+  }
+  entry {
+    id
+    displayForm
+    kind
+  }
+}
+
+fragment ExerciseSetView on ExerciseSet {
+  id
+  title
+  instructions
+  questions {
+    __typename
+    id
+    position
+    points
+    ... on SingleChoiceQuestion {
+      stem
+      options {
+        id
+        content
+      }
+    }
+    ... on TrueFalseNotGivenQuestion {
+      statement
+    }
+    ... on GapFillQuestion {
+      segments {
+        __typename
+        ... on TextSegment {
+          text
+        }
+        ... on GapSegment {
+          gapId
+        }
+      }
+    }
+  }
+}
+
+fragment PracticeResultView on PracticeResult {
+  exerciseSetId
+  score
+  maxScore
+  questions {
+    questionId
+    correct
+    awardedPoints
+    maxPoints
+    explanation
+    correctAnswer {
+      __typename
+      ... on ChoiceAnswer {
+        optionId
+      }
+      ... on JudgementAnswer {
+        judgement
+      }
+      ... on GapsAnswer {
+        gaps {
+          gapId
+          text
+        }
+      }
+    }
+  }
+}

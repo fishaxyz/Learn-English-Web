@@ -4,12 +4,41 @@ import type { ExerciseSetInput } from "../modules/assessment/schemas";
 import type { RichTextDocument } from "../modules/rich-text";
 
 let block = 0;
+type TextNode = { type: "text"; text: string; marks?: { type: "lexical"; attrs: { senseRevisionId: string } }[] };
+
+/**
+ * A paragraph from a string. `{{word|sense-key}}` links a word to a sense; until the senses exist, the mark
+ * carries the key, and `linkSenses` swaps in the sense revision id.
+ */
 const p = (text: string) => ({
   type: "paragraph" as const,
   attrs: { id: `blk-${++block}` },
-  content: [{ type: "text" as const, text }],
+  content: text
+    .split(/(\{\{[^}]+\}\})/)
+    .filter(Boolean)
+    .map((part): TextNode => {
+      const link = part.match(/^\{\{([^|]+)\|([^}]+)\}\}$/);
+      return link
+        ? {
+            type: "text",
+            text: link[1] ?? "",
+            marks: [{ type: "lexical", attrs: { senseRevisionId: `key:${link[2]}` } }],
+          }
+        : { type: "text", text: part };
+    }),
 });
 export const doc = (...paragraphs: string[]): RichTextDocument => ({ type: "doc", content: paragraphs.map(p) });
+
+/** Replaces `key:<sense-key>` placeholders with the senses' published revision ids. */
+export function linkSenses(document: RichTextDocument, revisions: Map<string, string>): RichTextDocument {
+  return JSON.parse(
+    JSON.stringify(document).replace(/"key:([a-z0-9-]+)"/g, (_, key: string) => {
+      const id = revisions.get(key);
+      if (!id) throw new Error(`Seed text links to an unknown sense: ${key}`);
+      return JSON.stringify(id);
+    })
+  ) as RichTextDocument;
+}
 
 export const TOPICS = [
   { slug: "daily-life", name: "Daily life", description: "Everyday routines, home and free time." },
@@ -87,8 +116,8 @@ export const READING = {
   cefrLevel: "A2" as const,
   topicSlugs: ["daily-life", "travel"],
   body: doc(
-    "Mia lives in a small town and works in the city. Every morning she leaves her flat at seven o'clock and walks to the station. Her commute takes about forty minutes.",
-    "She usually reads a book on the train. During rush hour the train is very busy, so she often has to stand. She doesn't mind, because she likes watching the fields and the river from the window.",
+    "Mia lives in a small town and works in the city. Every morning she leaves her flat at seven o'clock and walks to the station. Her {{commute|commute-noun}} takes about forty minutes.",
+    "She usually reads a book on the train. During {{rush hour|rush-hour-noun}} the train is very busy, so she often has to stand. She doesn't mind, because she likes watching the fields and the {{bank|bank-noun-river}} of the river from the window.",
     'This morning, the train stopped between two stations. Nobody knew why. After twenty minutes it started again, and Mia arrived at the office late for the first time this year. Her manager just smiled and said, "Trains!"'
   ),
   exercises: [
@@ -119,7 +148,7 @@ export const READING = {
           prompt: { stem: "Why does Mia often stand on the train?" },
           options: ["She likes standing.", "The train is very busy.", "There are no seats on her train."],
           grading: { type: "SINGLE_CHOICE", correctOption: 1 },
-          explanation: "During rush hour the train is very busy.",
+          explanation: "During {{rush hour|rush-hour-noun}} the train is very busy.",
         },
         {
           type: "GAP_FILL",
@@ -139,7 +168,7 @@ export const LISTENING = {
   topicSlugs: ["daily-life", "work"],
   body: doc(
     "Ana: Hi Sam, where are you? The meeting starts in five minutes.",
-    "Sam: I'm so sorry, I'm running late. My bus didn't come, so I'm walking.",
+    "Sam: I'm so sorry, I'm {{running late|run-late}}. My bus didn't come, so I'm walking.",
     "Ana: Don't worry. How long will you be?",
     "Sam: About fifteen minutes, I think. Can you start without me?",
     "Ana: Sure. I'll send you the notes after the meeting."

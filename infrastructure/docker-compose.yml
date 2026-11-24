@@ -43,6 +43,10 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_JSON: "1"
       DEFAULT_SITE_DOMAIN: ${DEFAULT_SITE_DOMAIN:-localhost}
+      # Requests reach the API through the website's server, which passes the visitor's address on.
+      TRUST_PROXY: "true"
+      REVALIDATION_URLS: http://website:3400/api/revalidate
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET:?set REVALIDATION_SECRET in .env}
     ports:
       - "127.0.0.1:4400:4400"
     depends_on:
@@ -58,6 +62,9 @@ services:
     environment:
       GRAPHQL_API_URL: http://api:4400
       PORT: "3400"
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      SITE_URL: ${SITE_URL:-http://localhost:3400}
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET:?set REVALIDATION_SECRET in .env}
     ports:
       - "127.0.0.1:3400:3400"
     depends_on:

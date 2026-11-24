@@ -23,7 +23,10 @@ const schema = z.object({
         .map((s) => s.trim())
         .filter(Boolean)
     ),
-  REVALIDATION_SECRET: z.string().min(32, "must be at least 32 characters").optional(),
+  REVALIDATION_SECRET: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(32, "must be at least 32 characters").optional()
+  ),
   /** Browser origins allowed to call the API, comma-separated. Server-to-server calls don't need it. */
   CORS_ORIGINS: z
     .string()

@@ -1,0 +1,319 @@
+/** Internal type. DO NOT USE DIRECTLY. */
+type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
+/** Internal type. DO NOT USE DIRECTLY. */
+export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
+/** CEFR levels. An editorial estimate of a lesson's difficulty, not a guarantee of a learner's level. */
+export type CefrLevel =
+  | 'A1'
+  | 'A2'
+  | 'B1'
+  | 'B2'
+  | 'C1'
+  | 'C2';
+
+export type CreateResourceInput = {
+  body?: unknown;
+  cefrLevel?: CefrLevel | null | undefined;
+  kind: ResourceKind;
+  locale?: string;
+  siteId: string;
+  slug: string;
+  summary?: string | null | undefined;
+  title: string;
+  topicSlugs?: Array<string> | null | undefined;
+};
+
+export type GapAnswerInput = {
+  gapId: string;
+  text: string;
+};
+
+export type GradePracticeInput = {
+  /** At most 100. */
+  answers: Array<PracticeAnswerInput>;
+  exerciseSetId: string;
+};
+
+export type Judgement =
+  | 'FALSE'
+  | 'NOT_GIVEN'
+  | 'TRUE';
+
+export type LexicalEntryKind =
+  | 'COLLOCATION'
+  | 'IDIOM'
+  | 'PHRASAL_VERB'
+  | 'PHRASE'
+  | 'WORD';
+
+/** One answer: optionId for single choice, judgement for true/false/not given, gaps for gap fill. */
+export type PracticeAnswerInput = {
+  gaps?: Array<GapAnswerInput> | null | undefined;
+  judgement?: Judgement | null | undefined;
+  optionId?: string | null | undefined;
+  questionId: string;
+};
+
+export type ResourceFilter = {
+  cefrLevel?: CefrLevel | null | undefined;
+  kind?: ResourceKind | null | undefined;
+  /** Defaults to the site's default locale. */
+  locale?: string | null | undefined;
+  /** Full-text search in titles, summaries and text. */
+  search?: string | null | undefined;
+  topicSlug?: string | null | undefined;
+};
+
+export type ResourceKind =
+  | 'ARTICLE'
+  | 'LEXICAL_COLLECTION'
+  | 'LISTENING'
+  | 'READING';
+
+export type RevisionStatus =
+  | 'DRAFT'
+  | 'IN_REVIEW'
+  | 'PUBLISHED'
+  | 'SUPERSEDED';
+
+export type SiteRole =
+  | 'ADMIN'
+  | 'EDITOR'
+  | 'OWNER'
+  | 'REVIEWER'
+  | 'VIEWER';
+
+export type UpdateDraftInput = {
+  body?: unknown;
+  cefrLevel?: CefrLevel | null | undefined;
+  localizationId: string;
+  lockVersion: number;
+  summary?: string | null | undefined;
+  title?: string | null | undefined;
+  /** Replaces the draft's topics. */
+  topicSlugs?: Array<string> | null | undefined;
+};
+
+export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ViewerQuery = { viewer: { id: string, email: string, name: string | null, memberships: Array<{ role: SiteRole, site: { id: string, domain: string, name: string } }> } | null };
+
+export type RevisionFieldsFragment = { id: string, revisionNo: number, status: RevisionStatus, title: string, summary: string | null, cefrLevel: CefrLevel | null, body: unknown, lockVersion: number, updatedAt: string, submittedAt: string | null, publishedAt: string | null, topics: Array<{ slug: string, name: string }> };
+
+export type EditorialSummaryFragment = { id: string, kind: ResourceKind, createdAt: string, archivedAt: string | null, localizations: Array<{ id: string, locale: string, slug: string, draft: { id: string, status: RevisionStatus, title: string, updatedAt: string, lockVersion: number } | null, published: { id: string, title: string, revisionNo: number, publishedAt: string | null } | null }> };
+
+export type EditorialListQueryVariables = Exact<{
+  siteId: string;
+}>;
+
+
+export type EditorialListQuery = { editorialResources: Array<{ id: string, kind: ResourceKind, createdAt: string, archivedAt: string | null, localizations: Array<{ id: string, locale: string, slug: string, draft: { id: string, status: RevisionStatus, title: string, updatedAt: string, lockVersion: number } | null, published: { id: string, title: string, revisionNo: number, publishedAt: string | null } | null }> }> };
+
+export type EditorialLessonQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type EditorialLessonQuery = { editorialResource: { id: string, kind: ResourceKind, archivedAt: string | null, site: { id: string, domain: string, name: string }, localizations: Array<{ id: string, locale: string, slug: string, draft: { exercises: unknown, id: string, revisionNo: number, status: RevisionStatus, title: string, summary: string | null, cefrLevel: CefrLevel | null, body: unknown, lockVersion: number, updatedAt: string, submittedAt: string | null, publishedAt: string | null, vocabulary: Array<{ id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }>, topics: Array<{ slug: string, name: string }> } | null, published: { id: string, revisionNo: number, status: RevisionStatus, title: string, summary: string | null, cefrLevel: CefrLevel | null, body: unknown, lockVersion: number, updatedAt: string, submittedAt: string | null, publishedAt: string | null, topics: Array<{ slug: string, name: string }> } | null }> } | null };
+
+export type EditorTopicsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EditorTopicsQuery = { topics: Array<{ slug: string, name: string }> };
+
+export type SenseSearchQueryVariables = Exact<{
+  query: string;
+}>;
+
+
+export type SenseSearchQuery = { lexicalSearch: Array<{ id: string, displayForm: string, kind: LexicalEntryKind, senses: Array<{ id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }> }> };
+
+export type CreateResourceMutationVariables = Exact<{
+  input: CreateResourceInput;
+}>;
+
+
+export type CreateResourceMutation = { createResource: { id: string } };
+
+export type StartDraftMutationVariables = Exact<{
+  localizationId: string;
+}>;
+
+
+export type StartDraftMutation = { startDraft: { id: string } };
+
+export type UpdateDraftMutationVariables = Exact<{
+  input: UpdateDraftInput;
+}>;
+
+
+export type UpdateDraftMutation = { updateDraft: { id: string } };
+
+export type SaveExerciseSetsMutationVariables = Exact<{
+  localizationId: string;
+  lockVersion: number;
+  sets: unknown;
+}>;
+
+
+export type SaveExerciseSetsMutation = { saveExerciseSets: { id: string } };
+
+export type SubmitForReviewMutationVariables = Exact<{
+  localizationId: string;
+  lockVersion: number;
+}>;
+
+
+export type SubmitForReviewMutation = { submitForReview: { id: string } };
+
+export type ReturnToDraftMutationVariables = Exact<{
+  localizationId: string;
+  lockVersion: number;
+  note?: string | null | undefined;
+}>;
+
+
+export type ReturnToDraftMutation = { returnToDraft: { id: string } };
+
+export type PublishResourceMutationVariables = Exact<{
+  localizationId: string;
+  lockVersion: number;
+}>;
+
+
+export type PublishResourceMutation = { publishResource: { id: string } };
+
+export type ArchiveResourceMutationVariables = Exact<{
+  resourceId: string;
+}>;
+
+
+export type ArchiveResourceMutation = { archiveResource: { id: string } };
+
+export type SenseCardFragment = { id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } };
+
+export type ExerciseSetViewFragment = { id: string, title: string, instructions: string | null, questions: Array<
+    | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
+        | { __typename: 'GapSegment', gapId: string }
+        | { __typename: 'TextSegment', text: string }
+      > }
+    | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
+    | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+  > };
+
+export type PracticeResultViewFragment = { exerciseSetId: string, score: number, maxScore: number, questions: Array<{ questionId: string, correct: boolean, awardedPoints: number, maxPoints: number, explanation: string | null, correctAnswer:
+      | { __typename: 'ChoiceAnswer', optionId: string }
+      | { __typename: 'GapsAnswer', gaps: Array<{ gapId: string, text: string }> }
+      | { __typename: 'JudgementAnswer', judgement: Judgement }
+     }> };
+
+type LessonCard_ArticleResource_Fragment = { __typename: 'ArticleResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> };
+
+type LessonCard_LexicalCollectionResource_Fragment = { __typename: 'LexicalCollectionResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> };
+
+type LessonCard_ListeningResource_Fragment = { __typename: 'ListeningResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> };
+
+type LessonCard_ReadingResource_Fragment = { __typename: 'ReadingResource', estimatedReadingSeconds: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> };
+
+export type LessonCardFragment =
+  | LessonCard_ArticleResource_Fragment
+  | LessonCard_LexicalCollectionResource_Fragment
+  | LessonCard_ListeningResource_Fragment
+  | LessonCard_ReadingResource_Fragment
+;
+
+export type LessonListQueryVariables = Exact<{
+  filter?: ResourceFilter | null | undefined;
+  first: number;
+  after?: string | null | undefined;
+}>;
+
+
+export type LessonListQuery = { publishedResources: { nodes: Array<
+      | { __typename: 'ArticleResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> }
+      | { __typename: 'LexicalCollectionResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> }
+      | { __typename: 'ListeningResource', id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> }
+      | { __typename: 'ReadingResource', estimatedReadingSeconds: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, topics: Array<{ slug: string, name: string }> }
+    >, pageInfo: { endCursor: string | null, hasNextPage: boolean } } };
+
+export type ReadingLessonQueryVariables = Exact<{
+  slug: string;
+}>;
+
+
+export type ReadingLessonQuery = { resourceBySlug:
+    | { __typename: 'ArticleResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
+              | { __typename: 'GapSegment', gapId: string }
+              | { __typename: 'TextSegment', text: string }
+            > }
+          | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
+          | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+        > }>, topics: Array<{ slug: string, name: string }> }
+    | { __typename: 'LexicalCollectionResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
+              | { __typename: 'GapSegment', gapId: string }
+              | { __typename: 'TextSegment', text: string }
+            > }
+          | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
+          | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+        > }>, topics: Array<{ slug: string, name: string }> }
+    | { __typename: 'ListeningResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
+              | { __typename: 'GapSegment', gapId: string }
+              | { __typename: 'TextSegment', text: string }
+            > }
+          | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
+          | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+        > }>, topics: Array<{ slug: string, name: string }> }
+    | { __typename: 'ReadingResource', wordCount: number, body: unknown, revisionNo: number, estimatedReadingSeconds: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, vocabulary: Array<{ id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }>, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
+              | { __typename: 'GapSegment', gapId: string }
+              | { __typename: 'TextSegment', text: string }
+            > }
+          | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
+          | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+        > }>, topics: Array<{ slug: string, name: string }> }
+   | null };
+
+export type SiteTopicsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SiteTopicsQuery = { topics: Array<{ slug: string, name: string, description: string | null }> };
+
+export type GradePracticeMutationVariables = Exact<{
+  input: GradePracticeInput;
+}>;
+
+
+export type GradePracticeMutation = { gradePractice: { exerciseSetId: string, score: number, maxScore: number, questions: Array<{ questionId: string, correct: boolean, awardedPoints: number, maxPoints: number, explanation: string | null, correctAnswer:
+        | { __typename: 'ChoiceAnswer', optionId: string }
+        | { __typename: 'GapsAnswer', gaps: Array<{ gapId: string, text: string }> }
+        | { __typename: 'JudgementAnswer', judgement: Judgement }
+       }> } };
+
+export const RevisionFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"RevisionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Revision"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"lockVersion"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"submittedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<RevisionFieldsFragment, unknown>;
+export const EditorialSummaryFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"EditorialSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EditorialResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"localizations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"locale"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"draft"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"lockVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"published"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}}]}}]}}]}}]} as unknown as DocumentNode<EditorialSummaryFragment, unknown>;
+export const SenseCardFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SenseCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LexicalSense"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionId"}},{"kind":"Field","name":{"kind":"Name","value":"senseKey"}},{"kind":"Field","name":{"kind":"Name","value":"partOfSpeech"}},{"kind":"Field","name":{"kind":"Name","value":"definition"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"usageNote"}},{"kind":"Field","name":{"kind":"Name","value":"register"}},{"kind":"Field","name":{"kind":"Name","value":"examples"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sentence"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pronunciations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accent"}},{"kind":"Field","name":{"kind":"Name","value":"ipa"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayForm"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}}]}}]}}]} as unknown as DocumentNode<SenseCardFragment, unknown>;
+export const ExerciseSetViewFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ExerciseSetView"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ExerciseSet"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"questions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"points"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SingleChoiceQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stem"}},{"kind":"Field","name":{"kind":"Name","value":"options"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"content"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TrueFalseNotGivenQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"statement"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapFillQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"segments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TextSegment"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"text"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapSegment"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gapId"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<ExerciseSetViewFragment, unknown>;
+export const PracticeResultViewFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PracticeResultView"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PracticeResult"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"exerciseSetId"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"maxScore"}},{"kind":"Field","name":{"kind":"Name","value":"questions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"questionId"}},{"kind":"Field","name":{"kind":"Name","value":"correct"}},{"kind":"Field","name":{"kind":"Name","value":"awardedPoints"}},{"kind":"Field","name":{"kind":"Name","value":"maxPoints"}},{"kind":"Field","name":{"kind":"Name","value":"explanation"}},{"kind":"Field","name":{"kind":"Name","value":"correctAnswer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ChoiceAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"optionId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"JudgementAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"judgement"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapsAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gaps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gapId"}},{"kind":"Field","name":{"kind":"Name","value":"text"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<PracticeResultViewFragment, unknown>;
+export const LessonCardFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LessonCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Resource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ReadingResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"estimatedReadingSeconds"}}]}}]}}]} as unknown as DocumentNode<LessonCardFragment, unknown>;
+export const ViewerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Viewer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"viewer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"memberships"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"site"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"domain"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ViewerQuery, ViewerQueryVariables>;
+export const EditorialListDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"EditorialList"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"siteId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"editorialResources"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"siteId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"siteId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"EditorialSummary"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"EditorialSummary"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"EditorialResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"localizations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"locale"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"draft"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"lockVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"published"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}}]}}]}}]}}]} as unknown as DocumentNode<EditorialListQuery, EditorialListQueryVariables>;
+export const EditorialLessonDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"EditorialLesson"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"editorialResource"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"site"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"domain"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"localizations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"locale"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"draft"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"RevisionFields"}},{"kind":"Field","name":{"kind":"Name","value":"exercises"}},{"kind":"Field","name":{"kind":"Name","value":"vocabulary"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SenseCard"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"published"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"RevisionFields"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"RevisionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Revision"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"lockVersion"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"submittedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SenseCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LexicalSense"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionId"}},{"kind":"Field","name":{"kind":"Name","value":"senseKey"}},{"kind":"Field","name":{"kind":"Name","value":"partOfSpeech"}},{"kind":"Field","name":{"kind":"Name","value":"definition"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"usageNote"}},{"kind":"Field","name":{"kind":"Name","value":"register"}},{"kind":"Field","name":{"kind":"Name","value":"examples"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sentence"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pronunciations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accent"}},{"kind":"Field","name":{"kind":"Name","value":"ipa"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayForm"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}}]}}]}}]} as unknown as DocumentNode<EditorialLessonQuery, EditorialLessonQueryVariables>;
+export const EditorTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"EditorTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<EditorTopicsQuery, EditorTopicsQueryVariables>;
+export const SenseSearchDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SenseSearch"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"lexicalSearch"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"10"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayForm"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"senses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SenseCard"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SenseCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LexicalSense"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionId"}},{"kind":"Field","name":{"kind":"Name","value":"senseKey"}},{"kind":"Field","name":{"kind":"Name","value":"partOfSpeech"}},{"kind":"Field","name":{"kind":"Name","value":"definition"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"usageNote"}},{"kind":"Field","name":{"kind":"Name","value":"register"}},{"kind":"Field","name":{"kind":"Name","value":"examples"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sentence"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pronunciations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accent"}},{"kind":"Field","name":{"kind":"Name","value":"ipa"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayForm"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}}]}}]}}]} as unknown as DocumentNode<SenseSearchQuery, SenseSearchQueryVariables>;
+export const CreateResourceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateResource"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateResourceInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createResource"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateResourceMutation, CreateResourceMutationVariables>;
+export const StartDraftDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartDraft"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startDraft"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"localizationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<StartDraftMutation, StartDraftMutationVariables>;
+export const UpdateDraftDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateDraft"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateDraftInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateDraft"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateDraftMutation, UpdateDraftMutationVariables>;
+export const SaveExerciseSetsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveExerciseSets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sets"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ExercisePayload"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveExerciseSets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"localizationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}}},{"kind":"Argument","name":{"kind":"Name","value":"lockVersion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}}},{"kind":"Argument","name":{"kind":"Name","value":"sets"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sets"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<SaveExerciseSetsMutation, SaveExerciseSetsMutationVariables>;
+export const SubmitForReviewDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitForReview"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitForReview"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"localizationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}}},{"kind":"Argument","name":{"kind":"Name","value":"lockVersion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<SubmitForReviewMutation, SubmitForReviewMutationVariables>;
+export const ReturnToDraftDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReturnToDraft"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"note"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"returnToDraft"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"localizationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}}},{"kind":"Argument","name":{"kind":"Name","value":"lockVersion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}}},{"kind":"Argument","name":{"kind":"Name","value":"note"},"value":{"kind":"Variable","name":{"kind":"Name","value":"note"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<ReturnToDraftMutation, ReturnToDraftMutationVariables>;
+export const PublishResourceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PublishResource"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"publishResource"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"localizationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"localizationId"}}},{"kind":"Argument","name":{"kind":"Name","value":"lockVersion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lockVersion"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<PublishResourceMutation, PublishResourceMutationVariables>;
+export const ArchiveResourceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveResource"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"resourceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveResource"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"resourceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"resourceId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<ArchiveResourceMutation, ArchiveResourceMutationVariables>;
+export const LessonListDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"LessonList"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"filter"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ResourceFilter"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"after"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"publishedResources"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"filter"}}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}},{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"after"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LessonCard"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"endCursor"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LessonCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Resource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ReadingResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"estimatedReadingSeconds"}}]}}]}}]} as unknown as DocumentNode<LessonListQuery, LessonListQueryVariables>;
+export const ReadingLessonDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ReadingLesson"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"slug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resourceBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"kind"},"value":{"kind":"EnumValue","value":"READING"}},{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"slug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LessonCard"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"examLabels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"exerciseSets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"ExerciseSetView"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ReadingResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wordCount"}},{"kind":"Field","name":{"kind":"Name","value":"vocabulary"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SenseCard"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LessonCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Resource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ReadingResource"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"estimatedReadingSeconds"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ExerciseSetView"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ExerciseSet"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"instructions"}},{"kind":"Field","name":{"kind":"Name","value":"questions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"position"}},{"kind":"Field","name":{"kind":"Name","value":"points"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SingleChoiceQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stem"}},{"kind":"Field","name":{"kind":"Name","value":"options"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"content"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TrueFalseNotGivenQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"statement"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapFillQuestion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"segments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TextSegment"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"text"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapSegment"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gapId"}}]}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SenseCard"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LexicalSense"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionId"}},{"kind":"Field","name":{"kind":"Name","value":"senseKey"}},{"kind":"Field","name":{"kind":"Name","value":"partOfSpeech"}},{"kind":"Field","name":{"kind":"Name","value":"definition"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"usageNote"}},{"kind":"Field","name":{"kind":"Name","value":"register"}},{"kind":"Field","name":{"kind":"Name","value":"examples"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sentence"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pronunciations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"accent"}},{"kind":"Field","name":{"kind":"Name","value":"ipa"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entry"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayForm"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}}]}}]}}]} as unknown as DocumentNode<ReadingLessonQuery, ReadingLessonQueryVariables>;
+export const SiteTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SiteTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]} as unknown as DocumentNode<SiteTopicsQuery, SiteTopicsQueryVariables>;
+export const GradePracticeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"GradePractice"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"GradePracticeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gradePractice"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PracticeResultView"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PracticeResultView"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PracticeResult"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"exerciseSetId"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"maxScore"}},{"kind":"Field","name":{"kind":"Name","value":"questions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"questionId"}},{"kind":"Field","name":{"kind":"Name","value":"correct"}},{"kind":"Field","name":{"kind":"Name","value":"awardedPoints"}},{"kind":"Field","name":{"kind":"Name","value":"maxPoints"}},{"kind":"Field","name":{"kind":"Name","value":"explanation"}},{"kind":"Field","name":{"kind":"Name","value":"correctAnswer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ChoiceAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"optionId"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"JudgementAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"judgement"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"GapsAnswer"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gaps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gapId"}},{"kind":"Field","name":{"kind":"Name","value":"text"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GradePracticeMutation, GradePracticeMutationVariables>;

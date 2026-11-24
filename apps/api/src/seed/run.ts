@@ -24,7 +24,11 @@ try {
     JSON.stringify({
       level: "info",
       service: "seed",
-      msg: result.created ? "sample content created" : "site already exists; nothing changed",
+      msg: result.created
+        ? "sample content created"
+        : "linked" in result && result.linked
+          ? `site exists; added vocabulary links to ${result.linked} sample lesson(s)`
+          : "site already exists; nothing changed",
       domain: env.SEED_SITE_DOMAIN,
     })
   );
