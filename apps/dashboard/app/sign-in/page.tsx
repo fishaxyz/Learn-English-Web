@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "../../auth";
 import { serverEnv } from "../../lib/env";
+import { loginWithPassword, sessionCookieName } from "../../lib/password-login";
 
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
@@ -13,6 +15,25 @@ async function requestLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!EMAIL.test(email) || email.length > 254) redirect("/sign-in?error=email");
   await signIn("nodemailer", { email, redirectTo: "/" });
+}
+
+async function passwordSignIn(formData: FormData) {
+  "use server";
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  if (!EMAIL.test(email) || email.length > 254 || !password || password.length > 128) redirect("/sign-in?error=wrong");
+  const result = await loginWithPassword(email, password);
+  if (!result.ok) redirect(`/sign-in?error=${result.reason}`);
+  // The same HttpOnly session cookie an email-link sign-in sets: nothing else is stored in the browser.
+  const secure = serverEnv().AUTH_URL.startsWith("https:");
+  (await cookies()).set(sessionCookieName(secure), result.sessionToken, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    expires: result.expires,
+  });
+  redirect("/");
 }
 
 async function continueWithGoogle() {
@@ -32,8 +53,8 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
         <h1 className="font-display text-3xl font-semibold">Sign in</h1>
         <p className="text-muted">
           {google
-            ? "Use the Google account or email address you were invited with. Email links work once and expire in 15 minutes."
-            : "Enter the email address you were invited with. We'll send you a link that signs you in; it works once and expires in 15 minutes."}
+            ? "Use the Google account or email address you were invited with."
+            : "Use the email address you were invited with."}
         </p>
       </div>
       {google ? (
@@ -66,12 +87,12 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
           </form>
           <p className="flex items-center gap-3 text-sm text-muted">
             <span aria-hidden="true" className="h-px flex-1 bg-line" />
-            or with an email link
+            or with your password
             <span aria-hidden="true" className="h-px flex-1 bg-line" />
           </p>
         </>
       ) : null}
-      <form action={requestLink} className="flex flex-col gap-3">
+      <form action={passwordSignIn} className="flex flex-col gap-3">
         <label htmlFor="email" className="font-medium">
           Email address
         </label>
@@ -80,21 +101,67 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
           name="email"
           type="email"
           required
-          autoComplete="email"
+          autoComplete="username"
           className="rounded-lg border border-line bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-accent"
         />
-        {error === "email" ? (
+        <label htmlFor="password" className="font-medium">
+          Password
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          maxLength={128}
+          autoComplete="current-password"
+          className="rounded-lg border border-line bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-accent"
+        />
+        {error === "wrong" ? (
           <p role="alert" className="text-sm text-bad">
-            That doesn&apos;t look like an email address.
+            That email and password don&apos;t match. If you haven&apos;t set a password yet, use an email link below.
+          </p>
+        ) : null}
+        {error === "locked" ? (
+          <p role="alert" className="text-sm text-bad">
+            Too many wrong tries: password sign-in is paused for 15 minutes. You can still sign in with an email link.
           </p>
         ) : null}
         <button
           type="submit"
           className="rounded-full bg-accent px-5 py-2.5 font-semibold text-on-accent hover:bg-accent-strong"
         >
-          Email me a sign-in link
+          Sign in
         </button>
       </form>
+      <details className="rounded-xl border border-line bg-surface p-4" open={error === "email" || undefined}>
+        <summary className="cursor-pointer font-medium">
+          No password yet, or forgot it? Get a sign-in link by email
+        </summary>
+        <form action={requestLink} className="mt-3 flex flex-col gap-3">
+          <label htmlFor="link-email" className="text-sm font-medium">
+            Email for a sign-in link
+          </label>
+          <input
+            id="link-email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="rounded-lg border border-line bg-surface px-3 py-2 focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          {error === "email" ? (
+            <p role="alert" className="text-sm text-bad">
+              That doesn&apos;t look like an email address.
+            </p>
+          ) : null}
+          <button type="submit" className="rounded-full border border-line px-5 py-2 font-semibold hover:border-accent">
+            Email me a sign-in link
+          </button>
+          <p className="text-sm text-muted">
+            The link works once and expires in 15 minutes. Then set a password on your Account page.
+          </p>
+        </form>
+      </details>
     </main>
   );
 }

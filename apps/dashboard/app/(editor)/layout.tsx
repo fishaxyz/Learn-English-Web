@@ -32,7 +32,9 @@ export default async function EditorLayout({ children }: { children: ReactNode }
             </nav>
           </div>
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted">{viewer.email}</span>
+            <a href="/account" className="text-muted hover:text-accent hover:underline">
+              {viewer.email}
+            </a>
             <form action={signOutAction}>
               <button type="submit" className="rounded-full border border-line px-3 py-1 hover:border-accent">
                 Sign out

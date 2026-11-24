@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Phase 2's acceptance test (AGENTS.md §13): an editor signs in, writes a reading lesson with a vocabulary
 // link and an exercise, it's reviewed and published, and a learner reads it, opens the word and is graded.
-import { DASHBOARD, EDITOR, signIn, WEBSITE } from "./helpers";
+import { EDITOR, signIn, WEBSITE } from "./helpers";
 
 test("an editor publishes a reading lesson and a learner uses it", async ({ page }) => {
   page.on("console", (m) => {

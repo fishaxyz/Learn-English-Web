@@ -9,6 +9,8 @@ export const envSchema = z.object({
   GRAPHQL_API_URL: httpUrl,
   /** Auth.js stores sessions in the same database (its tables are part of our Drizzle schema). */
   DATABASE_URL: databaseUrl,
+  /** The dashboard's own address; https here makes session cookies Secure. */
+  AUTH_URL: httpUrl.default("http://localhost:3401"),
   /** Signs Auth.js's tokens. At least 32 random characters. */
   AUTH_SECRET: z.string().min(32, "must be at least 32 characters"),
   /** development allows the local mailbox file instead of real email; production requires EMAIL_SERVER. */

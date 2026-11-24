@@ -59,6 +59,16 @@
   - Editors and reviewers still go through review.
 - **Essays are Readings:** the dashboard creates Reading lessons only. Articles had no page on the website, so a published one would have been invisible.
 
+- **Password sign-in for editors** (2026-11-25, requested by the owner):
+  - **Hashes:** passwords are stored only as scrypt hashes (N=2^17, r=8, p=1, a 16-byte salt) in `user_passwords`, apart from the Auth.js tables. The stored format names its parameters, so the cost can be raised later.
+  - **Who sets them:** each editor sets their own on the Account page, after a first email-link sign-in. Nobody else ever handles them.
+  - **Rules:** at least 10 characters, not repetitive, not containing the email name.
+  - **Lockout:** after 5 wrong tries, password sign-in pauses for 15 minutes; email links still work.
+  - **Errors:** every failure reads the same ("don't match") and takes about as long, whether the email is unknown or has no password. Only an invited user can sign in.
+  - **Sessions:** a successful login creates the same database session and HttpOnly cookie as an email link, so the API and permissions are unchanged.
+  - **Changing a password** ends the user's other sessions.
+  - The password check runs in the dashboard's server, next to Auth.js, and never in the browser.
+
 ## Lessons from building it
 
 - Tiptap's `useEditorState` returned nothing with React 19 and Next 16. The toolbar now re-renders on each transaction instead, and the editor's options are kept stable between renders.

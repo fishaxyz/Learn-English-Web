@@ -81,3 +81,17 @@ export const siteMemberships = pgTable(
   },
   (t) => [primaryKey({ columns: [t.siteId, t.userId] })]
 );
+
+/**
+ * An editor's password, as a slow salted hash only (scrypt; the format names its parameters, so they can be
+ * raised later). Kept apart from the Auth.js users table. Wrong tries are counted for the lockout.
+ */
+export const userPasswords = pgTable("user_passwords", {
+  userId: uuid()
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: text().notNull(),
+  failedAttempts: integer().notNull().default(0),
+  lockedUntil: timestamp({ withTimezone: true }),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
