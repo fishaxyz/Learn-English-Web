@@ -12,6 +12,14 @@ export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
 export const sessionCookieName = (secure: boolean) =>
   secure ? "__Secure-authjs.session-token" : "authjs.session-token";
 
+/** A database session, exactly like the ones Auth.js creates for an email link. */
+export async function createSession(userId: string, now = new Date()) {
+  const sessionToken = randomBytes(32).toString("base64url");
+  const expires = new Date(now.getTime() + SESSION_MAX_AGE_SECONDS * 1000);
+  await db().insert(schema.sessions).values({ sessionToken, userId, expires });
+  return { sessionToken, expires };
+}
+
 export type LoginResult = { ok: true; sessionToken: string; expires: Date } | { ok: false; reason: "wrong" | "locked" };
 
 /** The invited user with this email (any role on any site), with their password row if they set one. */
@@ -49,10 +57,7 @@ export async function loginWithPassword(email: string, password: string, now = n
     .update(schema.userPasswords)
     .set({ failedAttempts: 0, lockedUntil: null })
     .where(eq(schema.userPasswords.userId, row.user.id));
-  const sessionToken = randomBytes(32).toString("base64url");
-  const expires = new Date(now.getTime() + SESSION_MAX_AGE_SECONDS * 1000);
-  await db().insert(schema.sessions).values({ sessionToken, userId: row.user.id, expires });
-  return { ok: true, sessionToken, expires };
+  return { ok: true, ...(await createSession(row.user.id, now)) };
 }
 
 export type SetPasswordResult = { ok: true } | { ok: false; message: string };

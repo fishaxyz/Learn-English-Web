@@ -69,6 +69,11 @@
   - **Changing a password** ends the user's other sessions.
   - The password check runs in the dashboard's server, next to Auth.js, and never in the browser.
 
+- **Development sign-in** (2026-11-25, requested by the owner): one click, no password, for invited accounts.
+  - It's offered only when `APP_ENV=development` **and** `AUTH_URL` is localhost, so a live site can't offer it even if `APP_ENV` is set wrongly.
+  - The server re-checks this on every use, and the page lists nobody when it's off.
+  - It creates the same database session as the other ways in, and each use is audited (`dev.signed_in`).
+
 ## Lessons from building it
 
 - Tiptap's `useEditorState` returned nothing with React 19 and Next 16. The toolbar now re-renders on each transaction instead, and the editor's options are kept stable between renders.

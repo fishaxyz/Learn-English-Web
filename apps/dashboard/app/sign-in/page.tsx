@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "../../auth";
 import { serverEnv } from "../../lib/env";
+import { devModeOn, devSignIn, invitedAccounts } from "../../lib/dev-sign-in";
 import { loginWithPassword, sessionCookieName } from "../../lib/password-login";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -24,15 +25,27 @@ async function passwordSignIn(formData: FormData) {
   if (!EMAIL.test(email) || email.length > 254 || !password || password.length > 128) redirect("/sign-in?error=wrong");
   const result = await loginWithPassword(email, password);
   if (!result.ok) redirect(`/sign-in?error=${result.reason}`);
+  await setSessionCookie(result.sessionToken, result.expires);
+  redirect("/");
+}
+
+async function setSessionCookie(sessionToken: string, expires: Date) {
   // The same HttpOnly session cookie an email-link sign-in sets: nothing else is stored in the browser.
   const secure = serverEnv().AUTH_URL.startsWith("https:");
-  (await cookies()).set(sessionCookieName(secure), result.sessionToken, {
+  (await cookies()).set(sessionCookieName(secure), sessionToken, {
     httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",
-    expires: result.expires,
+    expires,
   });
+}
+
+async function developmentSignIn(formData: FormData) {
+  "use server";
+  const session = await devSignIn(String(formData.get("userId") ?? ""));
+  if (!session) redirect("/sign-in");
+  await setSessionCookie(session.sessionToken, session.expires);
   redirect("/");
 }
 
@@ -46,6 +59,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
   const { error } = await searchParams;
   const env = serverEnv();
   const google = Boolean(env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET);
+  const devAccounts = devModeOn() ? await invitedAccounts() : [];
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 py-16">
       <div className="flex flex-col gap-2">
@@ -57,6 +71,33 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
             : "Use the email address you were invited with."}
         </p>
       </div>
+      {devAccounts.length ? (
+        <section
+          aria-labelledby="dev-mode"
+          className="flex flex-col gap-3 rounded-xl border-2 border-dashed border-[#c98a1b] bg-[#fdf3e1] p-4 dark:bg-[#33281a]"
+        >
+          <h2 id="dev-mode" className="font-semibold">
+            Development sign-in
+          </h2>
+          <p className="text-sm text-muted">Only on this computer, never on a live site. No password needed.</p>
+          <ul className="flex flex-col gap-2">
+            {devAccounts.map((a) => (
+              <li key={a.id}>
+                <form action={developmentSignIn}>
+                  <input type="hidden" name="userId" value={a.id} />
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-left hover:border-accent"
+                  >
+                    Sign in as <span className="font-semibold">{a.email}</span>{" "}
+                    <span className="text-sm text-muted">({a.roles.join(", ")})</span>
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {google ? (
         <>
           <form action={continueWithGoogle}>
