@@ -9,9 +9,10 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/migrate.ts",
+    "db:migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:check": "drizzle-kit check"
   },
   "dependencies": {
     "@english/config": "workspace:*",
@@ -20,7 +21,6 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.16",
     "@types/node": "22.20.5",
     "drizzle-kit": "0.31.11",
     "tsx": "4.23.15",

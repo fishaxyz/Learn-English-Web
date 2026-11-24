@@ -31,6 +31,11 @@ export default tseslint.config(
     settings: { next: { rootDir: ["apps/website/", "apps/dashboard/"] } },
   },
   {
+    // Tests read rows they just inserted; a failed assertion there is a test failure, not a runtime risk.
+    files: ["**/test/**/*.ts"],
+    rules: { "@typescript-eslint/no-non-null-assertion": "off" },
+  },
+  {
     files: ["**/*.mjs", "**/*.cjs"],
     languageOptions: { globals: { process: "readonly", console: "readonly", URL: "readonly" } },
   }
