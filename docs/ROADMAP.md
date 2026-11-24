@@ -217,7 +217,7 @@ The guide differs from earlier discussions in seven places. Each needs a yes or 
 | 4 | Roles | owner, admin, editor, reviewer, viewer | Owner and Editor | ☐ |
 | 5 | Paid services | Media on Cloudflare R2 (it has a free tier); Vercel is optional | Avoid paid plans. Use MinIO locally, and containers on your own server in production. Self-hosting MinIO in production as well needs a decision record. | ☐ |
 | 6 | Client-side rule | Auth.js with database sessions; HttpOnly cookie only; no `NEXT_PUBLIC_` secrets | Never store accounts on the client | ✔ compatible |
-| 7 | Folder name | `content-platform/` | `English Learning/`, kept until the site has a name | ☐ |
+| 7 | Folder name | `content-platform/` | `English Learning/`, kept until the site has a name | ✔ **Decided 2026-11-24: `Learn-English-Web/`**, matching the GitHub repository fishaxyz/Learn-English-Web. |
 
 ## Working rules
 
