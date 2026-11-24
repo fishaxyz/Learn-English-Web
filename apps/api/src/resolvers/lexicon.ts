@@ -79,6 +79,7 @@ export const lexiconResolvers: Resolvers = {
     entry: async (s, _, ctx) => present(await ctx.loaders.entry.load(s.sense.entryId), "entry"),
   },
   EditorialSense: {
+    site: async (s, _, ctx) => present(await ctx.loaders.site.load(s.siteId), "site"),
     entry: async (s, _, ctx) => present(await ctx.loaders.entry.load(s.entryId), "entry"),
     draft: (s, _, ctx) => (s.draftRevisionId ? ctx.loaders.senseRevision.load(s.draftRevisionId) : null),
     published: (s, _, ctx) => (s.publishedRevisionId ? ctx.loaders.senseRevision.load(s.publishedRevisionId) : null),

@@ -99,6 +99,7 @@ export type EditorialSense = {
   partOfSpeech: Scalars['String']['output'];
   published?: Maybe<SenseRevision>;
   senseKey: Scalars['String']['output'];
+  site: Site;
 };
 
 export type ExamLabel = {
@@ -1001,6 +1002,7 @@ export type EditorialSenseResolvers<ContextType = GraphQLContext, ParentType ext
   partOfSpeech?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   published?: Resolver<Maybe<ResolversTypes['SenseRevision']>, ParentType, ContextType>;
   senseKey?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  site?: Resolver<ResolversTypes['Site'], ParentType, ContextType>;
 };
 
 export type ExamLabelResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ExamLabel'] = ResolversParentTypes['ExamLabel']> = {

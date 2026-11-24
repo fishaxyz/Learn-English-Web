@@ -38,3 +38,7 @@
   text-underline-offset: 4px;
   border-radius: 2px;
 }
+.editor-surface .lexical-link[data-key="true"] {
+  font-weight: 600;
+  text-decoration-style: solid;
+}

@@ -21,6 +21,18 @@ const field =
 const canWrite = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "EDITOR";
 const canReview = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "REVIEWER";
 
+/** Sense revision ids marked as key words in a document. */
+function keyIds(doc: JSONContent | undefined): Set<string> {
+  const ids = new Set<string>();
+  const walk = (n: JSONContent) => {
+    for (const m of n.marks ?? [])
+      if (m.type === "lexical" && m.attrs?.["key"]) ids.add(m.attrs["senseRevisionId"] as string);
+    n.content?.forEach(walk);
+  };
+  if (doc) walk(doc);
+  return ids;
+}
+
 /** Sense revision ids linked in a document, in order. */
 function linkedIds(doc: JSONContent | undefined): string[] {
   const ids: string[] = [];
@@ -60,6 +72,7 @@ export function LessonEditor({
   const [topicSlugs, setTopicSlugs] = useState<string[]>(draft?.topics.map((t) => t.slug) ?? []);
   const body = useRef<JSONContent | undefined>(draft?.body as JSONContent | undefined);
   const [linked, setLinked] = useState<string[]>(() => linkedIds(draft?.body as JSONContent | undefined));
+  const [keys, setKeys] = useState<Set<string>>(() => keyIds(draft?.body as JSONContent | undefined));
   const [senses, setSenses] = useState<Record<string, SenseCardFragment>>(
     Object.fromEntries((draft?.vocabulary ?? []).map((s) => [s.revisionId, s]))
   );
@@ -249,10 +262,12 @@ export function LessonEditor({
             onChange={(doc) => {
               body.current = doc;
               setLinked(linkedIds(doc));
+              setKeys(keyIds(doc));
               setTextDirty(true);
             }}
             searchSenses={(q) => actions.searchSenses(lesson.site.domain, q)}
             onSenseChosen={(s) => setSenses((prev) => ({ ...prev, [s.revisionId]: s }))}
+            newWordHref={(headword) => `/words/new?${new URLSearchParams({ site: lesson.site.id, headword })}`}
           />
           {editable ? (
             <button
@@ -375,6 +390,11 @@ export function LessonEditor({
             <ul className="flex flex-col gap-1 text-sm">
               {vocabulary.map((s) => (
                 <li key={s.revisionId}>
+                  {keys.has(s.revisionId) ? (
+                    <span title="Key word" aria-label="Key word">
+                      ★{" "}
+                    </span>
+                  ) : null}
                   <span className="font-semibold">{s.entry.displayForm}</span>{" "}
                   <span className="text-muted">{s.definition}</span>
                 </li>

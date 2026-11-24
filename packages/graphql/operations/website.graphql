@@ -45,6 +45,9 @@ query ReadingLesson($slug: String!) {
       vocabulary {
         ...SenseCard
       }
+      vocabularyItems {
+        ...VocabularyItemView
+      }
     }
   }
 }

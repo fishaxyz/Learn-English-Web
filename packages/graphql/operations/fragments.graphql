@@ -16,6 +16,10 @@ fragment SenseCard on LexicalSense {
     accent
     ipa
   }
+  translations {
+    locale
+    text
+  }
   entry {
     id
     displayForm
@@ -81,5 +85,19 @@ fragment PracticeResultView on PracticeResult {
         }
       }
     }
+  }
+}
+
+fragment VocabularyItemView on VocabularyItem {
+  isKey
+  sense {
+    ...SenseCard
+  }
+  occurrences {
+    blockId
+    start
+    end
+    text
+    sentence
   }
 }

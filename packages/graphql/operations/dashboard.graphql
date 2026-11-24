@@ -83,6 +83,9 @@ query EditorialLesson($id: ID!) {
         vocabulary {
           ...SenseCard
         }
+        vocabularyItems {
+          ...VocabularyItemView
+        }
       }
       published {
         ...RevisionFields
@@ -154,5 +157,75 @@ mutation PublishResource($localizationId: ID!, $lockVersion: Int!) {
 mutation ArchiveResource($resourceId: ID!) {
   archiveResource(resourceId: $resourceId) {
     ...EditorialSummary
+  }
+}
+
+fragment SenseRevisionFields on SenseRevision {
+  id
+  revisionNo
+  status
+  definition
+  cefrLevel
+  usageNote
+  register
+  lockVersion
+  publishedAt
+  examples {
+    sentence
+    explanation
+  }
+  pronunciations {
+    accent
+    ipa
+  }
+  translations {
+    locale
+    text
+  }
+}
+
+fragment EditorialSenseFields on EditorialSense {
+  id
+  site {
+    id
+    domain
+    name
+  }
+  senseKey
+  partOfSpeech
+  entry {
+    id
+    displayForm
+    kind
+  }
+  draft {
+    ...SenseRevisionFields
+  }
+  published {
+    ...SenseRevisionFields
+  }
+}
+
+query WordBank($siteId: ID!, $query: String) {
+  editorialSenses(siteId: $siteId, query: $query, first: 200) {
+    ...EditorialSenseFields
+  }
+}
+
+query WordBankSense($id: ID!) {
+  editorialSense(id: $id) {
+    ...EditorialSenseFields
+  }
+}
+
+mutation ManageSense($input: ManageLexicalSenseInput!) {
+  manageLexicalSense(input: $input) {
+    ...EditorialSenseFields
+  }
+}
+
+mutation PublishSense($senseId: ID!, $lockVersion: Int!) {
+  publishLexicalSense(senseId: $senseId, lockVersion: $lockVersion) {
+    ...EditorialSenseFields
   }
 }

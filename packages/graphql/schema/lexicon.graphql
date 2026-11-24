@@ -101,6 +101,7 @@ type SenseRevision {
 
 type EditorialSense {
   id: ID!
+  site: Site!
   senseKey: String!
   partOfSpeech: String!
   entry: LexicalEntry!

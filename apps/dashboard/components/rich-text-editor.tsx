@@ -66,6 +66,12 @@ const Lexical = Mark.create({
         parseHTML: (el) => el.getAttribute("data-sense-revision-id"),
         renderHTML: (attrs) => ({ "data-sense-revision-id": attrs["senseRevisionId"] }),
       },
+      /** A key word of the text: suggested to learners first. */
+      key: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-key") === "true",
+        renderHTML: (attrs) => (attrs["key"] ? { "data-key": "true" } : {}),
+      },
     };
   },
   parseHTML: () => [{ tag: "span[data-sense-revision-id]" }],
@@ -137,12 +143,15 @@ export function RichTextEditor({
   onChange,
   searchSenses,
   onSenseChosen,
+  newWordHref,
 }: {
   initial: unknown;
   editable: boolean;
   onChange: (doc: JSONContent) => void;
   searchSenses: (query: string) => Promise<SearchResult>;
   onSenseChosen: (sense: SenseCardFragment) => void;
+  /** Where to create a word that isn't in the word bank yet (opened in a new tab, prefilled). */
+  newWordHref: (headword: string) => string;
 }) {
   // Options must stay the same object-for-object between renders, or Tiptap keeps re-creating the editor.
   const [content] = useState(() => startingContent(initial));
@@ -160,6 +169,7 @@ export function RichTextEditor({
   );
 
   const [panel, setPanel] = useState<{ query: string; results: SearchResult | null } | null>(null);
+  const [asKey, setAsKey] = useState(false);
   const [searching, startSearch] = useTransition();
 
   if (!editor) {
@@ -180,6 +190,7 @@ export function RichTextEditor({
     ordered: editor.isActive("orderedList"),
     link: editor.isActive("link"),
     lexical: editor.isActive("lexical"),
+    lexicalKey: Boolean(editor.getAttributes("lexical")["key"]),
     hasSelection: !editor.state.selection.empty,
     selected: editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, " "),
   };
@@ -263,6 +274,22 @@ export function RichTextEditor({
           >
             {flags.lexical ? "Unlink word" : "Link word"}
           </ToolbarButton>
+          {flags.lexical ? (
+            <ToolbarButton
+              label={flags.lexicalKey ? "Unmark key word" : "Mark as key word"}
+              active={flags.lexicalKey}
+              onClick={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .extendMarkRange("lexical")
+                  .updateAttributes("lexical", { key: !flags.lexicalKey })
+                  .run()
+              }
+            >
+              ★ Key word
+            </ToolbarButton>
+          ) : null}
         </div>
       ) : null}
 
@@ -287,6 +314,10 @@ export function RichTextEditor({
             <button type="submit" className="rounded-full border border-line px-3 py-1 text-sm hover:border-accent">
               Search
             </button>
+            <label className="flex items-center gap-1.5 text-sm">
+              <input type="checkbox" checked={asKey} onChange={(e) => setAsKey(e.target.checked)} />
+              Key word
+            </label>
             <button type="button" onClick={() => setPanel(null)} className="ml-auto text-sm text-muted hover:underline">
               Close
             </button>
@@ -294,7 +325,17 @@ export function RichTextEditor({
           <div aria-live="polite" className="mt-2 text-sm">
             {searching ? <p className="text-muted">Searching…</p> : null}
             {!searching && panel.results?.length === 0 ? (
-              <p className="text-muted">No published meanings found. Only published word senses can be linked.</p>
+              <p className="text-muted">
+                No published meaning found. Only published words can be linked.{" "}
+                <a
+                  href={newWordHref(panel.query)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-accent underline"
+                >
+                  Add “{panel.query}” to the word bank
+                </a>
+              </p>
             ) : null}
             <ul className="mt-1 flex flex-col gap-1">
               {panel.results?.flatMap((entry) =>
@@ -303,7 +344,11 @@ export function RichTextEditor({
                     <button
                       type="button"
                       onClick={() => {
-                        editor.chain().focus().setMark("lexical", { senseRevisionId: sense.revisionId }).run();
+                        editor
+                          .chain()
+                          .focus()
+                          .setMark("lexical", { senseRevisionId: sense.revisionId, key: asKey })
+                          .run();
                         onSenseChosen(sense);
                         setPanel(null);
                       }}
@@ -320,6 +365,19 @@ export function RichTextEditor({
                 ))
               )}
             </ul>
+            {panel.results?.length ? (
+              <p className="mt-2 text-muted">
+                Not the right meaning?{" "}
+                <a
+                  href={newWordHref(panel.query)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-accent underline"
+                >
+                  Add a new one to the word bank
+                </a>
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}
