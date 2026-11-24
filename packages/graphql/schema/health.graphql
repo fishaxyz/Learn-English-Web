@@ -1,0 +1,15 @@
+"Whether a part of the system is working."
+enum HealthStatus {
+  OK
+  DOWN
+}
+
+"The API's own view of its health. Public: it reveals no hostnames, versions of dependencies or errors."
+type Health {
+  status: HealthStatus!
+  database: HealthStatus!
+}
+
+type Query {
+  health: Health!
+}

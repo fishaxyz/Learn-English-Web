@@ -1,0 +1,69 @@
+# Every push and pull request: lint, type checks, tests and builds must pass before a merge (AGENTS.md §11).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generated GraphQL types are up to date
+        run: pnpm codegen && git diff --exit-code
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/python-engine
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src tests
+      - run: uv run pytest
+
+  # Phase 0's acceptance test: a clean checkout starts every service and every health check passes.
+  docker:
+    runs-on: ubuntu-latest
+    needs: [typescript, python]
+    steps:
+      - uses: actions/checkout@v7
+      - run: cp .env.example .env
+      - name: Start every service and wait until all are healthy
+        run: docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait --wait-timeout 300
+      - name: Check the health endpoints
+        run: |
+          curl -fsS http://127.0.0.1:4400/health/ready
+          curl -fsS http://127.0.0.1:3400/api/health/ready
+          curl -fsS http://127.0.0.1:3401/api/health/ready
+          docker compose -f infrastructure/docker-compose.yml --env-file .env ps
+      - name: Logs, if anything failed
+        if: failure()
+        run: docker compose -f infrastructure/docker-compose.yml --env-file .env logs --no-color
+      - if: always()
+        run: docker compose -f infrastructure/docker-compose.yml --env-file .env down -v

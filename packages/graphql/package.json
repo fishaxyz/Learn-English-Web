@@ -1,0 +1,27 @@
+{
+  "name": "@english/graphql",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "codegen": "graphql-codegen --config codegen.ts && tsx scripts/emit-typedefs.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "graphql": "16.15.0"
+  },
+  "devDependencies": {
+    "@english/config": "workspace:*",
+    "@graphql-codegen/cli": "7.4.6",
+    "@graphql-codegen/typescript": "6.1.2",
+    "@graphql-codegen/typescript-resolvers": "6.1.1",
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

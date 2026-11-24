@@ -1,0 +1,33 @@
+"""Settings, validated once at startup. Errors name the setting, never its value."""
+
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, HttpUrl, SecretStr, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", frozen=True)
+
+    graphql_api_url: HttpUrl
+    # The worker's own narrow credential (AGENTS.md §10). Optional until job mutations exist in Phase 4.
+    worker_service_token: SecretStr | None = None
+    log_level: Literal["debug", "info", "warn", "error"] = "info"
+    worker_poll_interval_seconds: float = Field(default=10.0, gt=0, le=3600)
+    worker_request_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
+    worker_heartbeat_file: Path = Path("/tmp/content-engine.heartbeat")  # noqa: S108 - inside the container only
+
+
+class SettingsError(Exception):
+    def __init__(self, problems: list[str]) -> None:
+        self.problems = problems
+        super().__init__("Invalid environment:\n" + "\n".join(f"  - {p}" for p in problems))
+
+
+def load_settings(**overrides: object) -> Settings:
+    try:
+        return Settings(**overrides)  # type: ignore[arg-type]
+    except ValidationError as error:
+        problems = [f"{'.'.join(str(p) for p in e['loc']).upper() or '(root)'}: {e['msg']}" for e in error.errors()]
+        raise SettingsError(problems) from None

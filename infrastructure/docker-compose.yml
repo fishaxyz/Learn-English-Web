@@ -1,0 +1,81 @@
+# Local development: every core service, each started once the ones it needs are healthy.
+# Run from the repository root:  pnpm docker:up   (reads ./.env; copy .env.example first)
+# Ports listen on 127.0.0.1 only, so nothing is exposed to the local network.
+name: english-skills
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      API_PORT: "4400"
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON: "1"
+    ports:
+      - "127.0.0.1:4400:4400"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  website:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/next.Dockerfile
+      args:
+        APP: website
+    environment:
+      GRAPHQL_API_URL: http://api:4400
+      PORT: "3400"
+    ports:
+      - "127.0.0.1:3400:3400"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/next.Dockerfile
+      args:
+        APP: dashboard
+    environment:
+      GRAPHQL_API_URL: http://api:4400
+      PORT: "3401"
+    ports:
+      - "127.0.0.1:3401:3401"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../services/python-engine
+    environment:
+      GRAPHQL_API_URL: http://api:4400
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-10}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -1,0 +1,9 @@
+{
+  "extends": "@english/config/tsconfig.next.json",
+  "compilerOptions": {
+    "plugins": [],
+    "incremental": false,
+    "types": []
+  },
+  "include": ["src"]
+}

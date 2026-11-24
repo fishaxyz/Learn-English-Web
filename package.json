@@ -1,0 +1,32 @@
+{
+  "name": "english-skills",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "codegen": "pnpm --filter @english/graphql codegen",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "docker:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait",
+    "docker:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down",
+    "docker:logs": "docker compose -f infrastructure/docker-compose.yml --env-file .env logs -f",
+    "docker:ps": "docker compose -f infrastructure/docker-compose.yml --env-file .env ps"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "eslint-config-next": "16.4.6",
+    "vite": "8.3.7"
+  }
+}

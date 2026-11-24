@@ -1,0 +1,93 @@
+# English Skills Platform
+
+An SEO-friendly platform for learning English through Reading, Listening and Vocabulary. Working name: the site doesn't have a name yet.
+
+- **[AGENTS.md](AGENTS.md)**: the architecture guide, and the source of truth for anyone building this.
+- **[docs/ROADMAP.md](docs/ROADMAP.md)**: the build phases and their acceptance checks.
+- **[docs/adr/](docs/adr/)**: decision records.
+
+Status: **Phase 0** (foundations). There are no lessons yet.
+
+## What's here
+
+| Path                     | What it is                                                                         | Local port       |
+| ------------------------ | ---------------------------------------------------------------------------------- | ---------------- |
+| `apps/website`           | Public learning site (Next.js)                                                     | 3400             |
+| `apps/dashboard`         | Editorial dashboard (Next.js)                                                      | 3401             |
+| `apps/api`               | GraphQL API (GraphQL Yoga): the only place with business rules and database writes | 4400             |
+| `packages/database`      | Drizzle schema, migrations, connection                                             |                  |
+| `packages/graphql`       | GraphQL schema (`schema/*.graphql`) and generated types                            |                  |
+| `packages/ui`            | Shared React components                                                            |                  |
+| `packages/config`        | Shared TypeScript config and environment validation                                |                  |
+| `services/python-engine` | Python background worker; talks only to the API                                    |                  |
+| `infrastructure/`        | Docker Compose and Dockerfiles                                                     | Postgres on 5434 |
+
+The ports avoid the ones other local projects already use (3000, 3100, 3300, 8008, 8100, 8200).
+
+## Prerequisites
+
+- Node.js 22.15 or newer, and pnpm 10 (`corepack enable` sets up the pinned pnpm version).
+- [uv](https://docs.astral.sh/uv/) for the Python worker.
+- A Docker engine, to run everything together. This Mac uses [Colima](https://github.com/abiosoft/colima) (`colima start`); Docker Desktop also works.
+
+## Start everything with Docker
+
+```sh
+cp .env.example .env      # then change POSTGRES_PASSWORD
+pnpm docker:up            # builds the images and waits until every service is healthy
+pnpm docker:ps            # status and health of each service
+pnpm docker:down          # stop (the database volume is kept)
+```
+
+Then check:
+
+- the website at <http://localhost:3400>;
+- the dashboard at <http://localhost:3401>;
+- the API's readiness at <http://localhost:4400/health/ready>.
+
+## Develop without Docker
+
+```sh
+pnpm install
+cp .env.example .env
+pnpm dev                  # website, dashboard and API, reloading on change
+```
+
+The API needs a running PostgreSQL at `DATABASE_URL`. Without one it still starts, but `/health/ready` answers 503.
+
+To run the worker:
+
+```sh
+cd services/python-engine
+uv sync --locked
+GRAPHQL_API_URL=http://localhost:4400 uv run content-engine-worker
+```
+
+## Checks
+
+```sh
+pnpm check                # format, lint, type checks and tests (TypeScript)
+pnpm build                # production builds of the API, website and dashboard
+pnpm codegen              # regenerate GraphQL types after editing packages/graphql/schema
+
+cd services/python-engine
+uv run ruff check . && uv run ruff format --check . && uv run mypy src tests && uv run pytest
+```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of these on every push. It also starts the full Docker Compose stack and checks every health endpoint.
+
+## Health checks
+
+| Service            | Liveness (process is up)                                          | Readiness (can do real work)                    |
+| ------------------ | ----------------------------------------------------------------- | ----------------------------------------------- |
+| API                | `GET /health/live`                                                | `GET /health/ready`: the database answers       |
+| Website, dashboard | `GET /api/health/live`                                            | `GET /api/health/ready`: the API is ready       |
+| Worker             | heartbeat file, checked by `python -m content_engine.healthcheck` | logs `api status` when the API's status changes |
+
+Health answers say only "up" or "down". They never include hostnames, versions or error details.
+
+## Rules
+
+- Work happens on `feature/…` or `fix/…` branches. Merges to `main` happen only on approval.
+- Secrets go only in `.env`, which git ignores, or in the host's secret settings. `.env.example` holds placeholders only.
+- Generated files (`**/generated/**`) are never edited by hand. Run `pnpm codegen` instead.

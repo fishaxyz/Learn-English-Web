@@ -62,9 +62,9 @@ Phase 4 needs only the API from Phase 1, so it can start once the MVP is stable.
 - A README with start-up steps that have been tested.
 
 **Done when**
-- [ ] A fresh checkout plus one command starts everything.
-- [ ] All health checks pass.
-- [ ] CI passes on a branch.
+- [x] A fresh checkout plus one command starts everything. (2026-11-24, `pnpm docker:up`)
+- [x] All health checks pass. (2026-11-24, all 5 services healthy)
+- [ ] CI passes on a branch. (Every CI check passes locally; GitHub isn't set up yet.)
 
 **Not yet:** any lesson, AI, Redis or deployment.
 
