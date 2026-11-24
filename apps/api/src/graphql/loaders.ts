@@ -165,6 +165,32 @@ export function createLoaders(db: Database) {
       (r) => r.revisionId
     ),
 
+    /** The senses a revision's text links to, at the pinned revisions, in order of first appearance. */
+    annotatedSensesByRevision: grouped<string, SenseRow & { revisionId: string }>(
+      async (ids) => {
+        const rows = await db
+          .select({
+            sense: s.lexicalSenses,
+            revision: s.lexicalSenseRevisions,
+            revisionId: s.lexicalAnnotations.revisionId,
+            annotationId: s.lexicalAnnotations.id,
+          })
+          .from(s.lexicalAnnotations)
+          .innerJoin(s.lexicalSenseRevisions, eq(s.lexicalSenseRevisions.id, s.lexicalAnnotations.senseRevisionId))
+          .innerJoin(s.lexicalSenses, eq(s.lexicalSenses.id, s.lexicalSenseRevisions.senseId))
+          .where(inArray(s.lexicalAnnotations.revisionId, [...ids]))
+          .orderBy(asc(s.lexicalAnnotations.blockId), asc(s.lexicalAnnotations.start));
+        const seen = new Set<string>();
+        return rows.filter((r) => {
+          const key = `${r.revisionId}|${r.revision.id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      },
+      (r) => r.revisionId
+    ),
+
     senseRevision: single<string, LexicalSenseModel["revision"]>(
       (ids) =>
         db

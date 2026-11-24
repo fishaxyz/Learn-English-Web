@@ -22,8 +22,10 @@ const revisionParts = {
 
 export const lexiconResolvers: Resolvers = {
   Query: {
-    lexicalSearch: async (_, { query, first }, ctx) =>
-      lexicon.lexicalSearch(ctx.db, (await ctx.site()).id, query, first),
+    lexicalSearch: async (_, { query, first }, ctx) => {
+      ctx.limit("search");
+      return lexicon.lexicalSearch(ctx.db, (await ctx.site()).id, query, first);
+    },
     lexicalEntryById: async (_, { id }, ctx) => lexicon.lexicalEntryById(ctx.db, (await ctx.site()).id, id),
   },
 

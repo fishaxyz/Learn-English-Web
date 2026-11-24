@@ -27,10 +27,16 @@ const safeHref = z
     }
   }, "links must be http(s) or mailto");
 
+const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "must be an id");
+
+// Attribute objects drop keys they don't know (Tiptap adds harmless defaults like target or class); node and
+// mark objects are strict, so unknown node shapes are rejected, not passed through.
 const mark = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("bold") }),
   z.strictObject({ type: z.literal("italic") }),
-  z.strictObject({ type: z.literal("link"), attrs: z.strictObject({ href: safeHref }) }),
+  z.strictObject({ type: z.literal("link"), attrs: z.object({ href: safeHref }) }),
+  /** A word or phrase linked to one exact sense revision: the vocabulary pop-up (AGENTS.md §5.2). */
+  z.strictObject({ type: z.literal("lexical"), attrs: z.object({ senseRevisionId: uuid }) }),
 ]);
 
 export type RichTextNode = {
@@ -53,12 +59,12 @@ const node: z.ZodType<RichTextNode> = z.lazy(() =>
     z.strictObject({ type: z.enum(LEAVES) }),
     z.strictObject({
       type: z.literal("heading"),
-      attrs: z.strictObject({ id: blockId, level: z.union([z.literal(2), z.literal(3), z.literal(4)]) }),
+      attrs: z.object({ id: blockId, level: z.union([z.literal(2), z.literal(3), z.literal(4)]) }),
       content: z.array(node).max(500).optional(),
     }),
     z.strictObject({
       type: z.enum(BLOCKS).exclude(["heading"]),
-      attrs: z.strictObject({ id: blockId }),
+      attrs: z.object({ id: blockId }),
       content: z.array(node).max(500).optional(),
     }),
   ])
@@ -116,3 +122,43 @@ export function wordCount(text: string): number {
 
 /** At about 200 words a minute, rounded up to whole seconds. */
 export const readingSeconds = (words: number) => Math.ceil((words / 200) * 60);
+
+export type Annotation = { blockId: string; start: number; end: number; surfaceText: string; senseRevisionId: string };
+
+/**
+ * The document's vocabulary links, as stored in lexical_annotations. Offsets are Unicode code points (not
+ * UTF-16 units) into the text of the innermost block with an id, where a hard break counts as one ("\n"):
+ * "🚆 bank" puts "bank" at 2–6. Adjacent text nodes with the same sense are one annotation.
+ */
+export function annotationsOf(doc: RichTextDocument): Annotation[] {
+  const out: Annotation[] = [];
+  const walk = (n: RichTextNode) => {
+    const id = n.attrs?.["id"];
+    const hasInline = n.content?.some((c) => c.type === "text" || c.type === "hardBreak");
+    if (typeof id === "string" && hasInline) {
+      let offset = 0;
+      let open: Annotation | null = null;
+      for (const child of n.content ?? []) {
+        const text = child.type === "text" ? (child.text ?? "") : child.type === "hardBreak" ? "\n" : "";
+        const length = [...text].length;
+        const sense = child.marks?.find((m) => m.type === "lexical")?.attrs;
+        const senseId = sense && "senseRevisionId" in sense ? sense.senseRevisionId : null;
+        if (senseId && open && open.senseRevisionId === senseId && open.end === offset) {
+          open.end += length;
+          open.surfaceText += text;
+        } else if (senseId) {
+          open = { blockId: id, start: offset, end: offset + length, surfaceText: text, senseRevisionId: senseId };
+          out.push(open);
+        } else {
+          open = null;
+        }
+        offset += length;
+      }
+    }
+    n.content?.forEach((c) => {
+      if (c.type !== "text") walk(c);
+    });
+  };
+  doc.content.forEach(walk);
+  return out;
+}

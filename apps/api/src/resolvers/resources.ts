@@ -7,7 +7,11 @@ import type { Resolvers } from "../generated/resolvers";
 import type { PublishedResourceModel } from "../models";
 import * as editorial from "../modules/resources/editorial";
 import { publishedResources, resourceBySlug } from "../modules/resources/public";
+import { exerciseSetsForEditing } from "../modules/assessment/service";
+import type { ExerciseSetInput } from "../modules/assessment/schemas";
+import { tagsForResource } from "../modules/revalidate";
 import { readingSeconds, wordCount } from "../modules/rich-text";
+import { invalid } from "../errors";
 import { present } from "../rows";
 
 const TYPE_BY_KIND = {
@@ -43,6 +47,17 @@ async function editorialResource(ctx: GraphQLContext, id: string) {
   return row;
 }
 
+/** After a publish or archive: refresh the website's cached pages for every localization of the resource. */
+async function revalidate(ctx: GraphQLContext, resourceId: string) {
+  const resource = await editorialResource(ctx, resourceId);
+  const locs = await ctx.db
+    .select({ slug: schema.resourceLocalizations.slug })
+    .from(schema.resourceLocalizations)
+    .where(eq(schema.resourceLocalizations.resourceId, resourceId));
+  void ctx.revalidator.notify([...new Set(locs.flatMap((l) => tagsForResource(resource.kind, l.slug)))]);
+  return resource;
+}
+
 /** Authorizes against the site that owns the localization, never a site the client names. */
 async function onLocalization(
   ctx: GraphQLContext,
@@ -56,8 +71,10 @@ async function onLocalization(
 
 export const resourceResolvers: Resolvers = {
   Query: {
-    publishedResources: async (_, { filter, first, after }, ctx) =>
-      publishedResources(ctx.db, await ctx.site(), filter ?? {}, first, after),
+    publishedResources: async (_, { filter, first, after }, ctx) => {
+      if (filter?.search) ctx.limit("search");
+      return publishedResources(ctx.db, await ctx.site(), filter ?? {}, first, after);
+    },
     resourceBySlug: async (_, { kind, slug, locale }, ctx) =>
       resourceBySlug(ctx.db, await ctx.site(), kind, slug, locale),
     topics: async (_, __, ctx) => {
@@ -67,6 +84,10 @@ export const resourceResolvers: Resolvers = {
         .from(schema.topics)
         .where(eq(schema.topics.siteId, site.id))
         .orderBy(asc(schema.topics.name));
+    },
+    editorialResources: async (_, { siteId, first }, ctx) => {
+      authorize(await ctx.actor(), siteId, "content.read");
+      return editorial.editorialResources(ctx.db, siteId, first);
     },
     editorialResource: async (_, { id }, ctx) => {
       const siteId = await editorial.siteOfResource(ctx.db, id);
@@ -109,19 +130,28 @@ export const resourceResolvers: Resolvers = {
     },
     publishResource: async (_, { localizationId, lockVersion }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.publish");
-      return editorialResource(ctx, await editorial.publishResource(ctx.db, userId, localizationId, lockVersion));
+      return revalidate(ctx, await editorial.publishResource(ctx.db, userId, localizationId, lockVersion));
+    },
+    saveExerciseSets: async (_, { localizationId, lockVersion, sets }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      if (!Array.isArray(sets)) throw invalid("sets must be a list of exercise sets");
+      return editorialResource(
+        ctx,
+        await editorial.saveExerciseSets(ctx.db, userId, localizationId, lockVersion, sets as ExerciseSetInput[])
+      );
     },
     archiveResource: async (_, { resourceId }, ctx) => {
       const siteId = await editorial.siteOfResource(ctx.db, resourceId);
       if (!siteId) throw notFound("Resource");
       const actor = authorize(await ctx.actor(), siteId, "content.archive");
-      return editorialResource(ctx, await editorial.archiveResource(ctx.db, actor.user.id, resourceId));
+      return revalidate(ctx, await editorial.archiveResource(ctx.db, actor.user.id, resourceId));
     },
   },
 
   Resource: { __resolveType: (p) => TYPE_BY_KIND[p.resource.kind] },
   ReadingResource: {
     ...common,
+    vocabulary: (p, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(p.revision.id),
     wordCount: (p) => wordCount(p.revision.plainText),
     estimatedReadingSeconds: (p) => readingSeconds(wordCount(p.revision.plainText)),
   },
@@ -143,5 +173,8 @@ export const resourceResolvers: Resolvers = {
   Revision: {
     body: (r) => r.richText,
     topics: (r, _, ctx) => ctx.loaders.topicsByRevision.load(r.id),
+    vocabulary: (r, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(r.id),
+    // Answer keys, for editors: a Revision is only reachable through editorialResource(s), which authorize.
+    exercises: (r, _, ctx) => exerciseSetsForEditing(ctx.db, r.id),
   },
 };

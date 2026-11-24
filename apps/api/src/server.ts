@@ -3,12 +3,22 @@ import { createDatabase } from "@english/database";
 import { createApp } from "./app";
 import { loadEnv } from "./env";
 import { createLogger } from "./logger";
+import { createRateLimiter } from "./modules/rate-limit";
+import { createRevalidator } from "./modules/revalidate";
 
 const env = loadEnv();
 const log = createLogger(env.LOG_LEVEL, "api");
 const database = createDatabase(env.DATABASE_URL, { applicationName: "api" });
 const { handler } = createApp(
-  { db: database.db, log, ping: () => database.ping(), defaultSiteDomain: env.DEFAULT_SITE_DOMAIN },
+  {
+    db: database.db,
+    log,
+    ping: () => database.ping(),
+    defaultSiteDomain: env.DEFAULT_SITE_DOMAIN,
+    rateLimiter: createRateLimiter(),
+    revalidator: createRevalidator({ urls: env.REVALIDATION_URLS, secret: env.REVALIDATION_SECRET, log }),
+    trustProxy: env.TRUST_PROXY,
+  },
   {
     corsOrigins: env.CORS_ORIGINS,
     graphiql: env.NODE_ENV === "development",

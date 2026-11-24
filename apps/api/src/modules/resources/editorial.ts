@@ -5,7 +5,16 @@ import type { RevisionModel } from "../../models";
 import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
-import { EMPTY_DOCUMENT, parseRichText, plainTextOf, RICH_TEXT_SCHEMA_VERSION } from "../rich-text";
+import { replaceExerciseSets } from "../assessment/service";
+import type { ExerciseSetInput } from "../assessment/schemas";
+import {
+  annotationsOf,
+  EMPTY_DOCUMENT,
+  parseRichText,
+  plainTextOf,
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+} from "../rich-text";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Kind = (typeof schema.resourceKind.enumValues)[number];
@@ -51,6 +60,15 @@ async function setTopics(tx: Tx, siteId: string, revisionId: string, slugs: stri
   await tx.delete(schema.revisionTopics).where(eq(schema.revisionTopics.revisionId, revisionId));
   if (found.length) {
     await tx.insert(schema.revisionTopics).values(found.map((t) => ({ siteId, revisionId, topicId: t.id })));
+  }
+}
+
+/** Re-derives a draft's vocabulary links from its text, so they always match it (AGENTS.md §5.2). */
+async function writeAnnotations(tx: Tx, siteId: string, revisionId: string, doc: RichTextDocument) {
+  await tx.delete(schema.lexicalAnnotations).where(eq(schema.lexicalAnnotations.revisionId, revisionId));
+  const annotations = annotationsOf(doc);
+  if (annotations.length) {
+    await tx.insert(schema.lexicalAnnotations).values(annotations.map((a) => ({ ...a, siteId, revisionId })));
   }
 }
 
@@ -121,6 +139,7 @@ export async function createResource(db: Database, actorUserId: string | null, i
         );
         await tx.update(loc).set({ draftRevisionId: draft.id }).where(eq(loc.id, localization.id));
         if (input.topicSlugs) await setTopics(tx, input.siteId, draft.id, input.topicSlugs);
+        await writeAnnotations(tx, input.siteId, draft.id, body);
         await audit(tx, {
           siteId: input.siteId,
           actorUserId,
@@ -180,6 +199,10 @@ export async function startDraft(db: Database, actorUserId: string | null, local
       await tx.execute(sql`
         insert into collection_items (site_id, revision_id, sense_revision_id, position)
           select site_id, ${d.id}, sense_revision_id, position from collection_items where revision_id = ${p.id}`);
+      await tx.execute(sql`
+        insert into lexical_annotations (site_id, revision_id, block_id, start, "end", surface_text, sense_revision_id)
+          select site_id, ${d.id}, block_id, start, "end", surface_text, sense_revision_id
+          from lexical_annotations where revision_id = ${p.id}`);
       await copyExerciseSets(tx, p.siteId, p.id, d.id);
       await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));
       await audit(tx, {
@@ -223,6 +246,7 @@ export async function updateDraft(db: Database, actorUserId: string | null, inpu
         })
         .where(and(eq(rev.id, draft.id), eq(rev.lockVersion, draft.lockVersion)));
       if (input.topicSlugs) await setTopics(tx, l.siteId, draft.id, input.topicSlugs);
+      if (body) await writeAnnotations(tx, l.siteId, draft.id, body);
       await audit(tx, {
         siteId: l.siteId,
         actorUserId,
@@ -282,20 +306,14 @@ export async function publishResource(
       const l = await lockLocalization(tx, localizationId);
       const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
       if (draft.status !== "IN_REVIEW") throw conflict("Only a reviewed draft can be published: submit it for review");
-      const unpublished = await tx
-        .select({ id: schema.lexicalSenseRevisions.id })
-        .from(schema.collectionItems)
-        .innerJoin(
-          schema.lexicalSenseRevisions,
-          eq(schema.lexicalSenseRevisions.id, schema.collectionItems.senseRevisionId)
-        )
-        .where(
-          and(
-            eq(schema.collectionItems.revisionId, draft.id),
-            inArray(schema.lexicalSenseRevisions.status, ["DRAFT", "IN_REVIEW"])
-          )
-        );
-      if (unpublished.length) throw conflict("Publish the collection's word senses first");
+      // Collections and vocabulary links may only pin published (frozen) sense revisions.
+      const unpublished = await tx.execute(sql`
+        select 1 from lexical_sense_revisions r
+        where r.status in ('DRAFT', 'IN_REVIEW') and r.id in (
+          select sense_revision_id from collection_items where revision_id = ${draft.id}
+          union select sense_revision_id from lexical_annotations where revision_id = ${draft.id})
+        limit 1`);
+      if (unpublished.length) throw conflict("Publish the linked word senses first");
 
       if (l.publishedRevisionId) {
         await tx.update(rev).set({ status: "SUPERSEDED" }).where(eq(rev.id, l.publishedRevisionId));
@@ -350,4 +368,44 @@ export async function setCollectionItems(tx: Tx, siteId: string, revisionId: str
       .insert(schema.collectionItems)
       .values(senseRevisionIds.map((senseRevisionId, position) => ({ siteId, revisionId, senseRevisionId, position })));
   }
+}
+
+/** Replaces a draft's exercises. Validated whole: one bad question and nothing is written. */
+export async function saveExerciseSets(
+  db: Database,
+  actorUserId: string | null,
+  localizationId: string,
+  lockVersion: number,
+  sets: ExerciseSetInput[]
+) {
+  return translateDbErrors(() =>
+    db.transaction(async (tx) => {
+      const l = await lockLocalization(tx, localizationId);
+      const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
+      if (draft.status !== "DRAFT") throw conflict("The draft is in review; a reviewer must return it first");
+      await replaceExerciseSets(tx, l.siteId, draft.id, sets);
+      await tx
+        .update(rev)
+        .set({ lockVersion: draft.lockVersion + 1 })
+        .where(eq(rev.id, draft.id));
+      await audit(tx, {
+        siteId: l.siteId,
+        actorUserId,
+        action: "exercises.saved",
+        entityType: "revision",
+        entityId: draft.id,
+      });
+      return l.resourceId;
+    })
+  );
+}
+
+/** A site's resources for the dashboard, most recently created first. */
+export async function editorialResources(db: Database, siteId: string, first: number) {
+  return db
+    .select()
+    .from(resources)
+    .where(eq(resources.siteId, siteId))
+    .orderBy(sql`${resources.createdAt} desc`, sql`${resources.id} desc`)
+    .limit(Math.min(Math.max(first, 1), 100));
 }

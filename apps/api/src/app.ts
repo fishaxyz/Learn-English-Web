@@ -8,6 +8,7 @@ import { AppError, isClientSafe } from "./errors";
 import { createLoaders } from "./graphql/loaders";
 import { LIMITS, useLimits } from "./graphql/limits";
 import type { SiteModel } from "./models";
+import { clientOf } from "./modules/rate-limit";
 import { siteByDomain, siteDomainOf } from "./modules/sites";
 import { resolvers } from "./resolvers/index";
 
@@ -47,8 +48,11 @@ export function createApp(deps: ApiDependencies, options: AppOptions) {
       : false,
     logging: deps.log,
     plugins: [useLimits({ production: options.production })],
-    context: ({ request }): GraphQLContext => {
+    context: (initial): GraphQLContext => {
+      const { request } = initial;
       const domain = siteDomainOf(request.headers.get("x-site-domain"), deps.defaultSiteDomain);
+      const remote = (initial as { req?: IncomingMessage }).req?.socket.remoteAddress;
+      const client = clientOf(request.headers.get("x-forwarded-for"), remote, deps.trustProxy);
       return {
         db: deps.db,
         log: deps.log,
@@ -61,6 +65,8 @@ export function createApp(deps: ApiDependencies, options: AppOptions) {
         }),
         actor: once((): Promise<Actor | null> => resolveActor(deps.db, request.headers.get("authorization"))),
         loaders: createLoaders(deps.db),
+        limit: (name) => deps.rateLimiter.hit(name, client),
+        revalidator: deps.revalidator,
       };
     },
   });

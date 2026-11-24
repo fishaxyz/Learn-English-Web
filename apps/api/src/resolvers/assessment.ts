@@ -15,8 +15,10 @@ export const assessmentResolvers: Resolvers = {
     exerciseSet: async (_, { id }, ctx) => publishedExerciseSet(ctx.db, (await ctx.site()).id, id),
   },
   Mutation: {
-    gradePractice: async (_, { input }, ctx) =>
-      gradePractice(ctx.db, (await ctx.site()).id, input.exerciseSetId, input.answers),
+    gradePractice: async (_, { input }, ctx) => {
+      ctx.limit("grade");
+      return gradePractice(ctx.db, (await ctx.site()).id, input.exerciseSetId, input.answers);
+    },
   },
 
   ExerciseSet: {

@@ -1,3 +1,10 @@
+"""
+Exercises as editors write them: a list of sets, each {title, instructions?, questions: [...]}, where a question is
+{type, points?, prompt, options? (single choice), grading, explanation?}. Validated in full by the API; see
+apps/api/src/modules/assessment/schemas.ts for the exact shape of each question type. Editorial only.
+"""
+scalar ExercisePayload
+
 enum QuestionType {
   SINGLE_CHOICE
   TRUE_FALSE_NOT_GIVEN

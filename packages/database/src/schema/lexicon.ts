@@ -204,3 +204,35 @@ export const collectionItems = pgTable(
     }),
   ]
 );
+
+/**
+ * Vocabulary links inside a revision's text, derived by the API from the rich text's `lexical` marks on every
+ * save (so they can never drift from the text). Offsets are Unicode code points into the block's text.
+ */
+export const lexicalAnnotations = pgTable(
+  "lexical_annotations",
+  {
+    id: id(),
+    siteId: siteRef(),
+    revisionId: uuid().notNull(),
+    blockId: text().notNull(),
+    start: integer().notNull(),
+    end: integer().notNull(),
+    surfaceText: text().notNull(),
+    senseRevisionId: uuid().notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "lexical_annotations_revision_fk",
+      columns: [t.revisionId, t.siteId],
+      foreignColumns: [resourceRevisions.id, resourceRevisions.siteId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "lexical_annotations_sense_fk",
+      columns: [t.senseRevisionId, t.siteId],
+      foreignColumns: [lexicalSenseRevisions.id, lexicalSenseRevisions.siteId],
+    }),
+    index("lexical_annotations_revision").on(t.revisionId),
+    check("lexical_annotations_range", sql`${t.start} >= 0 and ${t.end} > ${t.start}`),
+  ]
+);

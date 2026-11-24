@@ -2,8 +2,8 @@ import type { CodegenConfig } from "@graphql-codegen/cli";
 
 // Schema-first (AGENTS.md §6): the .graphql files are the contract; every TypeScript type is generated from them.
 // Over the wire DateTime is an ISO string; inside the API it is a Date.
-const clientScalars = { ID: "string", DateTime: "string", RichText: "unknown" };
-const serverScalars = { ID: "string", DateTime: "Date", RichText: "unknown" };
+const clientScalars = { ID: "string", DateTime: "string", RichText: "unknown", ExercisePayload: "unknown" };
+const serverScalars = { ID: "string", DateTime: "Date", RichText: "unknown", ExercisePayload: "unknown" };
 
 const config: CodegenConfig = {
   schema: "schema/**/*.graphql",

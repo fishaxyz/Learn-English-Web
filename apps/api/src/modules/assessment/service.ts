@@ -60,6 +60,48 @@ export async function addExerciseSets(tx: Tx, siteId: string, revisionId: string
   }
 }
 
+/** Replaces all of a draft's exercises (the frozen-revision trigger refuses this for published ones). */
+export async function replaceExerciseSets(tx: Tx, siteId: string, revisionId: string, sets: ExerciseSetInput[]) {
+  await tx.delete(schema.exerciseSets).where(eq(schema.exerciseSets.revisionId, revisionId));
+  await addExerciseSets(tx, siteId, revisionId, sets);
+}
+
+/** A revision's exercises in the shape editors write them (answer keys included): editorial use only. */
+export async function exerciseSetsForEditing(db: Db, revisionId: string): Promise<ExerciseSetInput[]> {
+  const sets = await db
+    .select()
+    .from(schema.exerciseSets)
+    .where(eq(schema.exerciseSets.revisionId, revisionId))
+    .orderBy(asc(schema.exerciseSets.position));
+  const out: ExerciseSetInput[] = [];
+  for (const set of sets) {
+    const qs = await db
+      .select({ question: schema.questions, key: schema.answerKeys })
+      .from(schema.questions)
+      .innerJoin(schema.answerKeys, eq(schema.answerKeys.questionId, schema.questions.id))
+      .where(eq(schema.questions.exerciseSetId, set.id))
+      .orderBy(asc(schema.questions.position));
+    const questions = [];
+    for (const { question, key } of qs) {
+      const options = await db
+        .select({ content: schema.questionOptions.content })
+        .from(schema.questionOptions)
+        .where(eq(schema.questionOptions.questionId, question.id))
+        .orderBy(asc(schema.questionOptions.position));
+      questions.push({
+        type: question.type,
+        points: question.points,
+        prompt: question.promptJson,
+        ...(question.type === "SINGLE_CHOICE" ? { options: options.map((o) => o.content) } : {}),
+        grading: key.gradingJson,
+        ...(key.explanation ? { explanation: key.explanation } : {}),
+      } as ExerciseSetInput["questions"][number]);
+    }
+    out.push({ title: set.title, ...(set.instructions ? { instructions: set.instructions } : {}), questions });
+  }
+  return out;
+}
+
 /** Copies a revision's exercises (with their answer keys) onto a new draft, so the published ones stay frozen. */
 export async function copyExerciseSets(tx: Tx, siteId: string, fromRevisionId: string, toRevisionId: string) {
   const sets = await tx

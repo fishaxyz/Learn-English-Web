@@ -56,6 +56,8 @@ type ReadingResource implements Resource {
   topics: [Topic!]!
   examLabels: [ExamLabel!]!
   exerciseSets: [ExerciseSet!]!
+  "The word senses the text links to (its `lexical` marks), at the exact revisions it pinned."
+  vocabulary: [LexicalSense!]!
   wordCount: Int!
   "At about 200 words a minute."
   estimatedReadingSeconds: Int!
@@ -135,6 +137,8 @@ extend type Query {
 
   "Editorial: a resource with its draft and published revisions. Members of its site only."
   editorialResource(id: ID!): EditorialResource
+  "Editorial: a site's resources, newest first (at most 100)."
+  editorialResources(siteId: ID!, first: Int! = 50): [EditorialResource!]!
 }
 
 # --- Editorial
@@ -148,6 +152,10 @@ type Revision {
   cefrLevel: CefrLevel
   body: RichText!
   topics: [Topic!]!
+  "The linked word senses, as in the text."
+  vocabulary: [LexicalSense!]!
+  "The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only."
+  exercises: ExercisePayload!
   "Pass this back when you change the revision; a mismatch means someone else changed it first."
   lockVersion: Int!
   createdAt: DateTime!
@@ -208,6 +216,8 @@ extend type Mutation {
   returnToDraft(localizationId: ID!, lockVersion: Int!, note: String): EditorialResource!
   "Reviewers: publish the reviewed draft. The previous published revision is superseded, never changed."
   publishResource(localizationId: ID!, lockVersion: Int!): EditorialResource!
+  "Editors: replace the draft's exercises. Validated as a whole."
+  saveExerciseSets(localizationId: ID!, lockVersion: Int!, sets: ExercisePayload!): EditorialResource!
   "Admins: take the resource off the site. Its revisions are kept."
   archiveResource(resourceId: ID!): EditorialResource!
 }

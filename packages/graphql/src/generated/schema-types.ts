@@ -10,6 +10,12 @@ export type Scalars = {
   /** An ISO 8601 date-time, in UTC. */
   DateTime: { input: string; output: string; }
   /**
+   * Exercises as editors write them: a list of sets, each {title, instructions?, questions: [...]}, where a question is
+   * {type, points?, prompt, options? (single choice), grading, explanation?}. Validated in full by the API; see
+   * apps/api/src/modules/assessment/schemas.ts for the exact shape of each question type. Editorial only.
+   */
+  ExercisePayload: { input: unknown; output: unknown; }
+  /**
    * A rich-text document (Tiptap JSON, schema version 1). Validated by the API on every write; only known node
    * and mark types are accepted, and links must be http(s) or mailto.
    */
@@ -291,6 +297,8 @@ export type Mutation = {
   publishResource: EditorialResource;
   /** Reviewers: send it back to the editor. */
   returnToDraft: EditorialResource;
+  /** Editors: replace the draft's exercises. Validated as a whole. */
+  saveExerciseSets: EditorialResource;
   /** Editors: a new draft copied from the published revision (exercises included). */
   startDraft: EditorialResource;
   /** Editors: hand the draft to a reviewer. */
@@ -335,6 +343,13 @@ export type MutationReturnToDraftArgs = {
   localizationId: Scalars['ID']['input'];
   lockVersion: Scalars['Int']['input'];
   note?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationSaveExerciseSetsArgs = {
+  localizationId: Scalars['ID']['input'];
+  lockVersion: Scalars['Int']['input'];
+  sets: Scalars['ExercisePayload']['input'];
 };
 
 
@@ -392,6 +407,8 @@ export type Query = {
   __typename?: 'Query';
   /** Editorial: a resource with its draft and published revisions. Members of its site only. */
   editorialResource?: Maybe<EditorialResource>;
+  /** Editorial: a site's resources, newest first (at most 100). */
+  editorialResources: Array<EditorialResource>;
   /** A published exercise set on this site. */
   exerciseSet?: Maybe<ExerciseSet>;
   health: Health;
@@ -409,6 +426,12 @@ export type Query = {
 
 export type QueryEditorialResourceArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryEditorialResourcesArgs = {
+  first?: Scalars['Int']['input'];
+  siteId: Scalars['ID']['input'];
 };
 
 
@@ -487,6 +510,8 @@ export type ReadingResource = Resource & {
   summary?: Maybe<Scalars['String']['output']>;
   title: Scalars['String']['output'];
   topics: Array<Topic>;
+  /** The word senses the text links to (its `lexical` marks), at the exact revisions it pinned. */
+  vocabulary: Array<LexicalSense>;
   wordCount: Scalars['Int']['output'];
 };
 
@@ -534,6 +559,8 @@ export type Revision = {
   body: Scalars['RichText']['output'];
   cefrLevel?: Maybe<CefrLevel>;
   createdAt: Scalars['DateTime']['output'];
+  /** The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only. */
+  exercises: Scalars['ExercisePayload']['output'];
   id: Scalars['ID']['output'];
   /** Pass this back when you change the revision; a mismatch means someone else changed it first. */
   lockVersion: Scalars['Int']['output'];
@@ -545,6 +572,8 @@ export type Revision = {
   title: Scalars['String']['output'];
   topics: Array<Topic>;
   updatedAt: Scalars['DateTime']['output'];
+  /** The linked word senses, as in the text. */
+  vocabulary: Array<LexicalSense>;
 };
 
 export type RevisionStatus =

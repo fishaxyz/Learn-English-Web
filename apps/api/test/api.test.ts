@@ -2,6 +2,7 @@ import { schema } from "@english/database";
 import { testDatabaseUrl } from "@english/database/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { testDeps } from "./deps";
 import { codeOf, createHarness, type Harness } from "./helpers";
 
 const LIST = `query List($filter: ResourceFilter, $first: Int!, $after: String) {
@@ -464,15 +465,11 @@ describe.skipIf(!testDatabaseUrl)("Phase 1 API", () => {
 
     it("rejects large request bodies before parsing them", async () => {
       const { createApp } = await import("../src/app");
-      const { handler } = createApp(
-        {
-          db: h.t.db,
-          log: (await import("../src/logger")).createLogger(false, "test"),
-          ping: () => h.t.ping(),
-          defaultSiteDomain: "a.test",
-        },
-        { corsOrigins: [], graphiql: false, production: false }
-      );
+      const { handler } = createApp(testDeps({ db: h.t.db, ping: () => h.t.ping() }), {
+        corsOrigins: [],
+        graphiql: false,
+        production: false,
+      });
       const { createServer } = await import("node:http");
       const server = createServer(handler).listen(0);
       const port = (server.address() as { port: number }).port;

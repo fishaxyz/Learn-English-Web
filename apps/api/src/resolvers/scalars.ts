@@ -27,3 +27,11 @@ export const RichText = new GraphQLScalarType<unknown, unknown>({
   parseValue: (value) => value,
   parseLiteral: (ast) => valueFromASTUntyped(ast),
 });
+
+/** Editorial exercises: passed through as JSON, validated in full by saveExerciseSets. */
+export const ExercisePayload = new GraphQLScalarType<unknown, unknown>({
+  name: "ExercisePayload",
+  serialize: (value) => value,
+  parseValue: (value) => value,
+  parseLiteral: (ast) => valueFromASTUntyped(ast),
+});

@@ -22,6 +22,20 @@
       "when": 1795530169294,
       "tag": "0002_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795532322441,
+      "tag": "0003_lexical_annotations",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795532322956,
+      "tag": "0004_annotations_frozen",
+      "breakpoints": true
     }
   ]
 }

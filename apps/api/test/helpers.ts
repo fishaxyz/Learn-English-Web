@@ -1,28 +1,23 @@
 import { randomBytes } from "node:crypto";
 import { schema } from "@english/database";
 import { createTestDatabase, type TestDatabase } from "@english/database/testing";
-import { MemoryLogWriter } from "graphql-yoga";
 import { createApp } from "../src/app";
-import { createLogger } from "../src/logger";
 import type { SiteRoleValue } from "../src/models";
 import { seed } from "../src/seed/seed";
+import { testDeps } from "./deps";
 
 export type Harness = Awaited<ReturnType<typeof createHarness>>;
 
 /** A migrated throwaway database with site A seeded, an empty site B, and an editor of each role. */
-export async function createHarness() {
+export async function createHarness(overrides: Partial<Parameters<typeof testDeps>[0]> = {}) {
   const t: TestDatabase = await createTestDatabase();
   const a = await seed(t.db, "a.test", "Site A");
   const b = await seed(t.db, "b.test", "Site B");
-  const yoga = createApp(
-    {
-      db: t.db,
-      log: createLogger("error", "test", [new MemoryLogWriter()]),
-      ping: () => t.ping(),
-      defaultSiteDomain: "a.test",
-    },
-    { corsOrigins: [], graphiql: false, production: false }
-  ).yoga;
+  const yoga = createApp(testDeps({ db: t.db, ping: () => t.ping(), ...overrides }), {
+    corsOrigins: [],
+    graphiql: false,
+    production: false,
+  }).yoga;
 
   /** A signed-in editor: a user, a membership and a live session token. */
   async function editor(siteId: string, role: SiteRoleValue) {

@@ -1,16 +1,14 @@
 import type { Database } from "@english/database";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
-import { MemoryLogWriter } from "graphql-yoga";
-import { createLogger } from "../src/logger";
-
-const quiet = createLogger("error", "test", [new MemoryLogWriter()]);
+import { testDeps } from "./deps";
 
 function app(databaseUp: boolean) {
-  return createApp(
-    { db: {} as Database, log: quiet, ping: async () => databaseUp, defaultSiteDomain: "localhost" },
-    { corsOrigins: [], graphiql: false, production: false }
-  ).yoga;
+  return createApp(testDeps({ db: {} as Database, ping: async () => databaseUp }), {
+    corsOrigins: [],
+    graphiql: false,
+    production: false,
+  }).yoga;
 }
 
 const healthQuery = (yoga: ReturnType<typeof app>) =>
@@ -38,14 +36,12 @@ describe("health", () => {
 
   it("hides unexpected errors from clients", async () => {
     const yoga = createApp(
-      {
+      testDeps({
         db: {} as Database,
-        log: quiet,
         ping: async () => {
           throw new Error("connect ECONNREFUSED 10.0.0.5:5432 password=hunter2");
         },
-        defaultSiteDomain: "localhost",
-      },
+      }),
       { corsOrigins: [], graphiql: false, production: false }
     ).yoga;
     const body = JSON.stringify(await (await healthQuery(yoga)).json());
