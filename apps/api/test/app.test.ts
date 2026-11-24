@@ -8,8 +8,8 @@ const quiet = createLogger("error", "test", [new MemoryLogWriter()]);
 
 function app(databaseUp: boolean) {
   return createApp(
-    { db: {} as Database, log: quiet, ping: async () => databaseUp },
-    { corsOrigins: [], graphiql: false }
+    { db: {} as Database, log: quiet, ping: async () => databaseUp, defaultSiteDomain: "localhost" },
+    { corsOrigins: [], graphiql: false, production: false }
   ).yoga;
 }
 
@@ -44,8 +44,9 @@ describe("health", () => {
         ping: async () => {
           throw new Error("connect ECONNREFUSED 10.0.0.5:5432 password=hunter2");
         },
+        defaultSiteDomain: "localhost",
       },
-      { corsOrigins: [], graphiql: false }
+      { corsOrigins: [], graphiql: false, production: false }
     ).yoga;
     const body = JSON.stringify(await (await healthQuery(yoga)).json());
     expect(body).toContain("Unexpected error");

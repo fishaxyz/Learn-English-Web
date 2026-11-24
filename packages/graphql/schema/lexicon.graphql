@@ -1,0 +1,111 @@
+enum LexicalEntryKind {
+  WORD
+  PHRASE
+  COLLOCATION
+  IDIOM
+  PHRASAL_VERB
+}
+
+type LexicalExample {
+  sentence: String!
+  explanation: String
+}
+
+type Pronunciation {
+  "BCP 47 accent label, e.g. en-GB or en-US."
+  accent: String!
+  ipa: String!
+}
+
+"One meaning of a headword, as one exact revision."
+type LexicalSense {
+  id: ID!
+  senseKey: String!
+  partOfSpeech: String!
+  revisionId: ID!
+  definition: String!
+  cefrLevel: CefrLevel
+  usageNote: String
+  register: String
+  examples: [LexicalExample!]!
+  pronunciations: [Pronunciation!]!
+  entry: LexicalEntry!
+}
+
+type LexicalEntry {
+  id: ID!
+  displayForm: String!
+  kind: LexicalEntryKind!
+  language: String!
+  "Published senses only."
+  senses: [LexicalSense!]!
+}
+
+extend type Query {
+  "Exact and fuzzy headword lookup. Only entries with a published sense. `first` is at most 50."
+  lexicalSearch(query: String!, first: Int! = 20): [LexicalEntry!]!
+  lexicalEntryById(id: ID!): LexicalEntry
+}
+
+# --- Editorial
+
+type SenseRevision {
+  id: ID!
+  revisionNo: Int!
+  status: RevisionStatus!
+  definition: String!
+  cefrLevel: CefrLevel
+  usageNote: String
+  register: String
+  lockVersion: Int!
+  examples: [LexicalExample!]!
+  pronunciations: [Pronunciation!]!
+}
+
+type EditorialSense {
+  id: ID!
+  senseKey: String!
+  partOfSpeech: String!
+  entry: LexicalEntry!
+  draft: SenseRevision
+  published: SenseRevision
+}
+
+input LexicalExampleInput {
+  sentence: String!
+  explanation: String
+}
+
+input PronunciationInput {
+  accent: String!
+  ipa: String!
+}
+
+"""
+Creates a sense (and its entry, given headword and kind), or edits a sense's draft. Editing a sense with no
+draft starts a new draft revision; the published one is never changed.
+"""
+input ManageLexicalSenseInput {
+  siteId: ID!
+  "An existing sense to edit. Omit to create one."
+  senseId: ID
+  "For a new sense: its entry, or headword + kind to create one."
+  entryId: ID
+  headword: String
+  kind: LexicalEntryKind
+  partOfSpeech: String!
+  senseKey: String!
+  definition: String!
+  cefrLevel: CefrLevel
+  usageNote: String
+  register: String
+  examples: [LexicalExampleInput!]! = []
+  pronunciations: [PronunciationInput!]! = []
+  "Required when editing an existing draft."
+  lockVersion: Int
+}
+
+extend type Mutation {
+  manageLexicalSense(input: ManageLexicalSenseInput!): EditorialSense!
+  publishLexicalSense(senseId: ID!, lockVersion: Int!): EditorialSense!
+}

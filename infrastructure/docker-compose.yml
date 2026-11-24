@@ -20,6 +20,18 @@ services:
       timeout: 3s
       retries: 10
 
+  # Applies database migrations once, then exits; the API starts only if it succeeded (AGENTS.md §12).
+  migrate:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: ..
@@ -30,11 +42,12 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_JSON: "1"
+      DEFAULT_SITE_DOMAIN: ${DEFAULT_SITE_DOMAIN:-localhost}
     ports:
       - "127.0.0.1:4400:4400"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   website:
     build:

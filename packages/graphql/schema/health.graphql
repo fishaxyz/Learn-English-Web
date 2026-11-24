@@ -10,6 +10,6 @@ type Health {
   database: HealthStatus!
 }
 
-type Query {
+extend type Query {
   health: Health!
 }

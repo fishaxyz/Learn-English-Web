@@ -1,0 +1,32 @@
+enum SiteRole {
+  OWNER
+  ADMIN
+  EDITOR
+  REVIEWER
+  VIEWER
+}
+
+type Site {
+  id: ID!
+  domain: String!
+  name: String!
+  defaultLocale: String!
+}
+
+type Membership {
+  site: Site!
+  role: SiteRole!
+}
+
+"The signed-in editor. Learners have no accounts until a later phase."
+type Viewer {
+  id: ID!
+  email: String!
+  name: String
+  memberships: [Membership!]!
+}
+
+extend type Query {
+  "Who is signed in (from the request's session token), or null."
+  viewer: Viewer
+}

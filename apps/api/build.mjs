@@ -3,8 +3,13 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["src/server.ts"],
-  outfile: "dist/server.js",
+  // The server, the one-shot migration step (run before it starts) and the local sample-content seed.
+  entryPoints: {
+    server: "src/server.ts",
+    migrate: "../../packages/database/src/cli/migrate.ts",
+    seed: "src/seed/run.ts",
+  },
+  outdir: "dist",
   bundle: true,
   platform: "node",
   target: "node22",

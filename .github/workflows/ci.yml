@@ -15,6 +15,20 @@ concurrency:
 jobs:
   typescript:
     runs-on: ubuntu-latest
+    # Integration tests run against real PostgreSQL (AGENTS.md §11), in throwaway databases.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://ci:ci-only-password@localhost:5432/ci
+      REQUIRE_DATABASE_TESTS: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -28,6 +42,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: Schema and migrations agree
+        run: pnpm --filter @english/database db:check && (cd packages/database && npx drizzle-kit generate --name=ci-drift-check | grep -q "No schema changes")
       - run: pnpm test
       - run: pnpm build
         env:
@@ -56,8 +72,12 @@ jobs:
       - run: cp .env.example .env
       - name: Start every service and wait until all are healthy
         run: docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait --wait-timeout 300
-      - name: Check the health endpoints
+      - name: Load the sample content
+        run: docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm -e NODE_ENV=development api node dist/seed.js
+      - name: Check the health endpoints and a real query
         run: |
+          curl -fsS -X POST http://127.0.0.1:4400/graphql -H 'content-type: application/json' \
+            -d '{"query":"{ publishedResources(first: 5) { nodes { slug } } }"}' | grep -q a-morning-commute
           curl -fsS http://127.0.0.1:4400/health/ready
           curl -fsS http://127.0.0.1:3400/api/health/ready
           curl -fsS http://127.0.0.1:3401/api/health/ready

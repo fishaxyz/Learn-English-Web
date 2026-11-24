@@ -1,0 +1,28 @@
+# Root types. Every other file extends them, one domain per file (AGENTS.md §16).
+type Query
+type Mutation
+
+"An ISO 8601 date-time, in UTC."
+scalar DateTime
+
+"""
+A rich-text document (Tiptap JSON, schema version 1). Validated by the API on every write; only known node
+and mark types are accepted, and links must be http(s) or mailto.
+"""
+scalar RichText
+
+"For cursor pagination: pass endCursor as `after` to get the next page."
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+"CEFR levels. An editorial estimate of a lesson's difficulty, not a guarantee of a learner's level."
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}

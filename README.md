@@ -6,7 +6,7 @@ An SEO-friendly platform for learning English through Reading, Listening and Voc
 - **[docs/ROADMAP.md](docs/ROADMAP.md)**: the build phases and their acceptance checks.
 - **[docs/adr/](docs/adr/)**: decision records.
 
-Status: **Phase 0** (foundations). There are no lessons yet.
+Status: **Phase 1** (data model and API). The API serves sample lessons; the website and dashboard screens come in Phase 2.
 
 ## What's here
 
@@ -39,11 +39,18 @@ pnpm docker:ps            # status and health of each service
 pnpm docker:down          # stop (the database volume is kept)
 ```
 
+Load the sample lessons (only once is needed; running it again changes nothing):
+
+```sh
+pnpm docker:seed
+```
+
 Then check:
 
 - the website at <http://localhost:3400>;
 - the dashboard at <http://localhost:3401>;
-- the API's readiness at <http://localhost:4400/health/ready>.
+- the API's readiness at <http://localhost:4400/health/ready>;
+- a lesson, by posting `{ publishedResources(first: 5) { nodes { slug title } } }` to <http://localhost:4400/graphql>.
 
 ## Develop without Docker
 
@@ -53,7 +60,12 @@ cp .env.example .env
 pnpm dev                  # website, dashboard and API, reloading on change
 ```
 
-The API needs a running PostgreSQL at `DATABASE_URL`. Without one it still starts, but `/health/ready` answers 503.
+The API needs a running PostgreSQL at `DATABASE_URL` (Docker's is on port 5434). Without one it still starts, but `/health/ready` answers 503.
+
+```sh
+pnpm db:migrate           # apply migrations to DATABASE_URL
+pnpm db:seed              # sample lessons on the DEFAULT_SITE_DOMAIN site
+```
 
 To run the worker:
 
@@ -69,10 +81,13 @@ GRAPHQL_API_URL=http://localhost:4400 uv run content-engine-worker
 pnpm check                # format, lint, type checks and tests (TypeScript)
 pnpm build                # production builds of the API, website and dashboard
 pnpm codegen              # regenerate GraphQL types after editing packages/graphql/schema
+pnpm --filter @english/database db:generate --name=<change>   # a migration after editing the Drizzle schema
 
 cd services/python-engine
 uv run ruff check . && uv run ruff format --check . && uv run mypy src tests && uv run pytest
 ```
+
+Database tests need `TEST_DATABASE_URL` (in `.env`): a server where they create and drop throwaway `test_*` databases. Never point it at production.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of these on every push. It also starts the full Docker Compose stack and checks every health endpoint.
 

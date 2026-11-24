@@ -1,0 +1,131 @@
+enum QuestionType {
+  SINGLE_CHOICE
+  TRUE_FALSE_NOT_GIVEN
+  GAP_FILL
+}
+
+enum Judgement {
+  TRUE
+  FALSE
+  NOT_GIVEN
+}
+
+"A question as the learner sees it. Answers are never part of it: they come back from gradePractice."
+interface Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+}
+
+type QuestionOption {
+  id: ID!
+  content: String!
+}
+
+type SingleChoiceQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  stem: String!
+  options: [QuestionOption!]!
+}
+
+type TrueFalseNotGivenQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  statement: String!
+}
+
+type TextSegment {
+  text: String!
+}
+
+type GapSegment {
+  gapId: String!
+}
+
+union GapFillSegment = TextSegment | GapSegment
+
+type GapFillQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  segments: [GapFillSegment!]!
+}
+
+type ExerciseSet {
+  id: ID!
+  title: String!
+  instructions: String
+  questions: [Question!]!
+}
+
+input GapAnswerInput {
+  gapId: String!
+  text: String!
+}
+
+"One answer: optionId for single choice, judgement for true/false/not given, gaps for gap fill."
+input PracticeAnswerInput {
+  questionId: ID!
+  optionId: ID
+  judgement: Judgement
+  gaps: [GapAnswerInput!]
+}
+
+input GradePracticeInput {
+  exerciseSetId: ID!
+  "At most 100."
+  answers: [PracticeAnswerInput!]!
+}
+
+type ChoiceAnswer {
+  optionId: ID!
+}
+
+type JudgementAnswer {
+  judgement: Judgement!
+}
+
+type GapAnswer {
+  gapId: String!
+  "The first accepted answer."
+  text: String!
+}
+
+type GapsAnswer {
+  gaps: [GapAnswer!]!
+}
+
+union CorrectAnswer = ChoiceAnswer | JudgementAnswer | GapsAnswer
+
+type QuestionResult {
+  questionId: ID!
+  correct: Boolean!
+  awardedPoints: Int!
+  maxPoints: Int!
+  explanation: String
+  correctAnswer: CorrectAnswer!
+}
+
+type PracticeResult {
+  exerciseSetId: ID!
+  score: Int!
+  maxScore: Int!
+  questions: [QuestionResult!]!
+}
+
+extend type Query {
+  "A published exercise set on this site."
+  exerciseSet(id: ID!): ExerciseSet
+}
+
+extend type Mutation {
+  "Grades answers on the server. Nothing is stored: practice is anonymous in the MVP."
+  gradePractice(input: GradePracticeInput!): PracticeResult!
+}

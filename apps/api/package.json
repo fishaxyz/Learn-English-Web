@@ -8,12 +8,14 @@
     "build": "node build.mjs",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "tsx --env-file-if-exists=../../.env src/seed/run.ts"
   },
   "dependencies": {
     "@english/config": "workspace:*",
     "@english/database": "workspace:*",
     "@english/graphql": "workspace:*",
+    "dataloader": "2.2.3",
     "drizzle-orm": "0.45.4",
     "graphql": "16.15.0",
     "graphql-yoga": "6.0.1",

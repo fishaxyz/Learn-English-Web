@@ -1,0 +1,213 @@
+enum ResourceKind {
+  READING
+  LISTENING
+  LEXICAL_COLLECTION
+  ARTICLE
+}
+
+enum RevisionStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  SUPERSEDED
+}
+
+type Topic {
+  id: ID!
+  slug: String!
+  name: String!
+  description: String
+}
+
+type ExamLabel {
+  id: ID!
+  code: String!
+  name: String!
+}
+
+"A published lesson or article, as learners see it. Always one exact, frozen revision."
+interface Resource {
+  id: ID!
+  kind: ResourceKind!
+  locale: String!
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText!
+  revisionNo: Int!
+  publishedAt: DateTime!
+  topics: [Topic!]!
+  examLabels: [ExamLabel!]!
+  exerciseSets: [ExerciseSet!]!
+}
+
+type ReadingResource implements Resource {
+  id: ID!
+  kind: ResourceKind!
+  locale: String!
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText!
+  revisionNo: Int!
+  publishedAt: DateTime!
+  topics: [Topic!]!
+  examLabels: [ExamLabel!]!
+  exerciseSets: [ExerciseSet!]!
+  wordCount: Int!
+  "At about 200 words a minute."
+  estimatedReadingSeconds: Int!
+}
+
+type ListeningResource implements Resource {
+  id: ID!
+  kind: ResourceKind!
+  locale: String!
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  "The transcript. Audio tracks and timings arrive in Phase 3."
+  body: RichText!
+  revisionNo: Int!
+  publishedAt: DateTime!
+  topics: [Topic!]!
+  examLabels: [ExamLabel!]!
+  exerciseSets: [ExerciseSet!]!
+}
+
+type LexicalCollectionResource implements Resource {
+  id: ID!
+  kind: ResourceKind!
+  locale: String!
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText!
+  revisionNo: Int!
+  publishedAt: DateTime!
+  topics: [Topic!]!
+  examLabels: [ExamLabel!]!
+  exerciseSets: [ExerciseSet!]!
+  "The words, pinned to the exact sense revisions chosen when the collection was published."
+  items: [LexicalSense!]!
+}
+
+type ArticleResource implements Resource {
+  id: ID!
+  kind: ResourceKind!
+  locale: String!
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText!
+  revisionNo: Int!
+  publishedAt: DateTime!
+  topics: [Topic!]!
+  examLabels: [ExamLabel!]!
+  exerciseSets: [ExerciseSet!]!
+}
+
+input ResourceFilter {
+  kind: ResourceKind
+  cefrLevel: CefrLevel
+  topicSlug: String
+  "Defaults to the site's default locale."
+  locale: String
+  "Full-text search in titles, summaries and text."
+  search: String
+}
+
+type ResourceConnection {
+  nodes: [Resource!]!
+  pageInfo: PageInfo!
+}
+
+extend type Query {
+  "Published resources on this site, newest first. `first` is at most 50."
+  publishedResources(filter: ResourceFilter, first: Int! = 20, after: String): ResourceConnection!
+  resourceBySlug(kind: ResourceKind!, slug: String!, locale: String): Resource
+  topics: [Topic!]!
+
+  "Editorial: a resource with its draft and published revisions. Members of its site only."
+  editorialResource(id: ID!): EditorialResource
+}
+
+# --- Editorial
+
+type Revision {
+  id: ID!
+  revisionNo: Int!
+  status: RevisionStatus!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText!
+  topics: [Topic!]!
+  "Pass this back when you change the revision; a mismatch means someone else changed it first."
+  lockVersion: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  submittedAt: DateTime
+  publishedAt: DateTime
+}
+
+type EditorialLocalization {
+  id: ID!
+  locale: String!
+  slug: String!
+  draft: Revision
+  published: Revision
+}
+
+type EditorialResource {
+  id: ID!
+  kind: ResourceKind!
+  site: Site!
+  createdAt: DateTime!
+  archivedAt: DateTime
+  localizations: [EditorialLocalization!]!
+}
+
+input CreateResourceInput {
+  siteId: ID!
+  kind: ResourceKind!
+  locale: String! = "en"
+  slug: String!
+  title: String!
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText
+  topicSlugs: [String!]
+}
+
+input UpdateDraftInput {
+  localizationId: ID!
+  lockVersion: Int!
+  title: String
+  summary: String
+  cefrLevel: CefrLevel
+  body: RichText
+  "Replaces the draft's topics."
+  topicSlugs: [String!]
+}
+
+extend type Mutation {
+  "Editors: a new resource with its first draft."
+  createResource(input: CreateResourceInput!): EditorialResource!
+  "Editors: a new draft copied from the published revision (exercises included)."
+  startDraft(localizationId: ID!): EditorialResource!
+  updateDraft(input: UpdateDraftInput!): EditorialResource!
+  "Editors: hand the draft to a reviewer."
+  submitForReview(localizationId: ID!, lockVersion: Int!): EditorialResource!
+  "Reviewers: send it back to the editor."
+  returnToDraft(localizationId: ID!, lockVersion: Int!, note: String): EditorialResource!
+  "Reviewers: publish the reviewed draft. The previous published revision is superseded, never changed."
+  publishResource(localizationId: ID!, lockVersion: Int!): EditorialResource!
+  "Admins: take the resource off the site. Its revisions are kept."
+  archiveResource(resourceId: ID!): EditorialResource!
+}

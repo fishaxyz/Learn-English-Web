@@ -6,6 +6,8 @@ const schema = z.object({
   LOG_LEVEL: logLevel,
   DATABASE_URL: databaseUrl,
   API_PORT: port.default(4400),
+  /** The site a request is for when it doesn't send x-site-domain. */
+  DEFAULT_SITE_DOMAIN: z.string().trim().toLowerCase().min(1).default("localhost"),
   /** Browser origins allowed to call the API, comma-separated. Server-to-server calls don't need it. */
   CORS_ORIGINS: z
     .string()

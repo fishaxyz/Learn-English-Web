@@ -29,9 +29,10 @@ Other decisions:
   - readiness is `/health/ready`, which checks the database;
   - the Next.js apps answer `/api/health/live` and `/api/health/ready`, which checks the API;
   - the worker writes a heartbeat file.
-- **Tests and the database:** Phase 0 has no database tests. From Phase 1, integration tests run against real PostgreSQL in CI, and against PGlite (Postgres compiled to WebAssembly) locally when no `TEST_DATABASE_URL` is set.
+- **Tests and the database:** see ADR 0002. Tests always use real PostgreSQL; the PGlite idea was dropped.
+
+- **Local Docker engine:** Colima (free, open source), installed with Homebrew together with the docker, docker-compose and docker-buildx CLIs. Docker Desktop also works; nothing in the project depends on which engine runs.
 
 ## Consequences
 
 - Upgrading to TypeScript 7, graphql 17 or codegen 8 is a separate, deliberate change. The CI checks will show whether it works.
-- **Local Docker engine:** Colima (free, open source), installed with Homebrew together with the docker, docker-compose and docker-buildx CLIs. Docker Desktop also works; nothing in the project depends on which engine runs.

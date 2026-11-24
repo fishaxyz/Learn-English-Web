@@ -1,0 +1,353 @@
+import { schema, type Database } from "@english/database";
+import { and, eq, inArray, max, sql } from "drizzle-orm";
+import { conflict, invalid, notFound, translateDbErrors } from "../../errors";
+import type { RevisionModel } from "../../models";
+import { copyExerciseSets } from "../assessment/service";
+import { audit } from "../audit";
+import { one } from "../../rows";
+import { EMPTY_DOCUMENT, parseRichText, plainTextOf, RICH_TEXT_SCHEMA_VERSION } from "../rich-text";
+
+type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type Kind = (typeof schema.resourceKind.enumValues)[number];
+type Level = (typeof schema.cefrLevel.enumValues)[number];
+
+const { resources, resourceLocalizations: loc, resourceRevisions: rev } = schema;
+
+const LOCALE = /^[a-z]{2}(-[A-Z]{2})?$/;
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+function checkText(title: string | null | undefined, summary: string | null | undefined) {
+  if (title !== undefined && title !== null && (title.trim().length < 1 || title.length > 200)) {
+    throw invalid("The title must be 1 to 200 characters");
+  }
+  if (summary && summary.length > 1000) throw invalid("The summary must be at most 1000 characters");
+}
+
+/** Which site a localization belongs to, so the caller can authorize before anything else happens. */
+export async function siteOfLocalization(db: Database, localizationId: string): Promise<string | null> {
+  const [row] = await db.select({ siteId: loc.siteId }).from(loc).where(eq(loc.id, localizationId)).limit(1);
+  return row?.siteId ?? null;
+}
+
+export async function siteOfResource(db: Database, resourceId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ siteId: resources.siteId })
+    .from(resources)
+    .where(eq(resources.id, resourceId))
+    .limit(1);
+  return row?.siteId ?? null;
+}
+
+async function setTopics(tx: Tx, siteId: string, revisionId: string, slugs: string[]) {
+  const unique = [...new Set(slugs)];
+  const found = unique.length
+    ? await tx
+        .select({ id: schema.topics.id, slug: schema.topics.slug })
+        .from(schema.topics)
+        .where(and(eq(schema.topics.siteId, siteId), inArray(schema.topics.slug, unique)))
+    : [];
+  const missing = unique.filter((s) => !found.some((f) => f.slug === s));
+  if (missing.length) throw invalid(`Unknown topic: ${missing.join(", ")}`);
+  await tx.delete(schema.revisionTopics).where(eq(schema.revisionTopics.revisionId, revisionId));
+  if (found.length) {
+    await tx.insert(schema.revisionTopics).values(found.map((t) => ({ siteId, revisionId, topicId: t.id })));
+  }
+}
+
+/** The localization, locked for the rest of the transaction so two publishes can't interleave. */
+async function lockLocalization(tx: Tx, localizationId: string) {
+  const [row] = await tx.select().from(loc).where(eq(loc.id, localizationId)).for("update").limit(1);
+  if (!row) throw notFound("Resource");
+  return row;
+}
+
+async function draftOf(tx: Tx, draftRevisionId: string | null, lockVersion: number): Promise<RevisionModel> {
+  if (!draftRevisionId) throw conflict("There's no draft: start one first");
+  const [draft] = await tx.select().from(rev).where(eq(rev.id, draftRevisionId)).limit(1);
+  if (!draft) throw notFound("Draft");
+  if (draft.lockVersion !== lockVersion) throw conflict("Someone else changed this draft; reload it");
+  return draft;
+}
+
+export type CreateResource = {
+  siteId: string;
+  kind: Kind;
+  locale: string;
+  slug: string;
+  title: string;
+  summary?: string | null;
+  cefrLevel?: Level | null;
+  body?: unknown;
+  topicSlugs?: string[] | null;
+};
+
+export async function createResource(db: Database, actorUserId: string | null, input: CreateResource) {
+  if (!LOCALE.test(input.locale)) throw invalid("The locale must look like en or en-GB");
+  if (!SLUG.test(input.slug) || input.slug.length > 120) throw invalid("The slug must be lowercase words joined by -");
+  checkText(input.title, input.summary);
+  const body = input.body === undefined || input.body === null ? EMPTY_DOCUMENT : parseRichText(input.body);
+
+  return translateDbErrors(
+    () =>
+      db.transaction(async (tx) => {
+        const resource = one(
+          await tx
+            .insert(resources)
+            .values({ siteId: input.siteId, kind: input.kind, authorId: actorUserId })
+            .returning()
+        );
+        const localization = one(
+          await tx
+            .insert(loc)
+            .values({ siteId: input.siteId, resourceId: resource.id, locale: input.locale, slug: input.slug })
+            .returning()
+        );
+        const draft = one(
+          await tx
+            .insert(rev)
+            .values({
+              siteId: input.siteId,
+              localizationId: localization.id,
+              revisionNo: 1,
+              title: input.title.trim(),
+              summary: input.summary ?? null,
+              cefrLevel: input.cefrLevel ?? null,
+              richText: body,
+              plainText: plainTextOf(body),
+              schemaVersion: RICH_TEXT_SCHEMA_VERSION,
+              createdBy: actorUserId,
+            })
+            .returning()
+        );
+        await tx.update(loc).set({ draftRevisionId: draft.id }).where(eq(loc.id, localization.id));
+        if (input.topicSlugs) await setTopics(tx, input.siteId, draft.id, input.topicSlugs);
+        await audit(tx, {
+          siteId: input.siteId,
+          actorUserId,
+          action: "resource.created",
+          entityType: "resource",
+          entityId: resource.id,
+          data: { kind: input.kind, locale: input.locale, slug: input.slug },
+        });
+        return resource;
+      }),
+    { unique: "That slug is already used on this site" }
+  );
+}
+
+/** A new draft from the published revision: every attached part is copied, so the published one stays frozen. */
+export async function startDraft(db: Database, actorUserId: string | null, localizationId: string) {
+  return translateDbErrors(() =>
+    db.transaction(async (tx) => {
+      const l = await lockLocalization(tx, localizationId);
+      if (l.draftRevisionId) throw conflict("A draft already exists");
+      if (!l.publishedRevisionId) throw conflict("Nothing is published to start from");
+      const published = one(await tx.select().from(rev).where(eq(rev.id, l.publishedRevisionId)));
+      const [{ last } = { last: 0 }] = await tx
+        .select({ last: max(rev.revisionNo) })
+        .from(rev)
+        .where(eq(rev.localizationId, l.id));
+      const p = published;
+      const draft = one(
+        await tx
+          .insert(rev)
+          .values({
+            siteId: p.siteId,
+            localizationId: l.id,
+            revisionNo: (last ?? 0) + 1,
+            title: p.title,
+            summary: p.summary,
+            cefrLevel: p.cefrLevel,
+            richText: p.richText,
+            plainText: p.plainText,
+            seoTitle: p.seoTitle,
+            seoDescription: p.seoDescription,
+            schemaVersion: p.schemaVersion,
+            createdBy: actorUserId,
+          })
+          .returning()
+      );
+      const d = draft;
+      await tx.execute(sql`
+        insert into revision_topics (site_id, revision_id, topic_id)
+          select site_id, ${d.id}, topic_id from revision_topics where revision_id = ${p.id}`);
+      await tx.execute(sql`
+        insert into revision_exam_labels (site_id, revision_id, exam_label_id)
+          select site_id, ${d.id}, exam_label_id from revision_exam_labels where revision_id = ${p.id}`);
+      await tx.execute(sql`
+        insert into revision_media (site_id, revision_id, asset_id, role, position)
+          select site_id, ${d.id}, asset_id, role, position from revision_media where revision_id = ${p.id}`);
+      await tx.execute(sql`
+        insert into collection_items (site_id, revision_id, sense_revision_id, position)
+          select site_id, ${d.id}, sense_revision_id, position from collection_items where revision_id = ${p.id}`);
+      await copyExerciseSets(tx, p.siteId, p.id, d.id);
+      await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));
+      await audit(tx, {
+        siteId: l.siteId,
+        actorUserId,
+        action: "draft.started",
+        entityType: "revision",
+        entityId: d.id,
+      });
+      return l.resourceId;
+    })
+  );
+}
+
+export type UpdateDraft = {
+  localizationId: string;
+  lockVersion: number;
+  title?: string | null;
+  summary?: string | null;
+  cefrLevel?: Level | null;
+  body?: unknown;
+  topicSlugs?: string[] | null;
+};
+
+export async function updateDraft(db: Database, actorUserId: string | null, input: UpdateDraft) {
+  checkText(input.title, input.summary);
+  const body = input.body === undefined || input.body === null ? undefined : parseRichText(input.body);
+  return translateDbErrors(() =>
+    db.transaction(async (tx) => {
+      const l = await lockLocalization(tx, input.localizationId);
+      const draft = await draftOf(tx, l.draftRevisionId, input.lockVersion);
+      if (draft.status !== "DRAFT") throw conflict("The draft is in review; a reviewer must return it first");
+      await tx
+        .update(rev)
+        .set({
+          ...(input.title ? { title: input.title.trim() } : {}),
+          ...(input.summary !== undefined ? { summary: input.summary } : {}),
+          ...(input.cefrLevel !== undefined ? { cefrLevel: input.cefrLevel } : {}),
+          ...(body ? { richText: body, plainText: plainTextOf(body) } : {}),
+          lockVersion: draft.lockVersion + 1,
+        })
+        .where(and(eq(rev.id, draft.id), eq(rev.lockVersion, draft.lockVersion)));
+      if (input.topicSlugs) await setTopics(tx, l.siteId, draft.id, input.topicSlugs);
+      await audit(tx, {
+        siteId: l.siteId,
+        actorUserId,
+        action: "draft.updated",
+        entityType: "revision",
+        entityId: draft.id,
+      });
+      return l.resourceId;
+    })
+  );
+}
+
+/** DRAFT → IN_REVIEW (submit) or IN_REVIEW → DRAFT (return to the editor). */
+export async function moveDraft(
+  db: Database,
+  actorUserId: string | null,
+  localizationId: string,
+  lockVersion: number,
+  to: "IN_REVIEW" | "DRAFT",
+  note?: string | null
+) {
+  if (note && note.length > 2000) throw invalid("The note must be at most 2000 characters");
+  return db.transaction(async (tx) => {
+    const l = await lockLocalization(tx, localizationId);
+    const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
+    const from = to === "IN_REVIEW" ? "DRAFT" : "IN_REVIEW";
+    if (draft.status !== from) throw conflict(to === "IN_REVIEW" ? "It's already in review" : "It isn't in review");
+    await tx
+      .update(rev)
+      .set({ status: to, submittedAt: to === "IN_REVIEW" ? new Date() : null, lockVersion: draft.lockVersion + 1 })
+      .where(eq(rev.id, draft.id));
+    await audit(tx, {
+      siteId: l.siteId,
+      actorUserId,
+      action: to === "IN_REVIEW" ? "draft.submitted" : "draft.returned",
+      entityType: "revision",
+      entityId: draft.id,
+      ...(note ? { data: { note } } : {}),
+    });
+    return l.resourceId;
+  });
+}
+
+/**
+ * IN_REVIEW → PUBLISHED, atomically (AGENTS.md §5.1): the previous published revision becomes SUPERSEDED
+ * (unchanged otherwise), the pointers move, and the draft pointer clears. Collections may only pin frozen
+ * (published) sense revisions.
+ */
+export async function publishResource(
+  db: Database,
+  actorUserId: string | null,
+  localizationId: string,
+  lockVersion: number
+) {
+  return translateDbErrors(() =>
+    db.transaction(async (tx) => {
+      const l = await lockLocalization(tx, localizationId);
+      const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
+      if (draft.status !== "IN_REVIEW") throw conflict("Only a reviewed draft can be published: submit it for review");
+      const unpublished = await tx
+        .select({ id: schema.lexicalSenseRevisions.id })
+        .from(schema.collectionItems)
+        .innerJoin(
+          schema.lexicalSenseRevisions,
+          eq(schema.lexicalSenseRevisions.id, schema.collectionItems.senseRevisionId)
+        )
+        .where(
+          and(
+            eq(schema.collectionItems.revisionId, draft.id),
+            inArray(schema.lexicalSenseRevisions.status, ["DRAFT", "IN_REVIEW"])
+          )
+        );
+      if (unpublished.length) throw conflict("Publish the collection's word senses first");
+
+      if (l.publishedRevisionId) {
+        await tx.update(rev).set({ status: "SUPERSEDED" }).where(eq(rev.id, l.publishedRevisionId));
+      }
+      await tx
+        .update(rev)
+        .set({
+          status: "PUBLISHED",
+          publishedAt: new Date(),
+          publishedBy: actorUserId,
+          lockVersion: draft.lockVersion + 1,
+        })
+        .where(eq(rev.id, draft.id));
+      await tx.update(loc).set({ publishedRevisionId: draft.id, draftRevisionId: null }).where(eq(loc.id, l.id));
+      await audit(tx, {
+        siteId: l.siteId,
+        actorUserId,
+        action: "resource.published",
+        entityType: "revision",
+        entityId: draft.id,
+        data: { revisionNo: draft.revisionNo, superseded: l.publishedRevisionId },
+      });
+      return l.resourceId;
+    })
+  );
+}
+
+export async function archiveResource(db: Database, actorUserId: string | null, resourceId: string) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(resources)
+      .set({ archivedAt: sql`coalesce(${resources.archivedAt}, now())` })
+      .where(eq(resources.id, resourceId))
+      .returning();
+    if (!row) throw notFound("Resource");
+    await audit(tx, {
+      siteId: row.siteId,
+      actorUserId,
+      action: "resource.archived",
+      entityType: "resource",
+      entityId: row.id,
+    });
+    return row.id;
+  });
+}
+
+/** Seed and tests: pins sense revisions into a collection draft. */
+export async function setCollectionItems(tx: Tx, siteId: string, revisionId: string, senseRevisionIds: string[]) {
+  await tx.delete(schema.collectionItems).where(eq(schema.collectionItems.revisionId, revisionId));
+  if (senseRevisionIds.length) {
+    await tx
+      .insert(schema.collectionItems)
+      .values(senseRevisionIds.map((senseRevisionId, position) => ({ siteId, revisionId, senseRevisionId, position })));
+  }
+}

@@ -41,6 +41,9 @@ importers:
       '@english/graphql':
         specifier: workspace:*
         version: link:../../packages/graphql
+      dataloader:
+        specifier: 2.2.3
+        version: 2.2.3
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.16)(postgres@3.4.9)

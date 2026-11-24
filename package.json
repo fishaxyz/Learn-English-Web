@@ -18,7 +18,10 @@
     "docker:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down",
     "docker:logs": "docker compose -f infrastructure/docker-compose.yml --env-file .env logs -f",
-    "docker:ps": "docker compose -f infrastructure/docker-compose.yml --env-file .env ps"
+    "docker:ps": "docker compose -f infrastructure/docker-compose.yml --env-file .env ps",
+    "docker:seed": "docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm -e NODE_ENV=development api node dist/seed.js",
+    "db:migrate": "pnpm --filter @english/database db:migrate",
+    "db:seed": "pnpm --filter @english/api seed"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

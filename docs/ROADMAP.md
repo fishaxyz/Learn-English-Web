@@ -86,9 +86,9 @@ Phase 4 needs only the API from Phase 1, so it can start once the MVP is stable.
 - **Seed data:** one original reading, one listening and one word collection.
 
 **Done when**
-- [ ] A fresh database migrates cleanly.
-- [ ] The seed data loads.
-- [ ] Tests prove that:
+- [x] A fresh database migrates cleanly. (2026-11-24: every test database, and Docker's `migrate` step)
+- [x] The seed data loads. (`pnpm docker:seed`, safe to run twice)
+- [x] Tests prove that: (`packages/database/test`, `apps/api/test`)
   - one site can't see another site's data;
   - public queries return only published revisions;
   - answer keys never appear before grading.

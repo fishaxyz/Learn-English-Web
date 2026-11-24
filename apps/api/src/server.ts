@@ -8,8 +8,12 @@ const env = loadEnv();
 const log = createLogger(env.LOG_LEVEL, "api");
 const database = createDatabase(env.DATABASE_URL, { applicationName: "api" });
 const { handler } = createApp(
-  { db: database.db, log, ping: () => database.ping() },
-  { corsOrigins: env.CORS_ORIGINS, graphiql: env.NODE_ENV === "development" }
+  { db: database.db, log, ping: () => database.ping(), defaultSiteDomain: env.DEFAULT_SITE_DOMAIN },
+  {
+    corsOrigins: env.CORS_ORIGINS,
+    graphiql: env.NODE_ENV === "development",
+    production: env.NODE_ENV === "production",
+  }
 );
 
 const server = createServer(handler);
