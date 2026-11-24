@@ -51,6 +51,14 @@
   - Lesson pages carry `LearningResource` JSON-LD describing only what the page shows.
   - The sitemap lists published reading lessons, levels and topics.
 
+## Added later (2026-11-25)
+
+- **Publish now:** admins and owners can publish a draft in one step, skipping the review queue (permission `content.publishNow`).
+  - It's the same publish code, so version checks, word-link checks and page refreshes all still apply.
+  - The audit log records `skippedReview: true`.
+  - Editors and reviewers still go through review.
+- **Essays are Readings:** the dashboard creates Reading lessons only. Articles had no page on the website, so a published one would have been invisible.
+
 ## Lessons from building it
 
 - Tiptap's `useEditorState` returned nothing with React 19 and Next 16. The toolbar now re-renders on each transaction instead, and the editor's options are kept stable between renders.

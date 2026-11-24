@@ -141,6 +141,13 @@ export const resourceResolvers: Resolvers = {
         await editorial.saveExerciseSets(ctx.db, userId, localizationId, lockVersion, sets as ExerciseSetInput[])
       );
     },
+    publishNow: async (_, { localizationId, lockVersion }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.publishNow");
+      return revalidate(
+        ctx,
+        await editorial.publishResource(ctx.db, userId, localizationId, lockVersion, { skipReview: true })
+      );
+    },
     archiveResource: async (_, { resourceId }, ctx) => {
       const siteId = await editorial.siteOfResource(ctx.db, resourceId);
       if (!siteId) throw notFound("Resource");

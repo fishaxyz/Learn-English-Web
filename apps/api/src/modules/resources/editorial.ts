@@ -299,13 +299,17 @@ export async function publishResource(
   db: Database,
   actorUserId: string | null,
   localizationId: string,
-  lockVersion: number
+  lockVersion: number,
+  options: { skipReview?: boolean } = {}
 ) {
   return translateDbErrors(() =>
     db.transaction(async (tx) => {
       const l = await lockLocalization(tx, localizationId);
       const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
-      if (draft.status !== "IN_REVIEW") throw conflict("Only a reviewed draft can be published: submit it for review");
+      // "Publish now" (admins and owners) may skip the review queue; everyone else publishes reviewed drafts.
+      if (draft.status !== "IN_REVIEW" && !(options.skipReview && draft.status === "DRAFT")) {
+        throw conflict("Only a reviewed draft can be published: submit it for review");
+      }
       // Collections and vocabulary links may only pin published (frozen) sense revisions.
       const unpublished = await tx.execute(sql`
         select 1 from lexical_sense_revisions r
@@ -324,6 +328,7 @@ export async function publishResource(
           status: "PUBLISHED",
           publishedAt: new Date(),
           publishedBy: actorUserId,
+          submittedAt: draft.submittedAt ?? new Date(),
           lockVersion: draft.lockVersion + 1,
         })
         .where(eq(rev.id, draft.id));
@@ -334,7 +339,11 @@ export async function publishResource(
         action: "resource.published",
         entityType: "revision",
         entityId: draft.id,
-        data: { revisionNo: draft.revisionNo, superseded: l.publishedRevisionId },
+        data: {
+          revisionNo: draft.revisionNo,
+          superseded: l.publishedRevisionId,
+          ...(draft.status === "DRAFT" ? { skippedReview: true } : {}),
+        },
       });
       return l.resourceId;
     })

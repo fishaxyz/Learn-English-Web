@@ -6,7 +6,8 @@ import { editorMutation, explain } from "../../../../lib/api";
 
 export type CreateState = { message: string } | null;
 
-const KINDS: ResourceKind[] = ["READING", "ARTICLE"];
+// Essays are Reading lessons: that's the kind the website shows (Listening and Vocabulary pages come later).
+const KINDS: ResourceKind[] = ["READING"];
 const LEVELS: CefrLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 export async function createLesson(_: CreateState, form: FormData): Promise<CreateState> {

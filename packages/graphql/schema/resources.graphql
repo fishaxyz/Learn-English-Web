@@ -221,6 +221,8 @@ extend type Mutation {
   publishResource(localizationId: ID!, lockVersion: Int!): EditorialResource!
   "Editors: replace the draft's exercises. Validated as a whole."
   saveExerciseSets(localizationId: ID!, lockVersion: Int!, sets: ExercisePayload!): EditorialResource!
+  "Admins and owners: publish a draft straight away, without the review queue. Recorded in the audit log."
+  publishNow(localizationId: ID!, lockVersion: Int!): EditorialResource!
   "Admins: take the resource off the site. Its revisions are kept."
   archiveResource(resourceId: ID!): EditorialResource!
 }

@@ -1,25 +1,8 @@
-import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 // Phase 2's acceptance test (AGENTS.md §13): an editor signs in, writes a reading lesson with a vocabulary
 // link and an exercise, it's reviewed and published, and a learner reads it, opens the word and is graded.
-const DASHBOARD = process.env.DASHBOARD_URL ?? "http://localhost:3401";
-const WEBSITE = process.env.WEBSITE_URL ?? "http://localhost:3400";
-const MAILBOX = process.env.MAILBOX ?? ".dev-mailbox/sign-in-links.jsonl";
-const EDITOR = process.env.E2E_EDITOR ?? "owner@example.test"; // invited as OWNER: writes and reviews
-
-/** The newest sign-in link sent to `to` after `since` (the dev mailbox stands in for email). */
-async function signInLink(to: string, since: number): Promise<string> {
-  for (let i = 0; i < 40; i++) {
-    const lines = readFileSync(MAILBOX, "utf8").trim().split("\n").reverse();
-    for (const line of lines) {
-      const mail = JSON.parse(line) as { to: string; url: string; at: string };
-      if (mail.to === to && Date.parse(mail.at) >= since) return mail.url;
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error("No sign-in link arrived");
-}
+import { DASHBOARD, EDITOR, signIn, WEBSITE } from "./helpers";
 
 test("an editor publishes a reading lesson and a learner uses it", async ({ page }) => {
   page.on("console", (m) => {
@@ -29,14 +12,7 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   const slug = `e2e-${Date.now().toString(36)}`;
   const title = `Late Again ${slug.slice(4)}`;
 
-  // Sign in with an emailed link.
-  const asked = Date.now() - 1000;
-  await page.goto(`${DASHBOARD}/sign-in`);
-  await page.getByLabel("Email address").fill(EDITOR);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-  await page.goto(await signInLink(EDITOR, asked));
-  await expect(page.getByRole("heading", { name: "Lessons" })).toBeVisible();
+  await signIn(page, EDITOR);
 
   // A new reading lesson.
   await page.getByRole("link", { name: "New lesson" }).click();

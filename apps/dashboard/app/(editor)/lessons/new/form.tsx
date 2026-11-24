@@ -66,15 +66,7 @@ export function NewLessonForm({ siteId }: { siteId: string }) {
         </p>
       </div>
       <div className="flex flex-wrap gap-6">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="kind" className="font-medium">
-            Type
-          </label>
-          <select id="kind" name="kind" className={field} defaultValue="READING">
-            <option value="READING">Reading</option>
-            <option value="ARTICLE">Article</option>
-          </select>
-        </div>
+        <input type="hidden" name="kind" value="READING" />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="level" className="font-medium">
             Level

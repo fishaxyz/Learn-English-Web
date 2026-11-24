@@ -20,6 +20,7 @@ const field =
 
 const canWrite = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "EDITOR";
 const canReview = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "REVIEWER";
+const canPublishNow = (r: Role | undefined) => r === "OWNER" || r === "ADMIN";
 
 /** Sense revision ids marked as key words in a document. */
 function keyIds(doc: JSONContent | undefined): Set<string> {
@@ -319,6 +320,26 @@ export function LessonEditor({
           >
             Preview
           </Link>
+          {status === "DRAFT" && canPublishNow(role) ? (
+            <button
+              type="button"
+              disabled={pending || dirty}
+              title={dirty ? "Save your changes first" : undefined}
+              onClick={() => {
+                if (!window.confirm("Publish now? It goes live on the site straight away, without review.")) return;
+                startTransition(
+                  async () =>
+                    void after(
+                      await actions.publishNow(localization.id, lockVersion),
+                      "Published. It's live on the site."
+                    )
+                );
+              }}
+              className="rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+            >
+              Publish now
+            </button>
+          ) : null}
           {status === "DRAFT" && canWrite(role) ? (
             <button
               type="button"
@@ -330,7 +351,11 @@ export function LessonEditor({
                     void after(await actions.submitForReview(localization.id, lockVersion), "Sent for review.")
                 )
               }
-              className="rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+              className={
+                canPublishNow(role)
+                  ? "rounded-full border border-line px-4 py-2 hover:border-accent disabled:opacity-50"
+                  : "rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+              }
             >
               Submit for review
             </button>
@@ -380,7 +405,9 @@ export function LessonEditor({
             {message ? (
               <p className={`text-sm ${message.tone === "bad" ? "text-bad" : "text-good"}`}>{message.text}</p>
             ) : null}
-            {dirty && editable ? <p className="text-sm text-muted">You have unsaved changes.</p> : null}
+            {dirty && editable ? (
+              <p className="text-sm text-muted">You have unsaved changes. Save before publishing.</p>
+            ) : null}
           </div>
         </div>
 

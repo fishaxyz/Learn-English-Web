@@ -229,3 +229,9 @@ mutation PublishSense($senseId: ID!, $lockVersion: Int!) {
     ...EditorialSenseFields
   }
 }
+
+mutation PublishNow($localizationId: ID!, $lockVersion: Int!) {
+  publishNow(localizationId: $localizationId, lockVersion: $lockVersion) {
+    ...EditorialSummary
+  }
+}

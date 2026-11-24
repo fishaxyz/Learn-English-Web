@@ -10,6 +10,8 @@ const RULES = {
   "content.submit": ["OWNER", "ADMIN", "EDITOR"],
   "content.review": ["OWNER", "ADMIN", "REVIEWER"],
   "content.publish": ["OWNER", "ADMIN", "REVIEWER"],
+  /** Publish a draft straight away, without the review queue: people who may both write and approve. */
+  "content.publishNow": ["OWNER", "ADMIN"],
   "content.archive": ["OWNER", "ADMIN"],
   "lexicon.write": ["OWNER", "ADMIN", "EDITOR"],
   "lexicon.publish": ["OWNER", "ADMIN", "REVIEWER"],

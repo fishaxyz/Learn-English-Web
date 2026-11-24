@@ -2,6 +2,7 @@
 
 import {
   ArchiveResourceDocument,
+  PublishNowDocument,
   PublishResourceDocument,
   ReturnToDraftDocument,
   SaveExerciseSetsDocument,
@@ -63,6 +64,11 @@ export async function publish(localizationId: string, lockVersion: number) {
   return attempt(
     async () => (await editorMutation(PublishResourceDocument, { localizationId, lockVersion })).publishResource
   );
+}
+
+/** Admins and owners: draft → live in one step, without the review queue. */
+export async function publishNow(localizationId: string, lockVersion: number) {
+  return attempt(async () => (await editorMutation(PublishNowDocument, { localizationId, lockVersion })).publishNow);
 }
 
 export async function startDraft(localizationId: string) {

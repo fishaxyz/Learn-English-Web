@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 90_000,
   fullyParallel: false,
+  // One at a time: the tests share one account and the dev mailbox, and a sign-in link works once.
+  workers: 1,
   reporter: [["list"]],
   use: { channel: "chrome", trace: "retain-on-failure" },
 });
