@@ -7,6 +7,10 @@ export type JobRow = typeof schema.jobs.$inferSelect;
 
 export const LEASE_SECONDS = 300;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A claim token that can't be one is simply not held (never a database error). */
+const notHeld = () => conflict("This job is no longer held by this worker");
+
 /** Adds a job; the same idempotency key on the same site never creates a second one. */
 export async function enqueue(
   tx: Tx,
@@ -69,6 +73,7 @@ export async function claimJob(db: Database, types: string[]): Promise<JobRow | 
 
 /** The running job this worker holds, locked for the rest of the transaction; CONFLICT if its claim is stale. */
 export async function heldJob(tx: Tx | Database, jobId: string, claimToken: string): Promise<JobRow> {
+  if (!UUID.test(jobId) || !UUID.test(claimToken)) throw notHeld();
   const [job] = await tx
     .select()
     .from(schema.jobs)
@@ -76,6 +81,24 @@ export async function heldJob(tx: Tx | Database, jobId: string, claimToken: stri
     .for("update");
   if (!job) throw conflict("This job is no longer held by this worker");
   return job;
+}
+
+/** Keeps a long job (a slow language model) claimed: the lease runs another LEASE_SECONDS from now. */
+export async function renewLease(db: Database, jobId: string, claimToken: string) {
+  if (!UUID.test(jobId) || !UUID.test(claimToken)) throw notHeld();
+  const rows = await db
+    .update(schema.jobs)
+    .set({ leaseUntil: sql`now() + make_interval(secs => ${LEASE_SECONDS})`, updatedAt: new Date() })
+    .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.claimToken, claimToken), eq(schema.jobs.status, "RUNNING")))
+    .returning({ id: schema.jobs.id });
+  if (!rows.length) throw conflict("This job is no longer held by this worker");
+  return true;
+}
+
+export async function jobTypeOf(db: Database, jobId: string): Promise<string | null> {
+  if (!UUID.test(jobId)) return null;
+  const [row] = await db.select({ type: schema.jobs.type }).from(schema.jobs).where(eq(schema.jobs.id, jobId));
+  return row?.type ?? null;
 }
 
 export async function markSucceeded(tx: Tx, job: JobRow, result: object) {

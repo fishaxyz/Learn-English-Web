@@ -155,3 +155,63 @@ extend type Mutation {
   manageLexicalSense(input: ManageLexicalSenseInput!): EditorialSense!
   publishLexicalSense(senseId: ID!, lockVersion: Int!): EditorialSense!
 }
+
+# --- Vocabulary suggestions (editorial: words and structures found in a draft's script)
+
+enum VocabularySuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VocabularySuggestionsState {
+  "Nothing asked yet (no script)."
+  IDLE
+  "The worker is looking (with the local language model this can take a few minutes)."
+  WORKING
+  DONE
+  "The worker couldn't finish; ask again."
+  FAILED
+}
+
+type VocabularySuggestion {
+  id: ID!
+  status: VocabularySuggestionStatus!
+  kind: LexicalEntryKind!
+  "The base form for the word bank: give up, a piece of cake, like + verb-ing."
+  displayForm: String!
+  partOfSpeech: String!
+  "As it appears in the script."
+  surfaceText: String!
+  sentence: String!
+  "A draft meaning from the language model, to check; null when none was made."
+  definition: String
+  cefrLevel: CefrLevel
+  "Already in the word bank (published), so approving only links it."
+  inWordBank: Boolean!
+  "nlp (word frequency) or ai (the language model)."
+  source: String!
+}
+
+type VocabularySuggestions {
+  state: VocabularySuggestionsState!
+  "False when the language model wasn't reachable (only word-frequency suggestions); null before the first run."
+  usedLanguageModel: Boolean
+  items: [VocabularySuggestion!]!
+}
+
+extend type Revision {
+  "Editorial: suggested vocabulary for this draft's current text."
+  vocabularySuggestions: VocabularySuggestions!
+}
+
+extend type Mutation {
+  "Editors: link the chosen suggestions in the text as key words (new items are added to the word bank as drafts)."
+  approveVocabularySuggestions(localizationId: ID!, lockVersion: Int!, ids: [ID!]!): EditorialResource!
+  "Editors: take suggestions off the list (they aren't suggested again for this lesson)."
+  rejectVocabularySuggestions(localizationId: ID!, ids: [ID!]!): Boolean!
+  "Editors: look for suggestions again for the current text."
+  suggestVocabulary(localizationId: ID!): Boolean!
+  "The worker: keep a long job claimed."
+  renewJobLease(jobId: ID!, claimToken: String!): Boolean!
+}

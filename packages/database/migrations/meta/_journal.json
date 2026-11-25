@@ -71,6 +71,13 @@
       "when": 1795609172956,
       "tag": "0009_podcast_voiceover",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795621094204,
+      "tag": "0010_vocabulary_suggestions",
+      "breakpoints": true
     }
   ]
 }

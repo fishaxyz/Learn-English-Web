@@ -384,6 +384,8 @@ export type Mutation = {
   __typename?: "Mutation";
   /** Editors: keep a finished voice-over; only approved ones go live. */
   approveAudioTrack: AudioTrack;
+  /** Editors: link the chosen suggestions in the text as key words (new items are added to the word bank as drafts). */
+  approveVocabularySuggestions: EditorialResource;
   /** Admins: take the resource off the site. Its revisions are kept. */
   archiveResource: EditorialResource;
   claimJob?: Maybe<ClaimedJob>;
@@ -401,6 +403,10 @@ export type Mutation = {
   publishNow: EditorialResource;
   /** Reviewers: publish the reviewed draft. The previous published revision is superseded, never changed. */
   publishResource: EditorialResource;
+  /** Editors: take suggestions off the list (they aren't suggested again for this lesson). */
+  rejectVocabularySuggestions: Scalars["Boolean"]["output"];
+  /** The worker: keep a long job claimed. */
+  renewJobLease: Scalars["Boolean"]["output"];
   /** Editors: one voice-over of the draft's HOST1/HOST2 conversation, each host with their own voice. */
   requestConversationVoiceover: Array<AudioTrack>;
   /** Editors: start a voice-over of the draft's text for each voice (at most 4 at a time). Runs in the background. */
@@ -413,11 +419,19 @@ export type Mutation = {
   startDraft: EditorialResource;
   /** Editors: hand the draft to a reviewer. */
   submitForReview: EditorialResource;
+  /** Editors: look for suggestions again for the current text. */
+  suggestVocabulary: Scalars["Boolean"]["output"];
   updateDraft: EditorialResource;
 };
 
 export type MutationApproveAudioTrackArgs = {
   id: Scalars["ID"]["input"];
+};
+
+export type MutationApproveVocabularySuggestionsArgs = {
+  ids: Array<Scalars["ID"]["input"]>;
+  localizationId: Scalars["ID"]["input"];
+  lockVersion: Scalars["Int"]["input"];
 };
 
 export type MutationArchiveResourceArgs = {
@@ -478,6 +492,16 @@ export type MutationPublishResourceArgs = {
   lockVersion: Scalars["Int"]["input"];
 };
 
+export type MutationRejectVocabularySuggestionsArgs = {
+  ids: Array<Scalars["ID"]["input"]>;
+  localizationId: Scalars["ID"]["input"];
+};
+
+export type MutationRenewJobLeaseArgs = {
+  claimToken: Scalars["String"]["input"];
+  jobId: Scalars["ID"]["input"];
+};
+
 export type MutationRequestConversationVoiceoverArgs = {
   input: ConversationVoiceoverInput;
 };
@@ -506,6 +530,10 @@ export type MutationStartDraftArgs = {
 export type MutationSubmitForReviewArgs = {
   localizationId: Scalars["ID"]["input"];
   lockVersion: Scalars["Int"]["input"];
+};
+
+export type MutationSuggestVocabularyArgs = {
+  localizationId: Scalars["ID"]["input"];
 };
 
 export type MutationUpdateDraftArgs = {
@@ -736,6 +764,8 @@ export type Revision = {
   /** The linked word senses, as in the text. */
   vocabulary: Array<LexicalSense>;
   vocabularyItems: Array<VocabularyItem>;
+  /** Editorial: suggested vocabulary for this draft's current text. */
+  vocabularySuggestions: VocabularySuggestions;
 };
 
 export type RevisionStatus = "DRAFT" | "IN_REVIEW" | "PUBLISHED" | "SUPERSEDED";
@@ -874,6 +904,45 @@ export type VocabularyItem = {
   occurrences: Array<TextOccurrence>;
   sense: LexicalSense;
 };
+
+export type VocabularySuggestion = {
+  __typename?: "VocabularySuggestion";
+  cefrLevel?: Maybe<CefrLevel>;
+  /** A draft meaning from the language model, to check; null when none was made. */
+  definition?: Maybe<Scalars["String"]["output"]>;
+  /** The base form for the word bank: give up, a piece of cake, like + verb-ing. */
+  displayForm: Scalars["String"]["output"];
+  id: Scalars["ID"]["output"];
+  /** Already in the word bank (published), so approving only links it. */
+  inWordBank: Scalars["Boolean"]["output"];
+  kind: LexicalEntryKind;
+  partOfSpeech: Scalars["String"]["output"];
+  sentence: Scalars["String"]["output"];
+  /** nlp (word frequency) or ai (the language model). */
+  source: Scalars["String"]["output"];
+  status: VocabularySuggestionStatus;
+  /** As it appears in the script. */
+  surfaceText: Scalars["String"]["output"];
+};
+
+export type VocabularySuggestionStatus = "APPROVED" | "PENDING" | "REJECTED";
+
+export type VocabularySuggestions = {
+  __typename?: "VocabularySuggestions";
+  items: Array<VocabularySuggestion>;
+  state: VocabularySuggestionsState;
+  /** False when the language model wasn't reachable (only word-frequency suggestions); null before the first run. */
+  usedLanguageModel?: Maybe<Scalars["Boolean"]["output"]>;
+};
+
+export type VocabularySuggestionsState =
+  | "DONE"
+  /** The worker couldn't finish; ask again. */
+  | "FAILED"
+  /** Nothing asked yet (no script). */
+  | "IDLE"
+  /** The worker is looking (with the local language model this can take a few minutes). */
+  | "WORKING";
 
 export type Voice = {
   __typename?: "Voice";
@@ -1091,6 +1160,10 @@ export type ResolversTypes = {
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ResolverTypeWrapper<ViewerModel>;
   VocabularyItem: ResolverTypeWrapper<VocabularyItemModel>;
+  VocabularySuggestion: ResolverTypeWrapper<VocabularySuggestion>;
+  VocabularySuggestionStatus: VocabularySuggestionStatus;
+  VocabularySuggestions: ResolverTypeWrapper<VocabularySuggestions>;
+  VocabularySuggestionsState: VocabularySuggestionsState;
   Voice: ResolverTypeWrapper<Voice>;
   VoiceAccent: VoiceAccent;
   VoiceCatalog: ResolverTypeWrapper<VoiceCatalog>;
@@ -1171,6 +1244,8 @@ export type ResolversParentTypes = {
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ViewerModel;
   VocabularyItem: VocabularyItemModel;
+  VocabularySuggestion: VocabularySuggestion;
+  VocabularySuggestions: VocabularySuggestions;
   Voice: Voice;
   VoiceCatalog: VoiceCatalog;
   WordTiming: WordTiming;
@@ -1486,6 +1561,12 @@ export type MutationResolvers<
     ContextType,
     RequireFields<MutationApproveAudioTrackArgs, "id">
   >;
+  approveVocabularySuggestions?: Resolver<
+    ResolversTypes["EditorialResource"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationApproveVocabularySuggestionsArgs, "ids" | "localizationId" | "lockVersion">
+  >;
   archiveResource?: Resolver<
     ResolversTypes["EditorialResource"],
     ParentType,
@@ -1558,6 +1639,18 @@ export type MutationResolvers<
     ContextType,
     RequireFields<MutationPublishResourceArgs, "localizationId" | "lockVersion">
   >;
+  rejectVocabularySuggestions?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationRejectVocabularySuggestionsArgs, "ids" | "localizationId">
+  >;
+  renewJobLease?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationRenewJobLeaseArgs, "claimToken" | "jobId">
+  >;
   requestConversationVoiceover?: Resolver<
     Array<ResolversTypes["AudioTrack"]>,
     ParentType,
@@ -1593,6 +1686,12 @@ export type MutationResolvers<
     ParentType,
     ContextType,
     RequireFields<MutationSubmitForReviewArgs, "localizationId" | "lockVersion">
+  >;
+  suggestVocabulary?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationSuggestVocabularyArgs, "localizationId">
   >;
   updateDraft?: Resolver<
     ResolversTypes["EditorialResource"],
@@ -1796,6 +1895,7 @@ export type RevisionResolvers<
   updatedAt?: Resolver<ResolversTypes["DateTime"], ParentType, ContextType>;
   vocabulary?: Resolver<Array<ResolversTypes["LexicalSense"]>, ParentType, ContextType>;
   vocabularyItems?: Resolver<Array<ResolversTypes["VocabularyItem"]>, ParentType, ContextType>;
+  vocabularySuggestions?: Resolver<ResolversTypes["VocabularySuggestions"], ParentType, ContextType>;
 };
 
 export interface RichTextScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes["RichText"], any> {
@@ -1929,6 +2029,32 @@ export type VocabularyItemResolvers<
   sense?: Resolver<ResolversTypes["LexicalSense"], ParentType, ContextType>;
 };
 
+export type VocabularySuggestionResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["VocabularySuggestion"] = ResolversParentTypes["VocabularySuggestion"],
+> = {
+  cefrLevel?: Resolver<Maybe<ResolversTypes["CefrLevel"]>, ParentType, ContextType>;
+  definition?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+  displayForm?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
+  inWordBank?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  kind?: Resolver<ResolversTypes["LexicalEntryKind"], ParentType, ContextType>;
+  partOfSpeech?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  sentence?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  source?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  status?: Resolver<ResolversTypes["VocabularySuggestionStatus"], ParentType, ContextType>;
+  surfaceText?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+};
+
+export type VocabularySuggestionsResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["VocabularySuggestions"] = ResolversParentTypes["VocabularySuggestions"],
+> = {
+  items?: Resolver<Array<ResolversTypes["VocabularySuggestion"]>, ParentType, ContextType>;
+  state?: Resolver<ResolversTypes["VocabularySuggestionsState"], ParentType, ContextType>;
+  usedLanguageModel?: Resolver<Maybe<ResolversTypes["Boolean"]>, ParentType, ContextType>;
+};
+
 export type VoiceResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["Voice"] = ResolversParentTypes["Voice"],
@@ -2015,6 +2141,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   TrueFalseNotGivenQuestion?: TrueFalseNotGivenQuestionResolvers<ContextType>;
   Viewer?: ViewerResolvers<ContextType>;
   VocabularyItem?: VocabularyItemResolvers<ContextType>;
+  VocabularySuggestion?: VocabularySuggestionResolvers<ContextType>;
+  VocabularySuggestions?: VocabularySuggestionsResolvers<ContextType>;
   Voice?: VoiceResolvers<ContextType>;
   VoiceCatalog?: VoiceCatalogResolvers<ContextType>;
   WordTiming?: WordTimingResolvers<ContextType>;

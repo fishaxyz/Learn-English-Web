@@ -6,6 +6,7 @@ import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
 import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio/service";
+import { queueSuggestions } from "../lexicon/suggestions";
 import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
@@ -66,7 +67,7 @@ async function setTopics(tx: Tx, siteId: string, revisionId: string, slugs: stri
 }
 
 /** Re-derives a draft's vocabulary links from its text, so they always match it (AGENTS.md §5.2). */
-async function writeAnnotations(tx: Tx, siteId: string, revisionId: string, doc: RichTextDocument) {
+export async function writeAnnotations(tx: Tx, siteId: string, revisionId: string, doc: RichTextDocument) {
   await tx.delete(schema.lexicalAnnotations).where(eq(schema.lexicalAnnotations.revisionId, revisionId));
   const annotations = annotationsOf(doc);
   if (annotations.length) {
@@ -75,13 +76,13 @@ async function writeAnnotations(tx: Tx, siteId: string, revisionId: string, doc:
 }
 
 /** The localization, locked for the rest of the transaction so two publishes can't interleave. */
-async function lockLocalization(tx: Tx, localizationId: string) {
+export async function lockLocalization(tx: Tx, localizationId: string) {
   const [row] = await tx.select().from(loc).where(eq(loc.id, localizationId)).for("update").limit(1);
   if (!row) throw notFound("Resource");
   return row;
 }
 
-async function draftOf(tx: Tx, draftRevisionId: string | null, lockVersion: number): Promise<RevisionModel> {
+export async function draftOf(tx: Tx, draftRevisionId: string | null, lockVersion: number): Promise<RevisionModel> {
   if (!draftRevisionId) throw conflict("There's no draft: start one first");
   const [draft] = await tx.select().from(rev).where(eq(rev.id, draftRevisionId)).limit(1);
   if (!draft) throw notFound("Draft");
@@ -144,6 +145,7 @@ export async function createResource(db: Database, actorUserId: string | null, i
         await tx.update(loc).set({ draftRevisionId: draft.id }).where(eq(loc.id, localization.id));
         if (input.topicSlugs) await setTopics(tx, input.siteId, draft.id, input.topicSlugs);
         await writeAnnotations(tx, input.siteId, draft.id, body);
+        if (input.kind === "READING") await queueSuggestions(tx, draft, body, actorUserId);
         await audit(tx, {
           siteId: input.siteId,
           actorUserId,
@@ -254,7 +256,12 @@ export async function updateDraft(db: Database, actorUserId: string | null, inpu
         })
         .where(and(eq(rev.id, draft.id), eq(rev.lockVersion, draft.lockVersion)));
       if (input.topicSlugs) await setTopics(tx, l.siteId, draft.id, input.topicSlugs);
-      if (body) await writeAnnotations(tx, l.siteId, draft.id, body);
+      if (body) {
+        await writeAnnotations(tx, l.siteId, draft.id, body);
+        // A saved script gets vocabulary suggestions (once per text; the worker makes them in the background).
+        const level = input.cefrLevel !== undefined ? input.cefrLevel : draft.cefrLevel;
+        await queueSuggestions(tx, { ...draft, cefrLevel: level }, body, actorUserId);
+      }
       await audit(tx, {
         siteId: l.siteId,
         actorUserId,

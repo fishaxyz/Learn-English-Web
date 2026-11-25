@@ -1,3 +1,4 @@
+import * as suggestions from "../modules/lexicon/suggestions";
 import { checklistFrom, missingParts } from "../modules/resources/checklist";
 import { schema } from "@english/database";
 import { asc, eq } from "drizzle-orm";
@@ -164,6 +165,21 @@ export const resourceResolvers: Resolvers = {
         })
       );
     },
+    approveVocabularySuggestions: async (_, { localizationId, lockVersion, ids }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return editorialResource(
+        ctx,
+        await suggestions.approveSuggestions(ctx.db, userId, localizationId, lockVersion, ids)
+      );
+    },
+    rejectVocabularySuggestions: async (_, { localizationId, ids }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return suggestions.rejectSuggestions(ctx.db, userId, localizationId, ids);
+    },
+    suggestVocabulary: async (_, { localizationId }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return suggestions.suggestAgain(ctx.db, userId, localizationId);
+    },
     archiveResource: async (_, { resourceId }, ctx) => {
       const siteId = await editorial.siteOfResource(ctx.db, resourceId);
       if (!siteId) throw notFound("Resource");
@@ -199,6 +215,37 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    vocabularySuggestions: async (r, _, ctx) => {
+      if (r.status === "PUBLISHED" || r.status === "SUPERSEDED")
+        return { state: "IDLE", usedLanguageModel: null, items: [] };
+      const found = await suggestions.suggestionsFor(ctx.db, r);
+      const published = new Set(
+        (
+          await Promise.all(
+            found.items
+              .filter((i) => i.senseRevisionId)
+              .map((i) => ctx.loaders.senseRevision.load(i.senseRevisionId as string))
+          )
+        ).flatMap((x) => (x && x.status === "PUBLISHED" ? [x.id] : []))
+      );
+      return {
+        state: found.state,
+        usedLanguageModel: found.usedLanguageModel,
+        items: found.items.map((i) => ({
+          id: i.id,
+          status: i.status as "PENDING" | "APPROVED" | "REJECTED",
+          kind: i.kind,
+          displayForm: i.displayForm,
+          partOfSpeech: i.partOfSpeech,
+          surfaceText: i.surfaceText,
+          sentence: i.sentence,
+          definition: i.definition,
+          cefrLevel: i.cefrLevel,
+          inWordBank: Boolean(i.senseRevisionId && published.has(i.senseRevisionId)),
+          source: i.source,
+        })),
+      };
+    },
     checklist: async (r, _, ctx) => {
       const [tracks, senses, sets] = await Promise.all([
         ctx.loaders.audioTracksByRevision.load(r.id),

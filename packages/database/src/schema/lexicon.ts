@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -237,5 +238,62 @@ export const lexicalAnnotations = pgTable(
     }),
     index("lexical_annotations_revision").on(t.revisionId),
     check("lexical_annotations_range", sql`${t.start} >= 0 and ${t.end} > ${t.start}`),
+  ]
+);
+
+/**
+ * Words and structures suggested for a draft's vocabulary (the worker's vocab.suggest job: spaCy, word frequency
+ * and the local language model). An editor approves each one, which links it in the text as a key word (adding a
+ * draft word-bank entry when it's new), or removes it. Editorial only: learners never see suggestions.
+ * `textHash` says which text they were made for; a changed text replaces the pending ones.
+ */
+export const vocabularySuggestions = pgTable(
+  "vocabulary_suggestions",
+  {
+    id: id(),
+    siteId: siteRef(),
+    revisionId: uuid().notNull(),
+    /** PENDING, APPROVED or REJECTED. */
+    status: text().notNull().default("PENDING"),
+    kind: lexicalEntryKind().notNull(),
+    /** The base form for the word bank: "give up", "a piece of cake", "like + verb-ing". */
+    displayForm: text().notNull(),
+    normalizedForm: text().notNull(),
+    partOfSpeech: text().notNull(),
+    blockId: text().notNull(),
+    start: integer().notNull(),
+    end: integer().notNull(),
+    surfaceText: text().notNull(),
+    sentence: text().notNull(),
+    /** A draft meaning from the language model, for the editor to check; null when none was made. */
+    definition: text(),
+    cefrLevel: cefrLevel(),
+    /** How common the word is (wordfreq's Zipf scale: 7 very common, 1 rare). */
+    zipf: doublePrecision(),
+    /** "nlp" (spaCy + word frequency) or "ai" (the language model). */
+    source: text().notNull(),
+    /** The word-bank sense revision it matches or was added as. */
+    senseRevisionId: uuid(),
+    textHash: text().notNull(),
+    decidedBy: uuid().references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "vocabulary_suggestions_revision_fk",
+      columns: [t.revisionId, t.siteId],
+      foreignColumns: [resourceRevisions.id, resourceRevisions.siteId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "vocabulary_suggestions_sense_fk",
+      columns: [t.senseRevisionId, t.siteId],
+      foreignColumns: [lexicalSenseRevisions.id, lexicalSenseRevisions.siteId],
+    }),
+    unique("vocabulary_suggestions_span").on(t.revisionId, t.blockId, t.start, t.end),
+    index("vocabulary_suggestions_revision").on(t.revisionId, t.status),
+    check("vocabulary_suggestions_status", sql`${t.status} in ('PENDING', 'APPROVED', 'REJECTED')`),
+    check("vocabulary_suggestions_source", sql`${t.source} in ('nlp', 'ai')`),
+    check("vocabulary_suggestions_range", sql`${t.start} >= 0 and ${t.end} > ${t.start}`),
   ]
 );
