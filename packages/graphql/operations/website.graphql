@@ -13,6 +13,10 @@ fragment LessonCard on Resource {
   }
   ... on ReadingResource {
     estimatedReadingSeconds
+    audioTracks {
+      id
+      label
+    }
   }
 }
 
@@ -47,6 +51,19 @@ query ReadingLesson($slug: String!) {
       }
       vocabularyItems {
         ...VocabularyItemView
+      }
+      audioTracks {
+        id
+        label
+        url
+        durationMs
+        wordTimings {
+          blockId
+          start
+          end
+          startMs
+          endMs
+        }
       }
     }
   }

@@ -1,7 +1,14 @@
 "use server";
 
 import {
+  ApproveAudioTrackDocument,
   ArchiveResourceDocument,
+  DeleteAudioTrackDocument,
+  DraftAudioDocument,
+  RequestVoiceoversDocument,
+  VoiceCatalogDocument,
+  type AudioTrackFieldsFragment,
+  type VoiceCatalogQuery,
   PublishNowDocument,
   PublishResourceDocument,
   ReturnToDraftDocument,
@@ -87,5 +94,57 @@ export async function searchSenses(siteDomain: string, query: string): Promise<S
     return (await editorQuery(SenseSearchDocument, { query: q }, siteDomain)).lexicalSearch;
   } catch {
     return [];
+  }
+}
+
+// --- Voice-overs
+
+export type TracksResult = { ok: true; tracks: AudioTrackFieldsFragment[] } | { ok: false; message: string };
+
+export async function voiceCatalog(
+  siteId: string
+): Promise<{ ok: true; catalog: VoiceCatalogQuery["voiceCatalog"] } | { ok: false; message: string }> {
+  try {
+    return { ok: true, catalog: (await editorQuery(VoiceCatalogDocument, { siteId })).voiceCatalog };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function draftTracks(resourceId: string): Promise<TracksResult> {
+  try {
+    const data = await editorQuery(DraftAudioDocument, { id: resourceId });
+    return { ok: true, tracks: data.editorialResource?.localizations[0]?.draft?.audioTracks ?? [] };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function requestVoiceovers(localizationId: string, voiceIds: string[]): Promise<TracksResult> {
+  try {
+    return {
+      ok: true,
+      tracks: (await editorMutation(RequestVoiceoversDocument, { localizationId, voiceIds })).requestVoiceovers,
+    };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function approveTrack(id: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(ApproveAudioTrackDocument, { id });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function deleteTrack(id: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(DeleteAudioTrackDocument, { id });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
   }
 }

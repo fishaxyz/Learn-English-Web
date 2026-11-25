@@ -86,6 +86,9 @@ query EditorialLesson($id: ID!) {
         vocabularyItems {
           ...VocabularyItemView
         }
+        audioTracks {
+          ...AudioTrackFields
+        }
       }
       published {
         ...RevisionFields
@@ -234,4 +237,65 @@ mutation PublishNow($localizationId: ID!, $lockVersion: Int!) {
   publishNow(localizationId: $localizationId, lockVersion: $lockVersion) {
     ...EditorialSummary
   }
+}
+
+fragment AudioTrackFields on AudioTrack {
+  id
+  status
+  voiceName
+  gender
+  accent
+  label
+  url
+  durationMs
+  characters
+  stale
+  error
+  createdAt
+}
+
+query VoiceCatalog($siteId: ID!) {
+  voiceCatalog(siteId: $siteId) {
+    provider
+    charactersUsed
+    charactersLimit
+    voices {
+      id
+      name
+      gender
+      accent
+      previewUrl
+    }
+  }
+}
+
+query DraftAudio($id: ID!) {
+  editorialResource(id: $id) {
+    id
+    localizations {
+      id
+      draft {
+        id
+        audioTracks {
+          ...AudioTrackFields
+        }
+      }
+    }
+  }
+}
+
+mutation RequestVoiceovers($localizationId: ID!, $voiceIds: [ID!]!) {
+  requestVoiceovers(localizationId: $localizationId, voiceIds: $voiceIds) {
+    ...AudioTrackFields
+  }
+}
+
+mutation ApproveAudioTrack($id: ID!) {
+  approveAudioTrack(id: $id) {
+    ...AudioTrackFields
+  }
+}
+
+mutation DeleteAudioTrack($id: ID!) {
+  deleteAudioTrack(id: $id)
 }

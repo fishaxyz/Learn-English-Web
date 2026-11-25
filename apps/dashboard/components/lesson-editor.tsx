@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
 import { fromPayload, toPayload, type EditorSet } from "../lib/exercises";
 import { ExercisesEditor } from "./exercises-editor";
+import { VoiceoverPanel } from "./voiceover-panel";
 import { RichTextEditor } from "./rich-text-editor";
 
 type Lesson = NonNullable<EditorialLessonQuery["editorialResource"]>;
@@ -21,6 +22,23 @@ const field =
 const canWrite = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "EDITOR";
 const canReview = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "REVIEWER";
 const canPublishNow = (r: Role | undefined) => r === "OWNER" || r === "ADMIN";
+
+/** About how many characters a voice-over reads: each block's text, separated by blank lines (as the API does). */
+function voiceCharacters(doc: JSONContent | undefined): number {
+  const blocks: string[] = [];
+  const inline = (n: JSONContent): string =>
+    n.type === "text" ? (n.text ?? "") : n.type === "hardBreak" ? "\n" : (n.content ?? []).map(inline).join("");
+  const walk = (n: JSONContent) => {
+    if (n.content?.some((c) => c.type === "text" || c.type === "hardBreak")) {
+      const text = inline(n);
+      if (text.trim()) blocks.push(text);
+      return;
+    }
+    n.content?.forEach(walk);
+  };
+  if (doc) walk(doc);
+  return [...blocks.join("\n\n")].length;
+}
 
 /** Sense revision ids marked as key words in a document. */
 function keyIds(doc: JSONContent | undefined): Set<string> {
@@ -281,6 +299,16 @@ export function LessonEditor({
             </button>
           ) : null}
         </section>
+
+        <VoiceoverPanel
+          resourceId={lesson.id}
+          localizationId={localization.id}
+          siteId={lesson.site.id}
+          editable={editable}
+          textSaved={!textDirty}
+          characters={voiceCharacters(draft.body as JSONContent | undefined)}
+          initial={draft.audioTracks}
+        />
 
         <section aria-labelledby="exercises-heading" className="flex flex-col gap-4">
           <h2 id="exercises-heading" className="font-display text-2xl font-semibold">
