@@ -15,6 +15,7 @@ import {
 import { Working } from "./working";
 
 const letter = (i: number) => String.fromCharCode(65 + i);
+const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"];
 const ANSWER: Record<string, string> = { TRUE: "True", FALSE: "False", NOT_GIVEN: "Not given", YES: "Yes", NO: "No" };
 
 /** A drafted question as an editor checks it: what learners see, with the answer key marked. */
@@ -47,24 +48,27 @@ function QuestionCheck({ q }: { q: EditorQuestion }) {
           <span className="font-semibold text-good">→ {ANSWER[q.answer]}</span>
         </p>
       );
-    case "MATCHING":
+    case "MATCHING": {
+      // Paragraph letters are the options themselves; headings are numbered i, ii, iii as learners see them.
+      const lettersOnly = q.variant === "INFORMATION";
+      const mark = (i: number) => (q.variant === "HEADINGS" ? (ROMAN[i] ?? `${i + 1}`) : letter(i));
+      const show = (i: number) => (lettersOnly ? (q.options[i] ?? "") : `${mark(i)} ${q.options[i] ?? ""}`);
       return (
         <>
           <p className="text-sm text-muted">
-            {MATCHING_LABEL[q.variant]} · options: {q.options.map((o, i) => `${letter(i)} ${o}`).join(" · ")}
+            {MATCHING_LABEL[q.variant]} · {lettersOnly ? "paragraphs" : "options"}:{" "}
+            {q.options.map((_, i) => show(i)).join(" · ")}
           </p>
           <ul className="flex flex-col gap-0.5 text-sm">
             {q.items.map((item, i) => (
               <li key={i}>
-                {item}{" "}
-                <span className="font-semibold text-good">
-                  → {letter(q.answers[i] ?? 0)} ({q.options[q.answers[i] ?? 0]})
-                </span>
+                {item} <span className="font-semibold text-good">→ {show(q.answers[i] ?? 0)}</span>
               </li>
             ))}
           </ul>
         </>
       );
+    }
     case "COMPLETION":
     case "GAP_FILL": {
       const parsed = parseGapText(q.text);
