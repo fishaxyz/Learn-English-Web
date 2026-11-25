@@ -46,19 +46,38 @@ export function useCollapsed() {
   };
 }
 
-export type SectionState = "done" | "todo" | "unsaved" | "working" | "attention";
+export type SectionState = "done" | "todo" | "unsaved" | "working" | "busy" | "attention";
 
 const STATE: Record<SectionState, { label: string; tone: string }> = {
   done: { label: "Done", tone: "bg-good-soft text-good" },
   todo: { label: "To do", tone: "bg-line/70 text-muted" },
   unsaved: { label: "Unsaved", tone: "bg-sun text-on-pastel" },
   working: { label: "In progress", tone: "bg-sky text-on-pastel" },
+  /** Something is being made in the background right now (suggestions, a voice-over). */
+  busy: { label: "Working…", tone: "bg-sky text-on-pastel" },
   attention: { label: "Check", tone: "bg-bad-soft text-bad" },
 };
 
+/** A small spinning ring, for work happening in the background. Still for people who prefer less motion. */
+export function Spinner({ className = "size-3" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${className} shrink-0 animate-spin motion-reduce:animate-none`}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function StateChip({ state }: { state: SectionState }) {
   return (
-    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATE[state].tone}`}>
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATE[state].tone}`}
+    >
+      {state === "busy" ? <Spinner /> : null}
       {STATE[state].label}
     </span>
   );

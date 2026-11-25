@@ -115,3 +115,24 @@
   font-weight: 600;
   text-decoration-style: solid;
 }
+
+/* The moving bar while vocabulary suggestions are being made. */
+@keyframes vocab-progress {
+  from {
+    left: -33%;
+  }
+  to {
+    left: 100%;
+  }
+}
+.vocab-progress {
+  animation: vocab-progress 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vocab-progress {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

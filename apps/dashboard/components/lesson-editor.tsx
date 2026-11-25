@@ -1,5 +1,6 @@
 "use client";
 
+import type { SuggestionsFieldsFragment } from "@english/graphql";
 import type { CefrLevel, EditorialLessonQuery, EditorialSummaryFragment, SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
 import Link from "next/link";
@@ -33,6 +34,10 @@ type Role = "OWNER" | "ADMIN" | "EDITOR" | "REVIEWER" | "VIEWER";
 const canWrite = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "EDITOR";
 const canReview = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "REVIEWER";
 const canPublishNow = (r: Role | undefined) => r === "OWNER" || r === "ADMIN";
+
+/** Paragraphs with text in a saved document (the local AI reads one at a time). */
+const paragraphs = (doc: unknown): number =>
+  ((doc as { content?: { content?: unknown[] }[] } | null)?.content ?? []).filter((b) => b.content?.length).length;
 
 export function LessonEditor({
   lesson,
@@ -132,11 +137,16 @@ export function LessonEditor({
   );
   const [tracks, setTracks] = useState(draft?.audioTracks ?? []);
   const [savedBody, setSavedBody] = useState<unknown>(draft?.body);
+  const [suggestions, setSuggestions] = useState<SuggestionsFieldsFragment>(
+    draft?.vocabularySuggestions ?? { state: "IDLE", usedLanguageModel: null, items: [] }
+  );
   const [words, setWords] = useState(() => countWords(draft?.body as JSONContent | undefined));
   const sections = useCollapsed();
   const parts = sectionStates({
     words,
     level: script.level,
+    toCheck: suggestions.items.filter((i) => i.status === "PENDING").length,
+    findingWords: suggestions.state === "WORKING",
     textDirty,
     tracks,
     vocabulary,
@@ -248,19 +258,15 @@ export function LessonEditor({
                 lockVersion={lockVersion}
                 editable={editable}
                 saved={!dirty}
-                initial={draft.vocabularySuggestions}
+                data={suggestions}
+                onData={setSuggestions}
+                paragraphs={paragraphs(savedBody)}
                 onApproved={(text) => {
                   setMessage({ tone: "good", text });
                   router.refresh(); // the draft's text now has the new links: the editor reloads with it
                 }}
               />
-              <VocabularyList
-                vocabulary={vocabulary}
-                keys={keys}
-                siteId={lesson.site.id}
-                editable={editable}
-                onWrite={() => sections.open("script")}
-              />
+              <VocabularyList vocabulary={vocabulary} keys={keys} />
             </div>
           </EditorSection>
 

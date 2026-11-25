@@ -3,7 +3,7 @@
 import type { SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
 import { useMemo, useState, useTransition } from "react";
-import { EditorSection, useCollapsed } from "../../../../components/editor-section";
+import { EditorSection } from "../../../../components/editor-section";
 import Link from "next/link";
 import { HeadphonesIcon, PlusIcon } from "../../../../components/icons";
 import { ExercisesEditor } from "../../../../components/exercises-editor";
@@ -63,7 +63,6 @@ export function NewLessonForm({
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const sections = useCollapsed();
 
   const text = voiceText(body);
   const sent = resolved(choice, catalog);
@@ -230,13 +229,7 @@ export function NewLessonForm({
                   After <strong className="text-ink">Save and Preview</strong>, words, phrases and idioms worth learning
                   are suggested here from the script, to approve or remove.
                 </p>
-                <VocabularyList
-                  vocabulary={vocabulary}
-                  keys={keys}
-                  siteId={site.id}
-                  editable
-                  onWrite={() => sections.open("script")}
-                />
+                <VocabularyList vocabulary={vocabulary} keys={keys} />
               </div>
             </EditorSection>
 

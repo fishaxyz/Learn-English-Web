@@ -2,7 +2,6 @@
 
 import type { CefrLevel, SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { searchSenses } from "../app/(editor)/lessons/[id]/actions";
 import type { EditorSet } from "../lib/exercises";
@@ -34,6 +33,8 @@ export function sectionStates(p: {
   exercisesDirty: boolean;
   /** Vocabulary suggestions still to approve or remove. */
   toCheck?: number;
+  /** The worker is looking for vocabulary suggestions right now. */
+  findingWords?: boolean;
   /** New lessons: what will be made when the lesson is created ("Podcast · Lauren & Roger"). */
   voicePlan?: string | null;
 }): Record<SectionId, { summary: string; state: SectionState }> {
@@ -54,7 +55,7 @@ export function sectionStates(p: {
       state: needsLook
         ? "attention"
         : making
-          ? "working"
+          ? "busy"
           : approved
             ? "done"
             : p.tracks.length || p.voicePlan
@@ -62,12 +63,20 @@ export function sectionStates(p: {
               : "todo",
     },
     vocabulary: {
-      summary: p.vocabulary.length
-        ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key${p.toCheck ? ` · ${p.toCheck} suggested to check` : ""}`
-        : p.toCheck
-          ? `${p.toCheck} suggested to check`
-          : "No words linked yet",
-      state: p.textDirty && p.vocabulary.length ? "unsaved" : p.vocabulary.length ? "done" : "todo",
+      summary: p.findingWords
+        ? "Finding words, phrases and idioms…"
+        : p.vocabulary.length
+          ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key${p.toCheck ? ` · ${p.toCheck} suggested to check` : ""}`
+          : p.toCheck
+            ? `${p.toCheck} suggested to check`
+            : "No words linked yet",
+      state: p.findingWords
+        ? "busy"
+        : p.textDirty && p.vocabulary.length
+          ? "unsaved"
+          : p.vocabulary.length
+            ? "done"
+            : "todo",
     },
     questions: {
       summary: p.sets.length
@@ -96,19 +105,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /** The words and structures linked in the text: what learners can tap and add to their list. */
-export function VocabularyList({
-  vocabulary,
-  keys,
-  siteId,
-  editable,
-  onWrite,
-}: {
-  vocabulary: SenseCardFragment[];
-  keys: Set<string>;
-  siteId: string;
-  editable: boolean;
-  onWrite: () => void;
-}) {
+export function VocabularyList({ vocabulary, keys }: { vocabulary: SenseCardFragment[]; keys: Set<string> }) {
   const sorted = [...vocabulary].sort((a, b) => Number(keys.has(b.revisionId)) - Number(keys.has(a.revisionId)));
   return (
     <div className="flex flex-col gap-4">
@@ -151,16 +148,6 @@ export function VocabularyList({
           No words linked yet.
         </p>
       )}
-      <div className="flex flex-wrap gap-2 text-sm">
-        {editable ? (
-          <a href="#script" onClick={onWrite} className={smallButton}>
-            Go to the script to link words
-          </a>
-        ) : null}
-        <Link href={`/words?site=${siteId}`} className={smallButton}>
-          Open Lexical Studio
-        </Link>
-      </div>
     </div>
   );
 }
