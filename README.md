@@ -57,6 +57,8 @@ After that first sign-in, open **Account** (your email at the top right) and set
 
 To also offer **Continue with Google**, follow [docs/google-sign-in.md](docs/google-sign-in.md).
 
+Voice-overs: put an ElevenLabs key in `.env` as `ELEVENLABS_API_KEY`. Each voice-over then uses about one character of your monthly ElevenLabs allowance per character of text, and the editor shows the cost before anything is made. Without a key, four silent test voices are offered instead, at no cost. Audio files are kept in the `media` Docker volume. See [ADR 0005](docs/adr/0005-voice-overs.md).
+
 Disk space: `pnpm docker:up` keeps Docker's build cache under 8 GB. If the Docker VM's disk file on your Mac grows anyway, `pnpm docker:trim` gives its unused space back to macOS; nothing is deleted.
 
 Then check:
