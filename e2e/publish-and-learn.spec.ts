@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Phase 2's acceptance test (AGENTS.md §13): an editor signs in, writes a reading lesson with a vocabulary
 // link and an exercise, it's reviewed and published, and a learner reads it, opens the word and is graded.
-import { addQuestion, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE } from "./helpers";
+import { addQuestion, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE, saveAndEdit } from "./helpers";
 
 test("an editor publishes a reading lesson and a learner uses it", async ({ page }) => {
   test.setTimeout(120_000);
@@ -20,8 +20,7 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Web address").fill(slug);
   await page.getByLabel("Level").selectOption("A2");
-  await page.getByRole("button", { name: "Create draft" }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
 
   // Text, with "commute" linked to its meaning.
   await page.getByLabel("Lesson text").click();

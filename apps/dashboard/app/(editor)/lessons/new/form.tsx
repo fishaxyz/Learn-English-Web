@@ -100,11 +100,6 @@ export function NewLessonForm({
       : typeof exercises === "string"
         ? exercises
         : voiceProblem;
-  const button = !wantsVoice
-    ? "Create draft"
-    : sent.mode === "conversation"
-      ? "Create draft and make the podcast"
-      : "Create draft and make voice-overs";
 
   function create() {
     if (problem || typeof exercises === "string") return;
@@ -150,7 +145,7 @@ export function NewLessonForm({
             title={problem ?? undefined}
             className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
           >
-            <PlusIcon /> {pending ? "Creating…" : button}
+            <PlusIcon /> {pending ? "Saving…" : "Save and Preview"}
           </button>
           {problem ? <p className="text-right text-sm text-muted">{problem}</p> : null}
           {error ? (

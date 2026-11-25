@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addQuestion, approveWhenReady, DASHBOARD, EDITOR, linkWord, signIn, WEBSITE } from "./helpers";
+import { addQuestion, approveWhenReady, DASHBOARD, EDITOR, linkWord, signIn, WEBSITE, saveAndEdit } from "./helpers";
 
 // A podcast-style lesson: HOST1/HOST2 lines, host names and voices set in the voice-over panel, made as one
 // conversation voice-over by the worker (the free test voices: this stack runs with TTS_PROVIDER=fake), then
@@ -22,8 +22,7 @@ test("an editor makes a two-host podcast lesson and learners see and hear the ho
   await page.getByLabel("Name learners see").first().fill("Kate");
   await page.getByLabel("Name learners see").last().fill("Max");
   page.once("dialog", (d) => void d.accept());
-  await page.getByRole("button", { name: "Create draft and make the podcast" }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
 
   // The conversation is made in the background; then the other parts.
   await approveWhenReady(page);

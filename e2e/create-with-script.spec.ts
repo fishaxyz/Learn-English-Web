@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DASHBOARD, EDITOR, signIn } from "./helpers";
+import { DASHBOARD, EDITOR, signIn, saveAndEdit } from "./helpers";
 
 // Creating a lesson with its text and the voice-over settings on the same page. No voice-over is made here: a
 // voice is ticked to check the cost, then unticked, so this never spends ElevenLabs characters.
@@ -23,11 +23,10 @@ test("an editor creates a lesson with its text and sees what a voice-over would 
   const first = page.locator('input[type="checkbox"][id^="voice-"]').first();
   await first.check();
   await expect(page.getByText(/1 chosen · about 45 characters/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create draft and make voice-overs" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save and Preview" })).toBeEnabled();
   await first.uncheck();
 
-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
   await expect(page.getByLabel("Lesson text").locator("p")).toHaveText([
     "Her commute is long.",
     "She reads on the train.",

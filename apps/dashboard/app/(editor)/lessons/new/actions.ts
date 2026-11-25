@@ -39,7 +39,7 @@ const newLesson = z.object({
 export type NewLesson = z.infer<typeof newLesson>;
 
 /**
- * Creates the draft with its script, then saves its questions and starts its voice-overs. The lesson exists once the
+ * Save and Preview: creates the draft with its script, then saves its questions and starts its voice-overs. The lesson exists once the
  * first step works; if a later step fails, its page opens and says why, so it can be done again there.
  */
 export async function createLesson(raw: NewLesson): Promise<CreateResult> {
@@ -104,7 +104,10 @@ export async function createLesson(raw: NewLesson): Promise<CreateResult> {
       problems.push(explain(error));
     }
   }
+  // Saved: show it as learners will see it. If a step went wrong, open the lesson page instead, which says what.
   redirect(
-    problems.length ? `/lessons/${id}?${new URLSearchParams({ voiceError: problems.join(" ") })}` : `/lessons/${id}`
+    problems.length
+      ? `/lessons/${id}?${new URLSearchParams({ voiceError: problems.join(" ") })}`
+      : `/lessons/${id}/preview?saved=1`
   );
 }

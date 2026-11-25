@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { approveWhenReady, DASHBOARD, EDITOR, linkWord, signIn } from "./helpers";
+import { approveWhenReady, DASHBOARD, EDITOR, linkWord, signIn, saveAndEdit } from "./helpers";
 
 // The New lesson page has the same four parts as the lesson page. A lesson filled in completely there (script with a
 // linked word, a question, a test voice-over) only needs its voice-over approved before it can be published.
@@ -34,8 +34,7 @@ test("an editor fills in all four parts on the New lesson page and publishes aft
   await page.getByLabel("Answer").selectOption("FALSE");
 
   page.once("dialog", (d) => void d.accept());
-  await page.getByRole("button", { name: "Create draft and make voice-overs" }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
   await expect(page.getByRole("button", { name: /Questions & quizzes 1 set · 1 question Done/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Lexical vocabulary 1 item linked/ })).toBeVisible();
 

@@ -100,3 +100,12 @@ export async function approveWhenReady(page: Page) {
   await voice.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(voice.getByText("Approved", { exact: true })).toBeVisible();
 }
+
+/** "Save and Preview" on the New reading page: it opens the preview; then back to the lesson page to keep editing. */
+export async function saveAndEdit(page: Page, title: string) {
+  await page.getByRole("button", { name: "Save and Preview" }).click();
+  await expect(page.getByRole("note")).toContainText("Saved. Preview of the draft.");
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await page.getByRole("link", { name: "← Back to editing" }).click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+}

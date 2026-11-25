@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { EDITOR, signIn } from "./helpers";
+import { EDITOR, signIn, saveAndEdit } from "./helpers";
 
 // The Reading Library: find a reading by search, narrow by status tab, switch to cards, and open its menu.
 test("an editor finds a reading in the Reading Library", async ({ page }) => {
@@ -10,8 +10,7 @@ test("an editor finds a reading in the Reading Library", async ({ page }) => {
   await page.getByRole("link", { name: "Create reading" }).click();
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Web address").fill(slug);
-  await page.getByRole("button", { name: "Create draft", exact: true }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
 
   await page.getByRole("navigation", { name: "Dashboard" }).getByRole("link", { name: "Reading Library" }).click();
   await expect(page.getByRole("heading", { name: "Reading Library" })).toBeVisible();

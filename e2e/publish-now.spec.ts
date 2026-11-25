@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addQuestion, DASHBOARD, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE } from "./helpers";
+import { addQuestion, DASHBOARD, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE, saveAndEdit } from "./helpers";
 
 // An admin (here the owner) writes an essay and publishes it in one step, without the review queue.
 test("an admin publishes an essay with Publish now", async ({ page }) => {
@@ -10,8 +10,7 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   await page.goto(`${DASHBOARD}/lessons/new`);
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Web address").fill(slug);
-  await page.getByRole("button", { name: "Create draft" }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await saveAndEdit(page, title);
 
   await page.getByLabel("Lesson text").click();
   await page.keyboard.type("Many people drink coffee before their commute. Others go for a run.");

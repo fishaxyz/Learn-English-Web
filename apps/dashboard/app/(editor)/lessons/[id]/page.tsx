@@ -22,7 +22,7 @@ export default async function EditLesson({
   searchParams: Promise<{ voiceError?: string }>;
 }) {
   const { id } = await params;
-  // Set by "Create draft" when the chosen voice-overs couldn't be started; shown as plain text.
+  // Set by "Save and Preview" on the New reading page when the chosen voice-overs couldn't be started; shown as plain text.
   const voiceError = (await searchParams).voiceError?.slice(0, 300) ?? null;
   if (!UUID.test(id)) notFound();
   const viewer = await getViewer();
