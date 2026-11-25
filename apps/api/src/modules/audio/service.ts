@@ -8,7 +8,7 @@ import { audit } from "../audit";
 import { enqueue, heldJob, markFailed, markSucceeded, type JobRow } from "../jobs/service";
 import { contentTypeFor, type MediaStorage } from "../media/storage";
 import { blockTexts, type RichTextDocument } from "../rich-text";
-import type { VoiceCatalog } from "../tts/voices";
+import type { Voice, VoiceCatalog } from "../tts/voices";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const { audioTracks: tracks, resourceRevisions: rev, resourceLocalizations: loc } = schema;
@@ -19,24 +19,72 @@ export const MAX_TTS_CHARACTERS = 9_500;
 export const MAX_VOICES_PER_REQUEST = 4;
 export const MAX_TRACKS_PER_REVISION = 8;
 
+/** Models per mode: single voices use Multilingual v2; conversations need a model that supports dialogue. */
+export const SINGLE_MODEL = "eleven_multilingual_v2";
+export const CONVERSATION_MODELS = ["eleven_v3", "eleven_v3_conversational"] as const;
+export const DEFAULT_CONVERSATION_MODEL = "eleven_v3";
+/** Conversations are sent in parts of at most this many characters (the dialogue endpoint's practical limit). */
+export const MAX_DIALOGUE_PART = 2_000;
+
+/** A conversation turn starts with "HOST1:" or "HOST2:"; that label is never read aloud. */
+const HOST_PREFIX = /^\s*HOST\s?([12])\s*:\s*/i;
+
 /**
  * What a voice reads: each block's text, separated by blank lines, and where each block starts (in code points)
- * so the worker can turn the provider's character timings back into block offsets.
+ * so the worker can turn the provider's character timings back into block offsets. A "HOST1:"/"HOST2:" label is
+ * left out of what's read; `offset` says how many code points it took at the start of the block, and `host`
+ * whose turn the block is.
  */
 export function ttsTextOf(doc: RichTextDocument) {
-  const blocks: { blockId: string; start: number; length: number }[] = [];
+  const blocks: { blockId: string; start: number; length: number; offset: number; host: 1 | 2 | null }[] = [];
   const parts: string[] = [];
-  let offset = 0;
-  for (const [blockId, text] of blockTexts(doc)) {
+  let position = 0;
+  for (const [blockId, raw] of blockTexts(doc)) {
+    const label = HOST_PREFIX.exec(raw);
+    const text = label ? raw.slice(label[0].length) : raw;
     if (!text.trim()) continue;
-    if (parts.length) offset += 2; // the "\n\n" between blocks
+    if (parts.length) position += 2; // the "\n\n" between blocks
     const length = [...text].length;
-    blocks.push({ blockId, start: offset, length });
+    blocks.push({
+      blockId,
+      start: position,
+      length,
+      offset: label ? [...label[0]].length : 0,
+      host: label ? (label[1] === "1" ? 1 : 2) : null,
+    });
     parts.push(text);
-    offset += length;
+    position += length;
   }
   const text = parts.join("\n\n");
   return { text, blocks, characters: [...text].length, hash: createHash("sha256").update(text).digest("hex") };
+}
+
+/** A conversation's turns, in order: each host block's text and where it is. Blocks without a host aren't read. */
+export function conversationOf(doc: RichTextDocument) {
+  const tts = ttsTextOf(doc);
+  const chars = [...tts.text];
+  const turns = tts.blocks
+    .filter((b) => b.host)
+    .map((b) => ({
+      host: b.host as 1 | 2,
+      blockId: b.blockId,
+      offset: b.offset,
+      text: chars.slice(b.start, b.start + b.length).join(""),
+    }));
+  return { turns, characters: turns.reduce((n, t) => n + [...t.text].length, 0), hash: tts.hash };
+}
+
+const SPEAKER_NAME = /^[\p{L}\p{M}' .-]{1,40}$/u;
+/** Host names as learners see them; blank names fall back to "Host 1" / "Host 2" on the website. */
+export function parseSpeakerNames(input: { host1?: string | null; host2?: string | null } | null | undefined) {
+  if (!input) return null;
+  const clean = (name: string | null | undefined) => {
+    const n = (name ?? "").trim();
+    if (n && !SPEAKER_NAME.test(n)) throw invalid("A host's name can use letters, spaces, apostrophes and hyphens");
+    return n || null;
+  };
+  const names = { host1: clean(input.host1), host2: clean(input.host2) };
+  return names.host1 || names.host2 ? names : null;
 }
 
 async function draftFor(tx: Tx | Database, localizationId: string) {
@@ -93,6 +141,7 @@ export async function requestVoiceovers(
               voiceName: voice.name,
               gender: voice.gender,
               accent: voice.accent,
+              modelId: SINGLE_MODEL,
               characters: tts.characters,
               textHash: tts.hash,
               position: existing.length + i,
@@ -105,7 +154,14 @@ export async function requestVoiceovers(
           type: TTS_JOB,
           idempotencyKey: `tts:${track.id}`,
           createdBy: actorUserId,
-          payload: { trackId: track.id, voiceId: voice.id, text: tts.text, blocks: tts.blocks },
+          payload: {
+            mode: "single",
+            trackId: track.id,
+            voiceId: voice.id,
+            modelId: SINGLE_MODEL,
+            text: tts.text,
+            blocks: tts.blocks,
+          },
         });
         await tx
           .update(tracks)
@@ -126,6 +182,117 @@ export async function requestVoiceovers(
         },
       });
       return created;
+    })
+  );
+}
+
+/**
+ * Starts one conversation voice-over: each HOST1/HOST2 turn read by that host's voice, in one audio file (the
+ * worker uses the provider's dialogue endpoint). The host names are saved on the draft for learners to see.
+ */
+export async function requestConversation(
+  db: Database,
+  catalog: VoiceCatalog,
+  actorUserId: string | null,
+  input: {
+    localizationId: string;
+    modelId: string;
+    host1: { voiceId: string; name?: string | null };
+    host2: { voiceId: string; name?: string | null };
+  }
+) {
+  if (!(CONVERSATION_MODELS as readonly string[]).includes(input.modelId)) throw invalid("Choose a conversation model");
+  const available = await catalog.voices();
+  const [voice1, voice2] = [input.host1.voiceId, input.host2.voiceId].map((id) => {
+    const voice = available.find((v) => v.id === id);
+    if (!voice) throw invalid("That voice isn't available");
+    return voice;
+  }) as [Voice, Voice];
+  const names = parseSpeakerNames({ host1: input.host1.name, host2: input.host2.name });
+
+  return translateDbErrors(() =>
+    db.transaction(async (tx) => {
+      const { localization, draft } = await draftFor(tx, input.localizationId);
+      const talk = conversationOf(draft.richText as RichTextDocument);
+      if (!talk.turns.length) {
+        throw invalid('No conversation lines: start each line with "HOST1:" or "HOST2:"');
+      }
+      if (talk.characters > MAX_TTS_CHARACTERS) {
+        throw invalid(
+          `The conversation is ${talk.characters} characters; a voice-over can read at most ${MAX_TTS_CHARACTERS}`
+        );
+      }
+      const tooLong = talk.turns.find((t) => [...t.text].length > MAX_DIALOGUE_PART);
+      if (tooLong) throw invalid(`One turn is longer than ${MAX_DIALOGUE_PART} characters; split it into two`);
+      const existing = await tx.select({ id: tracks.id }).from(tracks).where(eq(tracks.revisionId, draft.id));
+      if (existing.length + 1 > MAX_TRACKS_PER_REVISION) {
+        throw invalid(`A lesson can have at most ${MAX_TRACKS_PER_REVISION} voice-overs; delete some first`);
+      }
+      // The names belong to the draft's text, not to one voice-over: saved without changing its lock version,
+      // so an editor with the draft open can still save.
+      await tx.update(rev).set({ speakerNames: names }).where(eq(rev.id, draft.id));
+      const speakers = [
+        { host: 1, voiceId: voice1.id, voiceName: voice1.name },
+        { host: 2, voiceId: voice2.id, voiceName: voice2.name },
+      ];
+      const track = one(
+        await tx
+          .insert(tracks)
+          .values({
+            siteId: draft.siteId,
+            revisionId: draft.id,
+            provider: catalog.provider,
+            mode: "conversation",
+            speakers,
+            voiceId: voice1.id,
+            voiceName: `${voice1.name} & ${voice2.name}`,
+            gender: voice1.gender,
+            accent: voice1.accent,
+            modelId: input.modelId,
+            characters: talk.characters,
+            textHash: talk.hash,
+            position: existing.length,
+            createdBy: actorUserId,
+          })
+          .returning()
+      );
+      const voiceOf = { 1: voice1.id, 2: voice2.id } as const;
+      const job = await enqueue(tx, {
+        siteId: draft.siteId,
+        type: TTS_JOB,
+        idempotencyKey: `tts:${track.id}`,
+        createdBy: actorUserId,
+        payload: {
+          mode: "conversation",
+          trackId: track.id,
+          modelId: input.modelId,
+          maxPartCharacters: MAX_DIALOGUE_PART,
+          turns: talk.turns.map((t) => ({
+            voiceId: voiceOf[t.host],
+            text: t.text,
+            blockId: t.blockId,
+            offset: t.offset,
+          })),
+        },
+      });
+      await tx
+        .update(tracks)
+        .set({ jobId: job?.id ?? null })
+        .where(eq(tracks.id, track.id));
+      await audit(tx, {
+        siteId: draft.siteId,
+        actorUserId,
+        action: "voiceover.requested",
+        entityType: "revision",
+        entityId: draft.id,
+        data: {
+          mode: "conversation",
+          voices: [voice1.id, voice2.id],
+          characters: talk.characters,
+          localization: localization.id,
+        },
+      });
+      return [{ ...track, jobId: job?.id ?? null }];
     })
   );
 }
@@ -190,9 +357,9 @@ export async function prepareTracksForPublish(tx: Tx, revisionId: string, doc: R
 export async function copyTracks(tx: Tx, fromRevisionId: string, toRevisionId: string) {
   await tx.execute(sql`
     insert into audio_tracks (site_id, revision_id, asset_id, status, provider, voice_id, voice_name, gender, accent,
-      model_id, characters, text_hash, word_timings, duration_ms, position, created_by)
+      mode, speakers, model_id, characters, text_hash, word_timings, duration_ms, position, created_by)
     select site_id, ${toRevisionId}, asset_id, status, provider, voice_id, voice_name, gender, accent,
-      model_id, characters, text_hash, word_timings, duration_ms, position, created_by
+      mode, speakers, model_id, characters, text_hash, word_timings, duration_ms, position, created_by
     from audio_tracks where revision_id = ${fromRevisionId} and status = 'APPROVED'`);
 }
 

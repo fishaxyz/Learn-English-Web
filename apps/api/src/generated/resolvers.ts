@@ -66,7 +66,7 @@ export type ArticleResource = Resource & {
   topics: Array<Topic>;
 };
 
-/** One voice reading a revision's text. */
+/** A voice reading a revision's text: one voice, or two hosts in a conversation. */
 export type AudioTrack = {
   __typename?: "AudioTrack";
   accent: VoiceAccent;
@@ -76,8 +76,12 @@ export type AudioTrack = {
   error?: Maybe<Scalars["String"]["output"]>;
   gender: VoiceGender;
   id: Scalars["ID"]["output"];
-  /** For learners: "Woman · UK". */
+  /** For learners: "Woman · UK", or "Conversation · Kate & Max". */
   label: Scalars["String"]["output"];
+  mode: VoiceoverMode;
+  modelId?: Maybe<Scalars["String"]["output"]>;
+  /** Both hosts' voices, for conversations; empty for a single voice. */
+  speakers: Array<TrackSpeaker>;
   /** Editorial: the text changed after this voice-over was made. */
   stale: Scalars["Boolean"]["output"];
   status: AudioTrackStatus;
@@ -107,6 +111,20 @@ export type ClaimedJob = {
   type: Scalars["String"]["output"];
 };
 
+export type ConversationHostInput = {
+  /** Shown to learners instead of HOST1/HOST2 (saved on the draft). */
+  name?: InputMaybe<Scalars["String"]["input"]>;
+  voiceId: Scalars["ID"]["input"];
+};
+
+export type ConversationVoiceoverInput = {
+  host1: ConversationHostInput;
+  host2: ConversationHostInput;
+  localizationId: Scalars["ID"]["input"];
+  /** eleven_v3 (the default) or eleven_v3_conversational. */
+  modelId: Scalars["String"]["input"];
+};
+
 export type CorrectAnswer = ChoiceAnswer | GapsAnswer | JudgementAnswer;
 
 export type CreateResourceInput = {
@@ -116,6 +134,7 @@ export type CreateResourceInput = {
   locale?: Scalars["String"]["input"];
   siteId: Scalars["ID"]["input"];
   slug: Scalars["String"]["input"];
+  speakerNames?: InputMaybe<SpeakerNamesInput>;
   summary?: InputMaybe<Scalars["String"]["input"]>;
   title: Scalars["String"]["input"];
   topicSlugs?: InputMaybe<Array<Scalars["String"]["input"]>>;
@@ -364,6 +383,8 @@ export type Mutation = {
   publishNow: EditorialResource;
   /** Reviewers: publish the reviewed draft. The previous published revision is superseded, never changed. */
   publishResource: EditorialResource;
+  /** Editors: one voice-over of the draft's HOST1/HOST2 conversation, each host with their own voice. */
+  requestConversationVoiceover: Array<AudioTrack>;
   /** Editors: start a voice-over of the draft's text for each voice (at most 4 at a time). Runs in the background. */
   requestVoiceovers: Array<AudioTrack>;
   /** Reviewers: send it back to the editor. */
@@ -437,6 +458,10 @@ export type MutationPublishNowArgs = {
 export type MutationPublishResourceArgs = {
   localizationId: Scalars["ID"]["input"];
   lockVersion: Scalars["Int"]["input"];
+};
+
+export type MutationRequestConversationVoiceoverArgs = {
+  input: ConversationVoiceoverInput;
 };
 
 export type MutationRequestVoiceoversArgs = {
@@ -620,6 +645,8 @@ export type ReadingResource = Resource & {
   publishedAt: Scalars["DateTime"]["output"];
   revisionNo: Scalars["Int"]["output"];
   slug: Scalars["String"]["output"];
+  /** Conversation lessons: the names shown instead of HOST1/HOST2. */
+  speakerNames?: Maybe<SpeakerNames>;
   summary?: Maybe<Scalars["String"]["output"]>;
   title: Scalars["String"]["output"];
   topics: Array<Topic>;
@@ -679,6 +706,7 @@ export type Revision = {
   lockVersion: Scalars["Int"]["output"];
   publishedAt?: Maybe<Scalars["DateTime"]["output"]>;
   revisionNo: Scalars["Int"]["output"];
+  speakerNames?: Maybe<SpeakerNames>;
   status: RevisionStatus;
   submittedAt?: Maybe<Scalars["DateTime"]["output"]>;
   summary?: Maybe<Scalars["String"]["output"]>;
@@ -728,6 +756,18 @@ export type Site = {
 
 export type SiteRole = "ADMIN" | "EDITOR" | "OWNER" | "REVIEWER" | "VIEWER";
 
+/** Host names learners see instead of HOST1 and HOST2. */
+export type SpeakerNames = {
+  __typename?: "SpeakerNames";
+  host1?: Maybe<Scalars["String"]["output"]>;
+  host2?: Maybe<Scalars["String"]["output"]>;
+};
+
+export type SpeakerNamesInput = {
+  host1?: InputMaybe<Scalars["String"]["input"]>;
+  host2?: InputMaybe<Scalars["String"]["input"]>;
+};
+
 /** Where a vocabulary item appears in a text: a span of one block, and the sentence around it. */
 export type TextOccurrence = {
   __typename?: "TextOccurrence";
@@ -750,6 +790,14 @@ export type Topic = {
   id: Scalars["ID"]["output"];
   name: Scalars["String"]["output"];
   slug: Scalars["String"]["output"];
+};
+
+/** A host's voice in a conversation voice-over. */
+export type TrackSpeaker = {
+  __typename?: "TrackSpeaker";
+  host: Scalars["Int"]["output"];
+  voiceId: Scalars["ID"]["output"];
+  voiceName: Scalars["String"]["output"];
 };
 
 /** The meaning in another language. */
@@ -779,6 +827,8 @@ export type UpdateDraftInput = {
   cefrLevel?: InputMaybe<CefrLevel>;
   localizationId: Scalars["ID"]["input"];
   lockVersion: Scalars["Int"]["input"];
+  /** Set to replace the host names; null fields clear a name. */
+  speakerNames?: InputMaybe<SpeakerNamesInput>;
   summary?: InputMaybe<Scalars["String"]["input"]>;
   title?: InputMaybe<Scalars["String"]["input"]>;
   /** Replaces the draft's topics. */
@@ -826,6 +876,12 @@ export type VoiceCatalog = {
 };
 
 export type VoiceGender = "FEMALE" | "MALE";
+
+export type VoiceoverMode =
+  /** Each HOST1/HOST2 turn is read by its host's voice, like a podcast. */
+  | "CONVERSATION"
+  /** One voice reads the whole text. */
+  | "SINGLE";
 
 /** When a word is spoken in a track: its block, code-point offsets in that block's text, and milliseconds. */
 export type WordTiming = {
@@ -936,6 +992,8 @@ export type ResolversTypes = {
   CefrLevel: CefrLevel;
   ChoiceAnswer: ResolverTypeWrapper<ChoiceAnswer>;
   ClaimedJob: ResolverTypeWrapper<ClaimedJobModel>;
+  ConversationHostInput: ConversationHostInput;
+  ConversationVoiceoverInput: ConversationVoiceoverInput;
   CorrectAnswer: ResolverTypeWrapper<ResolversUnionTypes<ResolversTypes>["CorrectAnswer"]>;
   CreateResourceInput: CreateResourceInput;
   DateTime: ResolverTypeWrapper<Scalars["DateTime"]["output"]>;
@@ -998,10 +1056,13 @@ export type ResolversTypes = {
   SingleChoiceQuestion: ResolverTypeWrapper<QuestionModel>;
   Site: ResolverTypeWrapper<SiteModel>;
   SiteRole: SiteRole;
+  SpeakerNames: ResolverTypeWrapper<SpeakerNames>;
+  SpeakerNamesInput: SpeakerNamesInput;
   String: ResolverTypeWrapper<Scalars["String"]["output"]>;
   TextOccurrence: ResolverTypeWrapper<TextOccurrence>;
   TextSegment: ResolverTypeWrapper<TextSegment>;
   Topic: ResolverTypeWrapper<TopicModel>;
+  TrackSpeaker: ResolverTypeWrapper<TrackSpeaker>;
   Translation: ResolverTypeWrapper<Translation>;
   TranslationInput: TranslationInput;
   TrueFalseNotGivenQuestion: ResolverTypeWrapper<QuestionModel>;
@@ -1012,6 +1073,7 @@ export type ResolversTypes = {
   VoiceAccent: VoiceAccent;
   VoiceCatalog: ResolverTypeWrapper<VoiceCatalog>;
   VoiceGender: VoiceGender;
+  VoiceoverMode: VoiceoverMode;
   WordTiming: ResolverTypeWrapper<WordTiming>;
 };
 
@@ -1022,6 +1084,8 @@ export type ResolversParentTypes = {
   Boolean: Scalars["Boolean"]["output"];
   ChoiceAnswer: ChoiceAnswer;
   ClaimedJob: ClaimedJobModel;
+  ConversationHostInput: ConversationHostInput;
+  ConversationVoiceoverInput: ConversationVoiceoverInput;
   CorrectAnswer: ResolversUnionTypes<ResolversParentTypes>["CorrectAnswer"];
   CreateResourceInput: CreateResourceInput;
   DateTime: Scalars["DateTime"]["output"];
@@ -1071,10 +1135,13 @@ export type ResolversParentTypes = {
   SenseRevision: SenseRevisionModel;
   SingleChoiceQuestion: QuestionModel;
   Site: SiteModel;
+  SpeakerNames: SpeakerNames;
+  SpeakerNamesInput: SpeakerNamesInput;
   String: Scalars["String"]["output"];
   TextOccurrence: TextOccurrence;
   TextSegment: TextSegment;
   Topic: TopicModel;
+  TrackSpeaker: TrackSpeaker;
   Translation: Translation;
   TranslationInput: TranslationInput;
   TrueFalseNotGivenQuestion: QuestionModel;
@@ -1118,6 +1185,9 @@ export type AudioTrackResolvers<
   gender?: Resolver<ResolversTypes["VoiceGender"], ParentType, ContextType>;
   id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
   label?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  mode?: Resolver<ResolversTypes["VoiceoverMode"], ParentType, ContextType>;
+  modelId?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+  speakers?: Resolver<Array<ResolversTypes["TrackSpeaker"]>, ParentType, ContextType>;
   stale?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
   status?: Resolver<ResolversTypes["AudioTrackStatus"], ParentType, ContextType>;
   url?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
@@ -1454,6 +1524,12 @@ export type MutationResolvers<
     ContextType,
     RequireFields<MutationPublishResourceArgs, "localizationId" | "lockVersion">
   >;
+  requestConversationVoiceover?: Resolver<
+    Array<ResolversTypes["AudioTrack"]>,
+    ParentType,
+    ContextType,
+    RequireFields<MutationRequestConversationVoiceoverArgs, "input">
+  >;
   requestVoiceovers?: Resolver<
     Array<ResolversTypes["AudioTrack"]>,
     ParentType,
@@ -1634,6 +1710,7 @@ export type ReadingResourceResolvers<
   publishedAt?: Resolver<ResolversTypes["DateTime"], ParentType, ContextType>;
   revisionNo?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
   slug?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  speakerNames?: Resolver<Maybe<ResolversTypes["SpeakerNames"]>, ParentType, ContextType>;
   summary?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
   title?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
   topics?: Resolver<Array<ResolversTypes["Topic"]>, ParentType, ContextType>;
@@ -1675,6 +1752,7 @@ export type RevisionResolvers<
   lockVersion?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
   publishedAt?: Resolver<Maybe<ResolversTypes["DateTime"]>, ParentType, ContextType>;
   revisionNo?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  speakerNames?: Resolver<Maybe<ResolversTypes["SpeakerNames"]>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes["RevisionStatus"], ParentType, ContextType>;
   submittedAt?: Resolver<Maybe<ResolversTypes["DateTime"]>, ParentType, ContextType>;
   summary?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
@@ -1730,6 +1808,14 @@ export type SiteResolvers<
   name?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
 };
 
+export type SpeakerNamesResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["SpeakerNames"] = ResolversParentTypes["SpeakerNames"],
+> = {
+  host1?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+  host2?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+};
+
 export type TextOccurrenceResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["TextOccurrence"] = ResolversParentTypes["TextOccurrence"],
@@ -1757,6 +1843,15 @@ export type TopicResolvers<
   id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
   name?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
   slug?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+};
+
+export type TrackSpeakerResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["TrackSpeaker"] = ResolversParentTypes["TrackSpeaker"],
+> = {
+  host?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  voiceId?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
+  voiceName?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
 };
 
 export type TranslationResolvers<
@@ -1875,9 +1970,11 @@ export type Resolvers<ContextType = GraphQLContext> = {
   SenseRevision?: SenseRevisionResolvers<ContextType>;
   SingleChoiceQuestion?: SingleChoiceQuestionResolvers<ContextType>;
   Site?: SiteResolvers<ContextType>;
+  SpeakerNames?: SpeakerNamesResolvers<ContextType>;
   TextOccurrence?: TextOccurrenceResolvers<ContextType>;
   TextSegment?: TextSegmentResolvers<ContextType>;
   Topic?: TopicResolvers<ContextType>;
+  TrackSpeaker?: TrackSpeakerResolvers<ContextType>;
   Translation?: TranslationResolvers<ContextType>;
   TrueFalseNotGivenQuestion?: TrueFalseNotGivenQuestionResolvers<ContextType>;
   Viewer?: ViewerResolvers<ContextType>;

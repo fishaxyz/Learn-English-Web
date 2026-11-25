@@ -4,7 +4,7 @@ import { schema } from "@english/database";
 import { testDatabaseUrl } from "@english/database/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ttsTextOf } from "../src/modules/audio/service";
+import { conversationOf, ttsTextOf } from "../src/modules/audio/service";
 import { codeOf, createHarness, type Harness } from "./helpers";
 
 // No provider is called here: the stand-in voices are used, and the "worker" is this test.
@@ -35,9 +35,33 @@ describe("text read by a voice", () => {
     });
     expect(tts.text).toBe("Zoë 🚆 left.\n\nThen rain.");
     expect(tts.blocks).toEqual([
-      { blockId: "para-1", start: 0, length: 11 },
-      { blockId: "para-3", start: 13, length: 10 },
+      { blockId: "para-1", start: 0, length: 11, offset: 0, host: null },
+      { blockId: "para-3", start: 13, length: 10, offset: 0, host: null },
     ]);
+  });
+
+  it("leaves out HOST1:/HOST2: labels, remembering how much of the block they took", () => {
+    const doc = {
+      type: "doc" as const,
+      content: [
+        { type: "paragraph", attrs: { id: "para-1" }, content: [{ type: "text", text: "A Morning Chat" }] },
+        { type: "paragraph", attrs: { id: "para-2" }, content: [{ type: "text", text: "HOST1: Hi, Max." }] },
+        { type: "paragraph", attrs: { id: "para-3" }, content: [{ type: "text", text: "host 2 :Hello! 🚆" }] },
+      ],
+    };
+    const tts = ttsTextOf(doc);
+    expect(tts.text).toBe("A Morning Chat\n\nHi, Max.\n\nHello! 🚆");
+    expect(tts.blocks.map((b) => [b.blockId, b.offset, b.host])).toEqual([
+      ["para-1", 0, null],
+      ["para-2", 7, 1],
+      ["para-3", 8, 2],
+    ]);
+    const talk = conversationOf(doc);
+    expect(talk.turns).toEqual([
+      { host: 1, blockId: "para-2", offset: 7, text: "Hi, Max." },
+      { host: 2, blockId: "para-3", offset: 8, text: "Hello! 🚆" },
+    ]);
+    expect(talk.characters).toBe(16);
   });
 });
 
@@ -213,6 +237,80 @@ describe.skipIf(!testDatabaseUrl)("voice-overs", () => {
     expect((await ranged.arrayBuffer()).byteLength).toBe(100);
     const forged = track!.url.replace(/sig=[^&]+/, "sig=forged");
     expect((await fetch(local(forged))).status).toBe(403);
+  });
+
+  it("makes a conversation voice-over: both hosts' voices, their names for learners, turns for the worker", async () => {
+    const CONVO = `mutation($input: ConversationVoiceoverInput!) {
+      requestConversationVoiceover(input: $input) { id mode label modelId speakers { host voiceId voiceName } } }`;
+    const create = await h.gql(
+      CREATE,
+      {
+        input: {
+          siteId: h.a.siteId,
+          kind: "READING",
+          slug: "morning-chat",
+          title: "Morning chat",
+          body: {
+            type: "doc",
+            content: [
+              { type: "paragraph", attrs: { id: "chat-1" }, content: [{ type: "text", text: "HOST1: Hi, Max." }] },
+              { type: "paragraph", attrs: { id: "chat-2" }, content: [{ type: "text", text: "HOST2: Hello!" }] },
+            ],
+          },
+        },
+      },
+      { token: h.people.ownerA.token }
+    );
+    const id = (create.data?.createResource as { localizations: { id: string }[] }).localizations[0]!.id;
+    const input = (over: object = {}) => ({
+      localizationId: id,
+      modelId: "eleven_v3",
+      host1: { voiceId: "fake-woman-us", name: "Kate" },
+      host2: { voiceId: "fake-man-us", name: "Max" },
+      ...over,
+    });
+    const editor = { token: h.people.editorA.token };
+    expect(codeOf(await h.gql(CONVO, { input: input({ modelId: "eleven_multilingual_v2" }) }, editor))).toBe(
+      "VALIDATION_ERROR"
+    );
+    expect(
+      codeOf(await h.gql(CONVO, { input: input({ host1: { voiceId: "fake-woman-us", name: "<b>" } }) }, editor))
+    ).toBe("VALIDATION_ERROR");
+
+    const r = await h.gql(CONVO, { input: input() }, editor);
+    expect(r.errors).toBeUndefined();
+    expect(r.data?.requestConversationVoiceover).toEqual([
+      {
+        id: expect.any(String),
+        mode: "CONVERSATION",
+        label: "Conversation · Kate & Max",
+        modelId: "eleven_v3",
+        speakers: [
+          { host: 1, voiceId: "fake-woman-us", voiceName: "Test voice (woman, US)" },
+          { host: 2, voiceId: "fake-man-us", voiceName: "Test voice (man, US)" },
+        ],
+      },
+    ]);
+    const [job] = await h.t.db
+      .select()
+      .from(schema.jobs)
+      .where(
+        eq(schema.jobs.idempotencyKey, `tts:${(r.data?.requestConversationVoiceover as { id: string }[])[0]!.id}`)
+      );
+    expect(job!.payloadJson).toMatchObject({
+      mode: "conversation",
+      modelId: "eleven_v3",
+      turns: [
+        { voiceId: "fake-woman-us", text: "Hi, Max.", blockId: "chat-1", offset: 7 },
+        { voiceId: "fake-man-us", text: "Hello!", blockId: "chat-2", offset: 7 },
+      ],
+    });
+    // The names are saved on the draft, for learners to see instead of HOST1/HOST2.
+    const [draft] = await h.t.db
+      .select()
+      .from(schema.resourceRevisions)
+      .where(eq(schema.resourceRevisions.localizationId, id));
+    expect(draft!.speakerNames).toEqual({ host1: "Kate", host2: "Max" });
   });
 
   it("refuses to publish an approved voice-over that no longer matches the text", async () => {

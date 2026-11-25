@@ -83,3 +83,24 @@ def test_silent_fake_makes_real_wav_audio_with_timings() -> None:
         assert w.getframerate() == 8000 and w.getnframes() > 0
     assert speech.mime_type == "audio/wav"
     assert speech.alignment is not None and len(speech.alignment.characters) == len("Hello there.")
+
+
+def test_a_dialogue_alignment_is_cut_into_turns_and_unmatched_turns_get_none() -> None:
+    from content_engine.tts.providers import Alignment, split_alignment
+
+    text = "Hi.Hello."
+    whole = Alignment(list(text), [i * 0.1 for i in range(len(text))], [(i + 1) * 0.1 for i in range(len(text))])
+    first, second, third = split_alignment(whole, ["Hi.", "Hello.", "Missing"])
+    assert first is not None and "".join(first.characters) == "Hi."
+    assert (second is not None and second.starts[0] == 0.30000000000000004) or second.starts[0] == 0.3  # type: ignore[union-attr]
+    assert third is None
+
+
+def test_word_offsets_include_a_skipped_host_label() -> None:
+    from content_engine.tts.alignment import word_timings
+    from content_engine.tts.providers import Alignment
+
+    text = "Hi there."
+    alignment = Alignment(list(text), [i * 0.1 for i in range(9)], [(i + 1) * 0.1 for i in range(9)])
+    words = word_timings(text, [{"blockId": "para-1", "start": 0, "length": 9, "offset": 7}], alignment)
+    assert [(w["start"], w["end"]) for w in words] == [(7, 9), (10, 15)]

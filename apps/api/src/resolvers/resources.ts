@@ -71,6 +71,14 @@ async function onLocalization(
   return authorize(await ctx.actor(), siteId, permission).user.id;
 }
 
+/** Stored as JSON on the revision; only the two names are passed on. */
+const speakerNames = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const v = value as { host1?: unknown; host2?: unknown };
+  const name = (n: unknown) => (typeof n === "string" && n ? n : null);
+  return { host1: name(v.host1), host2: name(v.host2) };
+};
+
 export const resourceResolvers: Resolvers = {
   Query: {
     publishedResources: async (_, { filter, first, after }, ctx) => {
@@ -162,6 +170,7 @@ export const resourceResolvers: Resolvers = {
     ...common,
     vocabulary: (p, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(p.revision.id),
     vocabularyItems: (p, _, ctx) => vocabularyItems(ctx, p.revision),
+    speakerNames: (p) => speakerNames(p.revision.speakerNames),
     audioTracks: (p, _, ctx) => publicTracks(ctx, p.revision),
     wordCount: (p) => wordCount(p.revision.plainText),
     estimatedReadingSeconds: (p) => readingSeconds(wordCount(p.revision.plainText)),
@@ -183,6 +192,7 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    speakerNames: (r) => speakerNames(r.speakerNames),
     topics: (r, _, ctx) => ctx.loaders.topicsByRevision.load(r.id),
     vocabulary: (r, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(r.id),
     vocabularyItems: (r, _, ctx) => vocabularyItems(ctx, r),

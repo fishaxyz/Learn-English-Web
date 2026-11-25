@@ -43,6 +43,8 @@ interface Resource {
 }
 
 type ReadingResource implements Resource {
+  "Conversation lessons: the names shown instead of HOST1/HOST2."
+  speakerNames: SpeakerNames
   id: ID!
   kind: ResourceKind!
   locale: String!
@@ -148,6 +150,7 @@ extend type Query {
 # --- Editorial
 
 type Revision {
+  speakerNames: SpeakerNames
   id: ID!
   revisionNo: Int!
   status: RevisionStatus!
@@ -189,6 +192,7 @@ type EditorialResource {
 }
 
 input CreateResourceInput {
+  speakerNames: SpeakerNamesInput
   siteId: ID!
   kind: ResourceKind!
   locale: String! = "en"
@@ -201,6 +205,8 @@ input CreateResourceInput {
 }
 
 input UpdateDraftInput {
+  "Set to replace the host names; null fields clear a name."
+  speakerNames: SpeakerNamesInput
   localizationId: ID!
   lockVersion: Int!
   title: String

@@ -52,6 +52,12 @@ export const audioResolvers: Resolvers = {
       const actor = authorize(await ctx.actor(), siteId, "content.write");
       return audio.requestVoiceovers(ctx.db, ctx.voices, actor.user.id, localizationId, voiceIds);
     },
+    requestConversationVoiceover: async (_, { input }, ctx) => {
+      const siteId = await siteOfLocalization(ctx.db, input.localizationId);
+      if (!siteId) throw notFound("Lesson");
+      const actor = authorize(await ctx.actor(), siteId, "content.write");
+      return audio.requestConversation(ctx.db, ctx.voices, actor.user.id, input);
+    },
     approveAudioTrack: async (_, { id }, ctx) => audio.approveTrack(ctx.db, await onTrack(ctx, id), id),
     deleteAudioTrack: async (_, { id }, ctx) => audio.deleteTrack(ctx.db, await onTrack(ctx, id), id),
 
@@ -80,7 +86,15 @@ export const audioResolvers: Resolvers = {
   AudioTrack: {
     gender: (t) => (t.gender === "female" ? "FEMALE" : "MALE"),
     accent: (t) => (t.accent === "us" ? "US" : "UK"),
-    label: (t) => trackLabel(t.gender, t.accent),
+    mode: (t) => (t.mode === "conversation" ? "CONVERSATION" : "SINGLE"),
+    speakers: (t) =>
+      Array.isArray(t.speakers) ? (t.speakers as { host: number; voiceId: string; voiceName: string }[]) : [],
+    label: async (t, _, ctx) => {
+      if (t.mode !== "conversation") return trackLabel(t.gender, t.accent);
+      const revision = await ctx.loaders.revision.load(t.revisionId);
+      const names = (revision?.speakerNames ?? {}) as { host1?: string | null; host2?: string | null };
+      return `Conversation · ${names.host1 || "Host 1"} & ${names.host2 || "Host 2"}`;
+    },
     url: async (t, _, ctx) => {
       if (!t.assetId) return null;
       const asset = await ctx.loaders.mediaAsset.load(t.assetId);

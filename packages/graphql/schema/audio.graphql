@@ -24,14 +24,57 @@ type WordTiming {
   endMs: Int!
 }
 
-"One voice reading a revision's text."
+enum VoiceoverMode {
+  "One voice reads the whole text."
+  SINGLE
+  "Each HOST1/HOST2 turn is read by its host's voice, like a podcast."
+  CONVERSATION
+}
+
+"A host's voice in a conversation voice-over."
+type TrackSpeaker {
+  host: Int!
+  voiceId: ID!
+  voiceName: String!
+}
+
+"Host names learners see instead of HOST1 and HOST2."
+type SpeakerNames {
+  host1: String
+  host2: String
+}
+
+input SpeakerNamesInput {
+  host1: String
+  host2: String
+}
+
+input ConversationHostInput {
+  voiceId: ID!
+  "Shown to learners instead of HOST1/HOST2 (saved on the draft)."
+  name: String
+}
+
+input ConversationVoiceoverInput {
+  localizationId: ID!
+  "eleven_v3 (the default) or eleven_v3_conversational."
+  modelId: String!
+  host1: ConversationHostInput!
+  host2: ConversationHostInput!
+}
+
+"A voice reading a revision's text: one voice, or two hosts in a conversation."
 type AudioTrack {
   id: ID!
   status: AudioTrackStatus!
+  mode: VoiceoverMode!
+  "Both hosts' voices, for conversations; empty for a single voice."
+  speakers: [TrackSpeaker!]!
+  modelId: String
   voiceName: String!
   gender: VoiceGender!
   accent: VoiceAccent!
-  "For learners: \"Woman · UK\"."
+  "For learners: \"Woman · UK\", or \"Conversation · Kate & Max\"."
   label: String!
   "A time-limited address for the audio file, once it exists."
   url: String
@@ -69,6 +112,8 @@ extend type Query {
 extend type Mutation {
   "Editors: start a voice-over of the draft's text for each voice (at most 4 at a time). Runs in the background."
   requestVoiceovers(localizationId: ID!, voiceIds: [ID!]!): [AudioTrack!]!
+  "Editors: one voice-over of the draft's HOST1/HOST2 conversation, each host with their own voice."
+  requestConversationVoiceover(input: ConversationVoiceoverInput!): [AudioTrack!]!
   "Editors: keep a finished voice-over; only approved ones go live."
   approveAudioTrack(id: ID!): AudioTrack!
   deleteAudioTrack(id: ID!): Boolean!

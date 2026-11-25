@@ -5,7 +5,7 @@ import type { RevisionModel } from "../../models";
 import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
-import { copyTracks, prepareTracksForPublish } from "../audio/service";
+import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio/service";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
 import {
@@ -98,6 +98,7 @@ export type CreateResource = {
   cefrLevel?: Level | null;
   body?: unknown;
   topicSlugs?: string[] | null;
+  speakerNames?: { host1?: string | null; host2?: string | null } | null;
 };
 
 export async function createResource(db: Database, actorUserId: string | null, input: CreateResource) {
@@ -133,6 +134,7 @@ export async function createResource(db: Database, actorUserId: string | null, i
               cefrLevel: input.cefrLevel ?? null,
               richText: body,
               plainText: plainTextOf(body),
+              speakerNames: parseSpeakerNames(input.speakerNames),
               schemaVersion: RICH_TEXT_SCHEMA_VERSION,
               createdBy: actorUserId,
             })
@@ -180,6 +182,7 @@ export async function startDraft(db: Database, actorUserId: string | null, local
             cefrLevel: p.cefrLevel,
             richText: p.richText,
             plainText: p.plainText,
+            speakerNames: p.speakerNames,
             seoTitle: p.seoTitle,
             seoDescription: p.seoDescription,
             schemaVersion: p.schemaVersion,
@@ -227,6 +230,7 @@ export type UpdateDraft = {
   cefrLevel?: Level | null;
   body?: unknown;
   topicSlugs?: string[] | null;
+  speakerNames?: { host1?: string | null; host2?: string | null } | null;
 };
 
 export async function updateDraft(db: Database, actorUserId: string | null, input: UpdateDraft) {
@@ -244,6 +248,7 @@ export async function updateDraft(db: Database, actorUserId: string | null, inpu
           ...(input.summary !== undefined ? { summary: input.summary } : {}),
           ...(input.cefrLevel !== undefined ? { cefrLevel: input.cefrLevel } : {}),
           ...(body ? { richText: body, plainText: plainTextOf(body) } : {}),
+          ...(input.speakerNames !== undefined ? { speakerNames: parseSpeakerNames(input.speakerNames) } : {}),
           lockVersion: draft.lockVersion + 1,
         })
         .where(and(eq(rev.id, draft.id), eq(rev.lockVersion, draft.lockVersion)));

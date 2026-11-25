@@ -93,6 +93,11 @@ export const resourceRevisions = pgTable(
     cefrLevel: cefrLevel(),
     /** Tiptap document, validated by the API (schemaVersion says which shape). */
     richText: jsonb().notNull(),
+    /**
+     * Conversation lessons write each turn as "HOST1: …" or "HOST2: …"; these are the names learners see instead
+     * ({ "host1": "Kate", "host2": "Max" }). Null for ordinary texts.
+     */
+    speakerNames: jsonb(),
     /** The document's text, for search and word counts. Derived by the API from richText. */
     plainText: text().notNull().default(""),
     seoTitle: text(),
@@ -301,6 +306,13 @@ export const audioTracks = pgTable(
     gender: text().notNull(),
     /** "us" or "uk". */
     accent: text().notNull(),
+    /**
+     * "single": one voice reads the whole text. "conversation": each HOST1/HOST2 turn is read by its host's voice
+     * (voiceId, voiceName, gender and accent are then host 1's; `speakers` lists both).
+     */
+    mode: text().notNull().default("single"),
+    /** For conversations: [{ host: 1, voiceId, voiceName }, { host: 2, ... }]. */
+    speakers: jsonb(),
     modelId: text(),
     characters: integer().notNull(),
     textHash: text().notNull(),
@@ -328,5 +340,6 @@ export const audioTracks = pgTable(
     check("audio_tracks_gender", sql`${t.gender} in ('male', 'female')`),
     check("audio_tracks_accent", sql`${t.accent} in ('us', 'uk')`),
     check("audio_tracks_characters", sql`${t.characters} > 0`),
+    check("audio_tracks_mode", sql`${t.mode} in ('single', 'conversation')`),
   ]
 );

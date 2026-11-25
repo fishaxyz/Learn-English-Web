@@ -25,6 +25,7 @@ export type CreateResourceInput = {
   locale?: string;
   siteId: string;
   slug: string;
+  speakerNames?: SpeakerNamesInput | null | undefined;
   summary?: string | null | undefined;
   title: string;
   topicSlugs?: Array<string> | null | undefined;
@@ -127,6 +128,11 @@ export type SiteRole =
   | 'REVIEWER'
   | 'VIEWER';
 
+export type SpeakerNamesInput = {
+  host1?: string | null | undefined;
+  host2?: string | null | undefined;
+};
+
 export type TranslationInput = {
   locale: string;
   text: string;
@@ -137,6 +143,8 @@ export type UpdateDraftInput = {
   cefrLevel?: CefrLevel | null | undefined;
   localizationId: string;
   lockVersion: number;
+  /** Set to replace the host names; null fields clear a name. */
+  speakerNames?: SpeakerNamesInput | null | undefined;
   summary?: string | null | undefined;
   title?: string | null | undefined;
   /** Replaces the draft's topics. */
