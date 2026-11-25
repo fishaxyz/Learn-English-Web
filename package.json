@@ -26,7 +26,7 @@
     "invite": "pnpm --filter @english/api invite",
     "e2e": "playwright test",
     "e2e:stack": "TTS_PROVIDER=fake LLM_BASE_URL= pnpm docker:up",
-    "docker:prune-cache": "docker builder prune -af --max-used-space 8gb >/dev/null",
+    "docker:prune-cache": "sh infrastructure/docker-prune-cache.sh",
     "docker:trim": "colima ssh -- sudo fstrim -av"
   },
   "devDependencies": {
