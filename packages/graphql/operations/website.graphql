@@ -52,6 +52,10 @@ query ReadingLesson($slug: String!) {
       vocabularyItems {
         ...VocabularyItemView
       }
+      speakerNames {
+        host1
+        host2
+      }
       audioTracks {
         id
         label

@@ -34,3 +34,21 @@
 ## Settings
 
 `MEDIA_SIGNING_SECRET` (required) and `WORKER_SERVICE_TOKEN` are random values of at least 32 characters. `ELEVENLABS_API_KEY` is optional: without it, test mode is used. All of them live in `.env`, which is never committed.
+
+## Addendum: podcast mode (two hosts)
+
+- The voice-over settings have two modes, on both the New lesson page and the lesson page:
+  - **Single voice:** one voice reads the whole text, with **Multilingual v2**. Pick up to 4 voices to compare.
+  - **Podcast · 2 hosts:** like the Ditto Talks English podcast tool. Write each line as `HOST1: …` or `HOST2: …`. The default model is **v3**, and v3 Conversational is also offered.
+    - The default voices are Ditto's hosts: Lauren for HOST1 and Roger for HOST2. Any voice can be chosen instead.
+- **Host names** ("Kate", "Max") are saved on the draft (`resource_revisions.speaker_names`). Learners see them instead of `HOST1:`/`HOST2:`.
+  - The label itself stays in the text, hidden on the website, so vocabulary links and read-along offsets don't move.
+  - On the lesson page, the names are saved when the podcast voice-over is made. Saving the names doesn't change the draft's lock version, so an editor who has the draft open can still save.
+- **What's read:** a `HOSTn:` label is never read aloud, in either mode.
+  - In podcast mode, only host lines are read. Titles and other lines are skipped.
+  - Word timings are shifted past the label, so the highlighting lands on the right words.
+- **How it's made:** the worker calls ElevenLabs `text-to-dialogue/with-timestamps`.
+  - Turns are grouped into requests of at most 2,000 characters; a turn is never split.
+  - The MP3 parts are joined, and each part's timings are shifted by the length of the audio before it.
+  - Each turn's character timings are found in the dialogue's alignment. A turn whose characters don't match (for example because of audio tags) gets no timings rather than guessed ones.
+- A conversation voice-over is one track (`audio_tracks.mode = 'conversation'`, with both host voices in `speakers`). Learners see it as "Conversation · Kate & Max".

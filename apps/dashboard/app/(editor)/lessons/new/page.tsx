@@ -16,7 +16,7 @@ export default async function NewLesson({ searchParams }: { searchParams: Promis
         <p className="text-sm text-muted">{membership.site.name}</p>
         <h1 className="text-4xl font-medium tracking-tight">New reading</h1>
       </div>
-      <NewLessonForm siteId={membership.site.id} />
+      <NewLessonForm siteId={membership.site.id} siteDomain={membership.site.domain} />
     </div>
   );
 }

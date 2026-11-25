@@ -24,9 +24,10 @@ const clock = (ms: number) => {
 function rangeFor(container: HTMLElement, t: Timing): Range | null {
   const block = container.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(t.blockId)}"]`);
   if (!block) return null;
-  // Skip screen-reader-only additions ("(in your list)"): they aren't part of the lesson text.
+  // Skip additions that aren't lesson text: screen-reader notes ("(in your list)") and speaker names.
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.parentElement?.closest(".sr-only") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    acceptNode: (n) =>
+      n.parentElement?.closest(".sr-only, [data-extra]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
   });
   const range = document.createRange();
   let codePoint = 0;

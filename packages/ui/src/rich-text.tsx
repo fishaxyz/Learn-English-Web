@@ -15,6 +15,34 @@ function safeHref(value: unknown): string | null {
 
 export type RenderTerm = (senseRevisionId: string, children: ReactNode, key: string) => ReactNode;
 
+/** Names shown instead of a conversation's "HOST1:" / "HOST2:" labels. */
+export type SpeakerNames = { host1?: string | null; host2?: string | null } | null;
+
+const HOST_PREFIX = /^\s*HOST\s?([12])\s*:\s*/i;
+
+/**
+ * A conversation turn ("HOST1: Hi!") shows the host's name instead of the label. The label stays in the page,
+ * hidden, so code-point offsets into the block (vocabulary links, read-along timings) still line up; the name is
+ * marked data-extra so offset counting skips it.
+ */
+function speakerTurn(node: Node, speakers: SpeakerNames | undefined) {
+  const first = node.content?.[0];
+  if (node.type !== "paragraph" || first?.type !== "text" || !first.text) return null;
+  const label = HOST_PREFIX.exec(first.text);
+  if (!label) return null;
+  const host = label[1] === "1" ? 1 : 2;
+  const name = (host === 1 ? speakers?.host1 : speakers?.host2) || `Host ${host}`;
+  return {
+    host,
+    name,
+    label: label[0],
+    rest: {
+      ...node,
+      content: [{ ...first, text: first.text.slice(label[0].length) }, ...(node.content ?? []).slice(1)],
+    },
+  };
+}
+
 function renderText(node: Node, key: string, renderTerm?: RenderTerm): ReactNode {
   let out: ReactNode = node.text ?? "";
   for (const [i, mark] of (node.marks ?? []).entries()) {
@@ -38,9 +66,22 @@ function renderText(node: Node, key: string, renderTerm?: RenderTerm): ReactNode
   return out;
 }
 
-function renderNode(node: Node, key: string, renderTerm?: RenderTerm): ReactNode {
-  const children = (node.content ?? []).map((child, i) => renderNode(child, `${key}-${i}`, renderTerm));
+function renderNode(node: Node, key: string, renderTerm?: RenderTerm, speakers?: SpeakerNames): ReactNode {
   const id = typeof node.attrs?.["id"] === "string" ? (node.attrs["id"] as string) : undefined;
+  const turn = speakerTurn(node, speakers);
+  if (turn) {
+    return (
+      <p key={key} data-block-id={id} className={`turn turn-host-${turn.host}`}>
+        <span hidden>{turn.label}</span>
+        <span data-extra="" className="speaker-name">
+          {turn.name}
+          <span className="sr-only">:</span>
+        </span>{" "}
+        {(turn.rest.content ?? []).map((child, i) => renderNode(child, `${key}-${i}`, renderTerm, speakers))}
+      </p>
+    );
+  }
+  const children = (node.content ?? []).map((child, i) => renderNode(child, `${key}-${i}`, renderTerm, speakers));
   switch (node.type) {
     case "text":
       return renderText(node, key, renderTerm);
@@ -97,8 +138,17 @@ function renderNode(node: Node, key: string, renderTerm?: RenderTerm): ReactNode
  * Renders a stored rich-text document (Tiptap JSON) as React elements: no HTML strings, so nothing in the
  * document can run as code. `renderTerm` turns vocabulary links into pop-ups; without it they're plain text.
  */
-export function RichTextRenderer({ doc, renderTerm }: { doc: unknown; renderTerm?: RenderTerm }) {
+export function RichTextRenderer({
+  doc,
+  renderTerm,
+  speakers,
+}: {
+  doc: unknown;
+  renderTerm?: RenderTerm;
+  /** For conversations: who HOST1 and HOST2 are. */
+  speakers?: SpeakerNames;
+}) {
   const root = doc as Node | null;
   if (!root || root.type !== "doc" || !Array.isArray(root.content)) return null;
-  return <div className="rich-text">{root.content.map((n, i) => renderNode(n, `b${i}`, renderTerm))}</div>;
+  return <div className="rich-text">{root.content.map((n, i) => renderNode(n, `b${i}`, renderTerm, speakers))}</div>;
 }

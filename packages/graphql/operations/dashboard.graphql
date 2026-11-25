@@ -22,6 +22,10 @@ fragment RevisionFields on Revision {
   summary
   cefrLevel
   body
+  speakerNames {
+    host1
+    host2
+  }
   lockVersion
   updatedAt
   submittedAt
@@ -269,6 +273,13 @@ mutation PublishNow($localizationId: ID!, $lockVersion: Int!) {
 fragment AudioTrackFields on AudioTrack {
   id
   status
+  mode
+  modelId
+  speakers {
+    host
+    voiceId
+    voiceName
+  }
   voiceName
   gender
   accent
@@ -325,4 +336,10 @@ mutation ApproveAudioTrack($id: ID!) {
 
 mutation DeleteAudioTrack($id: ID!) {
   deleteAudioTrack(id: $id)
+}
+
+mutation RequestConversationVoiceover($input: ConversationVoiceoverInput!) {
+  requestConversationVoiceover(input: $input) {
+    ...AudioTrackFields
+  }
 }

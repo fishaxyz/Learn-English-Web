@@ -33,7 +33,7 @@ export default async function Preview({ params }: { params: Promise<{ id: string
           ))}
           after={draft ? previewSets(draft.exercises).map((set) => <ExerciseRenderer key={set.id} set={set} />) : null}
         >
-          <LinkedText body={revision.body} vocabulary={draft?.vocabulary ?? []} />
+          <LinkedText body={revision.body} vocabulary={draft?.vocabulary ?? []} speakers={revision.speakerNames} />
         </LessonLayout>
       </div>
     </div>

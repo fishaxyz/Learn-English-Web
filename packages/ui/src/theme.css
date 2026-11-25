@@ -73,6 +73,21 @@
   border-color: var(--color-line);
 }
 
+/* Conversation turns: the speaker's name in front of what they say. */
+.rich-text .speaker-name {
+  display: inline-block;
+  min-width: 3.5em;
+  margin-right: 0.35em;
+  font-family: var(--font-sans);
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-accent);
+}
+.rich-text .turn-host-2 .speaker-name {
+  color: var(--color-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

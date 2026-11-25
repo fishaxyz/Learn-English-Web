@@ -1,7 +1,7 @@
 "use client";
 
 import type { VocabularyItemViewFragment } from "@english/graphql";
-import { RichTextRenderer } from "@english/ui";
+import { RichTextRenderer, type SpeakerNames } from "@english/ui";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -119,11 +119,14 @@ export function ReadingExperience({
   items,
   lesson,
   tracks = [],
+  speakers,
 }: {
   body: unknown;
   items: Item[];
   lesson: { slug: string; title: string };
   tracks?: Track[];
+  /** For conversations: the names shown instead of HOST1/HOST2. */
+  speakers?: SpeakerNames;
 }) {
   const text = useRef<HTMLDivElement>(null);
   const player = useRef<PlayerHandle>(null);
@@ -212,6 +215,7 @@ export function ReadingExperience({
       >
         <RichTextRenderer
           doc={body}
+          speakers={speakers}
           renderTerm={(senseRevisionId, children, key) => {
             const item = byRevision.get(senseRevisionId);
             if (!item) return children;

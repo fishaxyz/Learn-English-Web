@@ -5,7 +5,9 @@ import {
   ArchiveResourceDocument,
   DeleteAudioTrackDocument,
   DraftAudioDocument,
+  RequestConversationVoiceoverDocument,
   RequestVoiceoversDocument,
+  type ConversationVoiceoverInput,
   VoiceCatalogDocument,
   type AudioTrackFieldsFragment,
   type VoiceCatalogQuery,
@@ -125,6 +127,17 @@ export async function requestVoiceovers(localizationId: string, voiceIds: string
     return {
       ok: true,
       tracks: (await editorMutation(RequestVoiceoversDocument, { localizationId, voiceIds })).requestVoiceovers,
+    };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function requestConversation(input: ConversationVoiceoverInput): Promise<TracksResult> {
+  try {
+    return {
+      ok: true,
+      tracks: (await editorMutation(RequestConversationVoiceoverDocument, { input })).requestConversationVoiceover,
     };
   } catch (error) {
     return { ok: false, message: explain(error) };

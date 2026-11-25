@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
 import { fromPayload, toPayload, type EditorSet } from "../lib/exercises";
 import { ExercisesEditor } from "./exercises-editor";
-import { voiceCharacters } from "./voice-picker";
+import { voiceText } from "../lib/voice-text";
 import { VoiceoverPanel } from "./voiceover-panel";
 import { RichTextEditor } from "./rich-text-editor";
 
@@ -293,7 +293,8 @@ export function LessonEditor({
           siteId={lesson.site.id}
           editable={editable}
           textSaved={!textDirty}
-          characters={voiceCharacters(draft.body)}
+          text={voiceText(draft.body)}
+          speakerNames={draft.speakerNames}
           initial={draft.audioTracks}
           initialError={voiceError}
         />

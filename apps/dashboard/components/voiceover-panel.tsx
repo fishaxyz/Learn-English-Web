@@ -3,7 +3,9 @@
 import type { AudioTrackFieldsFragment } from "@english/graphql";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
-import { confirmVoiceovers, MAX_VOICE_CHARACTERS, VoicePicker, type Catalog } from "./voice-picker";
+import type { VoiceText } from "../lib/voice-text";
+import { confirmCost, type Catalog } from "./voice-picker";
+import { costOf, initialChoice, problemOf, resolved, VoiceSettings } from "./voice-settings";
 
 const STATUS: Record<AudioTrackFieldsFragment["status"], { label: string; tone: string }> = {
   GENERATING: { label: "Being made…", tone: "bg-line/60 text-ink" },
@@ -22,7 +24,8 @@ export function VoiceoverPanel({
   siteId,
   editable,
   textSaved,
-  characters,
+  text,
+  speakerNames,
   initial,
   initialError,
 }: {
@@ -32,15 +35,17 @@ export function VoiceoverPanel({
   editable: boolean;
   /** The text must be saved first: voice-overs read the saved text. */
   textSaved: boolean;
-  /** About how many characters one voice-over of the saved text uses. */
-  characters: number;
+  /** What a voice-over of the saved text reads. */
+  text: VoiceText;
+  /** The draft's host names, to start the podcast settings with. */
+  speakerNames?: { host1?: string | null; host2?: string | null } | null;
   initial: AudioTrackFieldsFragment[];
   /** A problem starting voice-overs when the lesson was created. */
   initialError?: string | null;
 }) {
   const [tracks, setTracks] = useState(initial);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [choice, setChoice] = useState(() => initialChoice(speakerNames));
   const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(
     initialError ? { tone: "bad", text: `The voice-overs weren't started: ${initialError}` } : null
   );
@@ -59,13 +64,25 @@ export function VoiceoverPanel({
     return () => clearInterval(timer);
   }, [generating, refresh]);
 
+  const sent = resolved(choice, catalog);
+  const cost = costOf(sent, text);
+  const problem = problemOf(sent, text);
+
   function generate() {
-    if (!confirmVoiceovers(catalog, chosen.length, characters)) return;
+    if (!confirmCost(catalog, cost.count > 1 ? `${cost.count} voice-overs` : cost.what, cost.characters)) return;
     start(async () => {
-      const r = await actions.requestVoiceovers(localizationId, chosen);
+      const r =
+        sent.mode === "conversation"
+          ? await actions.requestConversation({
+              localizationId,
+              modelId: sent.modelId,
+              host1: { voiceId: sent.host1.voiceId, name: sent.host1.name || null },
+              host2: { voiceId: sent.host2.voiceId, name: sent.host2.name || null },
+            })
+          : await actions.requestVoiceovers(localizationId, sent.voices);
       if (!r.ok) return setMessage({ tone: "bad", text: r.message });
-      setChosen([]);
-      setMessage({ tone: "good", text: "Started. Each voice-over takes a few seconds to a minute." });
+      setChoice({ ...sent, voices: [] });
+      setMessage({ tone: "good", text: "Started. Each voice-over takes a few seconds to a few minutes." });
       await refresh();
     });
   }
@@ -145,21 +162,18 @@ export function VoiceoverPanel({
           {!textSaved ? (
             <p className="text-sm text-bad">Save the text first: voice-overs read the saved text.</p>
           ) : null}
-          <VoicePicker
-            siteId={siteId}
-            characters={characters}
-            chosen={chosen}
-            onChange={setChosen}
-            onCatalog={setCatalog}
-          />
+          <VoiceSettings siteId={siteId} text={text} value={choice} onChange={setChoice} onCatalog={setCatalog} />
+          {textSaved && problem && (sent.mode === "conversation" || sent.voices.length) ? (
+            <p className="text-sm text-bad">{problem}</p>
+          ) : null}
           {catalog ? (
             <button
               type="button"
               onClick={generate}
-              disabled={pending || !chosen.length || !textSaved || !characters || characters > MAX_VOICE_CHARACTERS}
+              disabled={pending || !textSaved || !!problem}
               className="self-start rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
             >
-              {pending ? "Starting…" : "Make voice-over"}
+              {pending ? "Starting…" : sent.mode === "conversation" ? "Make the podcast" : "Make voice-over"}
             </button>
           ) : null}
         </div>
