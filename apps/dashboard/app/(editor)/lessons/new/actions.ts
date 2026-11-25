@@ -2,6 +2,7 @@
 
 import {
   CreateResourceDocument,
+  SlugAvailabilityDocument,
   RequestConversationVoiceoverDocument,
   RequestVoiceoversDocument,
   SaveExerciseSetsDocument,
@@ -9,7 +10,7 @@ import {
 } from "@english/graphql";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { editorMutation, explain } from "../../../../lib/api";
+import { editorMutation, editorQuery, explain } from "../../../../lib/api";
 
 export type CreateResult = { message: string };
 
@@ -37,18 +38,37 @@ const newLesson = z.object({
   }),
   /** Where to go once it's saved: the preview ("Save and Preview") or the lesson page ("Save script"). */
   open: z.enum(["preview", "edit"]).default("preview"),
+  /** The web address was made from the title (not typed): if it's taken, a free one ("-2") is used instead. */
+  autoSlug: z.boolean().default(false),
 });
 export type NewLesson = z.input<typeof newLesson>;
 
-/**
- * Save and Preview: creates the draft with its script, then saves its questions and starts its voice-overs. The lesson exists once the
- * first step works; if a later step fails, its page opens and says why, so it can be done again there.
- */
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** While the editor types: is this web address already used on the site, and what's a free one like it? */
+export async function slugStatus(siteId: string, slug: string): Promise<{ taken: boolean; suggestion: string | null }> {
+  if (!SLUG.test(slug) || slug.length > 120) return { taken: false, suggestion: null };
+  try {
+    const { slugAvailability: r } = await editorQuery(SlugAvailabilityDocument, { siteId, slug });
+    return { taken: !r.available, suggestion: r.available ? null : r.suggestion };
+  } catch {
+    return { taken: false, suggestion: null }; // the save itself will say if it's taken
+  }
+}
+
 export async function createLesson(raw: NewLesson): Promise<CreateResult> {
   const parsed = newLesson.safeParse(raw);
   if (!parsed.success) return { message: "Something in the form isn't valid. Check the fields and try again." };
   const input = parsed.data;
   const conversation = input.voice.mode === "conversation";
+  let slug = input.slug.trim();
+  if (input.autoSlug) {
+    try {
+      slug = (await editorQuery(SlugAvailabilityDocument, { siteId: input.siteId, slug })).slugAvailability.suggestion;
+    } catch {
+      // keep it: the create below says if it's taken
+    }
+  }
 
   let id: string;
   let localizationId: string | undefined;
@@ -59,7 +79,7 @@ export async function createLesson(raw: NewLesson): Promise<CreateResult> {
         input: {
           siteId: input.siteId,
           kind: "READING",
-          slug: input.slug.trim(),
+          slug,
           title: input.title.trim(),
           summary: input.summary.trim() || null,
           cefrLevel: (input.level || null) as CefrLevel | null,

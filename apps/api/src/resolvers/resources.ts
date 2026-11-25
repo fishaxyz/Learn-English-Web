@@ -102,6 +102,10 @@ export const resourceResolvers: Resolvers = {
       authorize(await ctx.actor(), siteId, "content.read");
       return editorial.editorialResources(ctx.db, siteId, first);
     },
+    slugAvailability: async (_, { siteId, slug }, ctx) => {
+      authorize(await ctx.actor(), siteId, "content.read");
+      return editorial.slugAvailability(ctx.db, siteId, slug);
+    },
     editorialResource: async (_, { id }, ctx) => {
       const siteId = await editorial.siteOfResource(ctx.db, id);
       if (!siteId) return null;

@@ -2,7 +2,7 @@
 
 import type { SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { EditorSection } from "../../../../components/editor-section";
 import Link from "next/link";
 import { HeadphonesIcon, PlusIcon } from "../../../../components/icons";
@@ -22,7 +22,7 @@ import { confirmCost, type Catalog } from "../../../../components/voice-picker";
 import { costOf, initialChoice, problemOf, resolved, VoiceSettings } from "../../../../components/voice-settings";
 import { toPayload, type EditorSet } from "../../../../lib/exercises";
 import { voiceText } from "../../../../lib/voice-text";
-import { createLesson } from "./actions";
+import { createLesson, slugStatus } from "./actions";
 
 /** "My First Lesson!" → "my-first-lesson". Editors can still change it before creating. */
 export const slugify = (title: string) =>
@@ -78,6 +78,24 @@ export function NewLessonForm({
   const [make, setMake] = useState(true);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether the web address is free, checked while typing (and fixed by itself when it came from the title).
+  const [slugCheck, setSlugCheck] = useState<{ slug: string; taken: boolean; suggestion: string | null } | null>(null);
+  useEffect(() => {
+    if (!SLUG.test(slug)) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void slugStatus(site.id, slug).then((r) => {
+        if (!live) return;
+        if (r.taken && r.suggestion && !slugEdited) setSlug(r.suggestion);
+        else setSlugCheck({ slug, ...r });
+      });
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [slug, slugEdited, site.id]);
+  const slugTaken = slugCheck?.slug === slug && slugCheck.taken;
   const [pending, start] = useTransition();
 
   const text = voiceText(body);
@@ -112,9 +130,11 @@ export function NewLessonForm({
     ? "Give the lesson a title."
     : !SLUG.test(slug)
       ? "Give it a web address: lowercase words joined by hyphens."
-      : typeof exercises === "string"
-        ? exercises
-        : voiceProblem;
+      : slugTaken
+        ? "That web address is already used by another lesson: choose another."
+        : typeof exercises === "string"
+          ? exercises
+          : voiceProblem;
 
   /** Saves the lesson, then opens its preview ("Save and Preview") or its page to keep editing ("Save script"). */
   function create(open: "preview" | "edit" = "preview") {
@@ -136,6 +156,7 @@ export function NewLessonForm({
         exercises,
         voice: { ...sent, make },
         open,
+        autoSlug: !slugEdited,
       });
       setError(r.message); // only returned when creating failed; success opens the lesson
     });
@@ -221,9 +242,24 @@ export function NewLessonForm({
                         }}
                       />
                     </div>
-                    <p id="slug-help" className="text-sm text-muted">
-                      Lowercase words joined by hyphens. It can&apos;t be changed after publishing.
-                    </p>
+                    {slugTaken ? (
+                      <p id="slug-help" role="alert" className="flex flex-wrap items-center gap-2 text-sm text-bad">
+                        This web address is already used by another lesson.
+                        {slugCheck?.suggestion ? (
+                          <button
+                            type="button"
+                            onClick={() => setSlug(slugCheck.suggestion ?? slug)}
+                            className="rounded-full border border-bad px-3 py-0.5 font-medium hover:bg-bad-soft"
+                          >
+                            Use {slugCheck.suggestion}
+                          </button>
+                        ) : null}
+                      </p>
+                    ) : (
+                      <p id="slug-help" className="text-sm text-muted">
+                        Lowercase words joined by hyphens. It can&apos;t be changed after publishing.
+                      </p>
+                    )}
                   </div>
                 }
                 footer={
@@ -237,8 +273,8 @@ export function NewLessonForm({
                     >
                       {pending ? "Saving…" : "Save script"}
                     </button>
-                    <p className="text-sm text-muted">
-                      {problem ?? (text.single ? `${text.single.toLocaleString("en")} characters.` : "")}
+                    <p className={`text-sm ${error ? "text-bad" : "text-muted"}`} role={error ? "alert" : undefined}>
+                      {error ?? problem ?? (text.single ? `${text.single.toLocaleString("en")} characters.` : "")}
                     </p>
                   </div>
                 }

@@ -145,6 +145,8 @@ extend type Query {
   editorialResource(id: ID!): EditorialResource
   "Editorial: a site's resources, newest first (at most 100)."
   editorialResources(siteId: ID!, first: Int! = 50): [EditorialResource!]!
+  "Editorial: whether a web address is free on the site, and the first free one like it (sasas, sasas-2...)."
+  slugAvailability(siteId: ID!, slug: String!): SlugAvailability!
 }
 
 # --- Editorial
@@ -259,4 +261,10 @@ extend type Mutation {
   publishNow(localizationId: ID!, lockVersion: Int!): EditorialResource!
   "Admins: take the resource off the site. Its revisions are kept."
   archiveResource(resourceId: ID!): EditorialResource!
+}
+
+type SlugAvailability {
+  available: Boolean!
+  "A free address like the one asked for: the same one when it's free."
+  suggestion: String!
 }

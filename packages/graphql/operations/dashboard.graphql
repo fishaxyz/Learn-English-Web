@@ -450,3 +450,10 @@ mutation RejectQuestionSuggestions($localizationId: ID!, $ids: [ID!]!) {
 mutation SuggestQuestions($localizationId: ID!) {
   suggestQuestions(localizationId: $localizationId)
 }
+
+query SlugAvailability($siteId: ID!, $slug: String!) {
+  slugAvailability(siteId: $siteId, slug: $slug) {
+    available
+    suggestion
+  }
+}

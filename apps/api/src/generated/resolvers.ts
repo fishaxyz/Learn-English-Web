@@ -693,6 +693,8 @@ export type Query = {
   /** Published resources on this site, newest first. `first` is at most 50. */
   publishedResources: ResourceConnection;
   resourceBySlug?: Maybe<Resource>;
+  /** Editorial: whether a web address is free on the site, and the first free one like it (sasas, sasas-2...). */
+  slugAvailability: SlugAvailability;
   topics: Array<Topic>;
   /** Who is signed in (from the request's session token), or null. */
   viewer?: Maybe<Viewer>;
@@ -741,6 +743,11 @@ export type QueryPublishedResourcesArgs = {
 export type QueryResourceBySlugArgs = {
   kind: ResourceKind;
   locale?: InputMaybe<Scalars["String"]["input"]>;
+  slug: Scalars["String"]["input"];
+};
+
+export type QuerySlugAvailabilityArgs = {
+  siteId: Scalars["ID"]["input"];
   slug: Scalars["String"]["input"];
 };
 
@@ -945,6 +952,13 @@ export type Site = {
 };
 
 export type SiteRole = "ADMIN" | "EDITOR" | "OWNER" | "REVIEWER" | "VIEWER";
+
+export type SlugAvailability = {
+  __typename?: "SlugAvailability";
+  available: Scalars["Boolean"]["output"];
+  /** A free address like the one asked for: the same one when it's free. */
+  suggestion: Scalars["String"]["output"];
+};
 
 /** Host names learners see instead of HOST1 and HOST2. */
 export type SpeakerNames = {
@@ -1317,6 +1331,7 @@ export type ResolversTypes = {
   SingleChoiceQuestion: ResolverTypeWrapper<QuestionModel>;
   Site: ResolverTypeWrapper<SiteModel>;
   SiteRole: SiteRole;
+  SlugAvailability: ResolverTypeWrapper<SlugAvailability>;
   SpeakerNames: ResolverTypeWrapper<SpeakerNames>;
   SpeakerNamesInput: SpeakerNamesInput;
   String: ResolverTypeWrapper<Scalars["String"]["output"]>;
@@ -1414,6 +1429,7 @@ export type ResolversParentTypes = {
   ShortAnswerQuestion: QuestionModel;
   SingleChoiceQuestion: QuestionModel;
   Site: SiteModel;
+  SlugAvailability: SlugAvailability;
   SpeakerNames: SpeakerNames;
   SpeakerNamesInput: SpeakerNamesInput;
   String: Scalars["String"]["output"];
@@ -2069,6 +2085,12 @@ export type QueryResolvers<
     ContextType,
     RequireFields<QueryResourceBySlugArgs, "kind" | "slug">
   >;
+  slugAvailability?: Resolver<
+    ResolversTypes["SlugAvailability"],
+    ParentType,
+    ContextType,
+    RequireFields<QuerySlugAvailabilityArgs, "siteId" | "slug">
+  >;
   topics?: Resolver<Array<ResolversTypes["Topic"]>, ParentType, ContextType>;
   viewer?: Resolver<Maybe<ResolversTypes["Viewer"]>, ParentType, ContextType>;
   voiceCatalog?: Resolver<
@@ -2264,6 +2286,14 @@ export type SiteResolvers<
   domain?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
   id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
   name?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+};
+
+export type SlugAvailabilityResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["SlugAvailability"] = ResolversParentTypes["SlugAvailability"],
+> = {
+  available?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  suggestion?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
 };
 
 export type SpeakerNamesResolvers<
@@ -2485,6 +2515,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   ShortAnswerQuestion?: ShortAnswerQuestionResolvers<ContextType>;
   SingleChoiceQuestion?: SingleChoiceQuestionResolvers<ContextType>;
   Site?: SiteResolvers<ContextType>;
+  SlugAvailability?: SlugAvailabilityResolvers<ContextType>;
   SpeakerNames?: SpeakerNamesResolvers<ContextType>;
   TextAnswer?: TextAnswerResolvers<ContextType>;
   TextOccurrence?: TextOccurrenceResolvers<ContextType>;

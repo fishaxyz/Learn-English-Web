@@ -91,6 +91,28 @@ export async function draftOf(tx: Tx, draftRevisionId: string | null, lockVersio
   return draft;
 }
 
+/** Whether a web address is free on the site, and the first free one like it ("sasas", "sasas-2"...). */
+export async function slugAvailability(db: Database, siteId: string, slug: string) {
+  if (!SLUG.test(slug) || slug.length > 120) throw invalid("The slug must be lowercase words joined by -");
+  const base = slug.replace(/-\d+$/, "");
+  const rows = await db
+    .select({ slug: loc.slug })
+    .from(loc)
+    .where(
+      and(
+        eq(loc.siteId, siteId),
+        sql`(${loc.slug} = ${slug} or ${loc.slug} = ${base} or ${loc.slug} like ${`${base}-%`})`
+      )
+    );
+  const used = new Set(rows.map((r) => r.slug));
+  if (!used.has(slug)) return { available: true, suggestion: slug };
+  for (let n = 2; n < 1000; n++) {
+    const candidate = `${base}-${n}`;
+    if (!used.has(candidate) && candidate.length <= 120) return { available: false, suggestion: candidate };
+  }
+  return { available: false, suggestion: `${base}-${Date.now().toString(36)}` };
+}
+
 export type CreateResource = {
   siteId: string;
   kind: Kind;
