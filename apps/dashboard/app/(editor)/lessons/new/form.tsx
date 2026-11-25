@@ -36,27 +36,15 @@ export const slugify = (title: string) =>
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-function SuggestCard({
-  what,
-  label,
-  disabled,
-  reason,
-  onClick,
-}: {
-  what: string;
-  label: string;
-  disabled: boolean;
-  reason: string | null;
-  onClick: () => void;
-}) {
+/** On a new lesson the Suggest buttons wait: suggestions are made from the saved script. */
+function SuggestCard({ what, label }: { what: string; label: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-sun/25 p-4 text-sm">
-      <p className="min-w-60 flex-1 text-muted">{reason ?? what}</p>
+      <p className="min-w-60 flex-1 text-muted">{what}</p>
       <button
         type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="rounded-full bg-accent px-4 py-1.5 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+        disabled
+        className="rounded-full bg-accent px-4 py-1.5 font-semibold text-on-accent disabled:opacity-50"
       >
         {label}
       </button>
@@ -128,8 +116,8 @@ export function NewLessonForm({
         ? exercises
         : voiceProblem;
 
-  /** Saves the lesson; `suggest` also starts vocabulary or question suggestions and opens the lesson page. */
-  function create(suggest: ("vocabulary" | "questions")[] = []) {
+  /** Saves the lesson, then opens its preview ("Save and Preview") or its page to keep editing ("Save script"). */
+  function create(open: "preview" | "edit" = "preview") {
     if (problem || typeof exercises === "string") return;
     if (
       wantsVoice &&
@@ -147,7 +135,7 @@ export function NewLessonForm({
         body: body ? (JSON.parse(JSON.stringify(body)) as unknown) : null,
         exercises,
         voice: { ...sent, make },
-        suggest,
+        open,
       });
       setError(r.message); // only returned when creating failed; success opens the lesson
     });
@@ -239,9 +227,20 @@ export function NewLessonForm({
                   </div>
                 }
                 footer={
-                  <p className="text-sm text-muted">
-                    {text.single ? `${text.single.toLocaleString("en")} characters.` : ""}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => create("edit")}
+                      disabled={pending || !!problem}
+                      title={problem ?? undefined}
+                      className="rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+                    >
+                      {pending ? "Saving…" : "Save script"}
+                    </button>
+                    <p className="text-sm text-muted">
+                      {problem ?? (text.single ? `${text.single.toLocaleString("en")} characters.` : "")}
+                    </p>
+                  </div>
                 }
               />
             </EditorSection>
@@ -256,11 +255,8 @@ export function NewLessonForm({
             >
               <div className="flex flex-col gap-4">
                 <SuggestCard
-                  label={pending ? "Saving…" : "Suggest vocabulary"}
-                  what="Saves the lesson, then the local AI finds words, phrases and idioms worth learning in the script, for you to approve or remove."
-                  reason={!text.single ? "Write the script first: suggestions are made from it." : problem}
-                  disabled={pending || !text.single || !!problem}
-                  onClick={() => create(["vocabulary"])}
+                  label="Suggest vocabulary"
+                  what="Save the script first (the Save script button at the end of the Script): then the local AI can find words, phrases and idioms worth learning in it."
                 />
                 <VocabularyList vocabulary={vocabulary} keys={keys} />
               </div>
@@ -276,11 +272,8 @@ export function NewLessonForm({
             >
               <div className="flex flex-col gap-4">
                 <SuggestCard
-                  label={pending ? "Saving…" : "Suggest questions"}
-                  what="Saves the lesson, then the local AI drafts IELTS-style questions about the script, for you to check and approve."
-                  reason={!text.single ? "Write the script first: questions are drafted from it." : problem}
-                  disabled={pending || !text.single || !!problem}
-                  onClick={() => create(["questions"])}
+                  label="Suggest questions"
+                  what="Save the script first (the Save script button at the end of the Script): then the local AI can draft IELTS-style questions about it."
                 />
                 <ExercisesEditor sets={sets} disabled={false} onChange={setSets} />
               </div>

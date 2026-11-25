@@ -2,8 +2,6 @@
 
 import {
   CreateResourceDocument,
-  SuggestQuestionsDocument,
-  SuggestVocabularyDocument,
   RequestConversationVoiceoverDocument,
   RequestVoiceoversDocument,
   SaveExerciseSetsDocument,
@@ -37,11 +35,8 @@ const newLesson = z.object({
     host1: host,
     host2: host,
   }),
-  /** Start suggestions right after creating (the section's "Suggest" button); then the lesson page opens. */
-  suggest: z
-    .array(z.enum(["vocabulary", "questions"]))
-    .max(2)
-    .default([]),
+  /** Where to go once it's saved: the preview ("Save and Preview") or the lesson page ("Save script"). */
+  open: z.enum(["preview", "edit"]).default("preview"),
 });
 export type NewLesson = z.input<typeof newLesson>;
 
@@ -111,21 +106,12 @@ export async function createLesson(raw: NewLesson): Promise<CreateResult> {
       problems.push(explain(error));
     }
   }
-  for (const what of input.suggest) {
-    if (!localizationId) break;
-    try {
-      if (what === "vocabulary") await editorMutation(SuggestVocabularyDocument, { localizationId });
-      else await editorMutation(SuggestQuestionsDocument, { localizationId });
-    } catch (error) {
-      problems.push(explain(error));
-    }
-  }
-  // Asked for suggestions: open the lesson page, where they appear. Otherwise show the lesson as learners will see it.
-  if (input.suggest.length && !problems.length) redirect(`/lessons/${id}`);
   // Saved: show it as learners will see it. If a step went wrong, open the lesson page instead, which says what.
   redirect(
     problems.length
       ? `/lessons/${id}?${new URLSearchParams({ voiceError: problems.join(" ") })}`
-      : `/lessons/${id}/preview?saved=1`
+      : input.open === "edit"
+        ? `/lessons/${id}`
+        : `/lessons/${id}/preview?saved=1`
   );
 }

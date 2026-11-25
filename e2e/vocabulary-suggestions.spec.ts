@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DASHBOARD, EDITOR, saveAndEdit, signIn } from "./helpers";
+import { DASHBOARD, EDITOR, signIn } from "./helpers";
 
 // "Suggest vocabulary" brings suggestions for the saved script; approving one links it in the script as a bold key word (a new
 // item goes into the word bank as a draft); removing one takes it off the list. This stack runs without the local
@@ -15,7 +15,11 @@ test("an editor approves and removes suggested vocabulary from the saved script"
   await page.getByLabel("Level").selectOption("A2");
   await page.getByLabel("Lesson text").click();
   await page.keyboard.type("Zoë gave up her job because the bureaucracy was exhausting.");
-  await saveAndEdit(page, title);
+  // "Save script" at the end of the Script section saves the lesson and opens it for editing.
+  await expect(page.locator("#vocabulary").getByRole("button", { name: "Suggest vocabulary" })).toBeDisabled();
+  await page.locator("#script").getByRole("button", { name: "Save script" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await expect(page.locator("#script").getByRole("button", { name: "Script saved" })).toBeVisible();
 
   const suggestions = page.getByRole("region", { name: "Suggested for this script" });
   // Saving doesn't start it: the section's button does.
