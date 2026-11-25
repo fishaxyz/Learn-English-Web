@@ -14,8 +14,16 @@ export const metadata: Metadata = { title: "Edit lesson" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-export default async function EditLesson({ params }: { params: Params }) {
+export default async function EditLesson({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<{ voiceError?: string }>;
+}) {
   const { id } = await params;
+  // Set by "Create draft" when the chosen voice-overs couldn't be started; shown as plain text.
+  const voiceError = (await searchParams).voiceError?.slice(0, 300) ?? null;
   if (!UUID.test(id)) notFound();
   const viewer = await getViewer();
   const { editorialResource: lesson } = await editorQuery(EditorialLessonDocument, { id });
@@ -45,6 +53,7 @@ export default async function EditLesson({ params }: { params: Params }) {
         role={roleOn(viewer, lesson.site.id)}
         topics={topics}
         websiteUrl={serverEnv().WEBSITE_URL}
+        voiceError={voiceError}
       />
     </div>
   );

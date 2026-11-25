@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
 import { fromPayload, toPayload, type EditorSet } from "../lib/exercises";
 import { ExercisesEditor } from "./exercises-editor";
+import { voiceCharacters } from "./voice-picker";
 import { VoiceoverPanel } from "./voiceover-panel";
 import { RichTextEditor } from "./rich-text-editor";
 
@@ -22,23 +23,6 @@ const field =
 const canWrite = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "EDITOR";
 const canReview = (r: Role | undefined) => r === "OWNER" || r === "ADMIN" || r === "REVIEWER";
 const canPublishNow = (r: Role | undefined) => r === "OWNER" || r === "ADMIN";
-
-/** About how many characters a voice-over reads: each block's text, separated by blank lines (as the API does). */
-function voiceCharacters(doc: JSONContent | undefined): number {
-  const blocks: string[] = [];
-  const inline = (n: JSONContent): string =>
-    n.type === "text" ? (n.text ?? "") : n.type === "hardBreak" ? "\n" : (n.content ?? []).map(inline).join("");
-  const walk = (n: JSONContent) => {
-    if (n.content?.some((c) => c.type === "text" || c.type === "hardBreak")) {
-      const text = inline(n);
-      if (text.trim()) blocks.push(text);
-      return;
-    }
-    n.content?.forEach(walk);
-  };
-  if (doc) walk(doc);
-  return [...blocks.join("\n\n")].length;
-}
 
 /** Sense revision ids marked as key words in a document. */
 function keyIds(doc: JSONContent | undefined): Set<string> {
@@ -72,12 +56,15 @@ export function LessonEditor({
   role,
   topics,
   websiteUrl,
+  voiceError,
 }: {
   lesson: Lesson;
   localization: Localization;
   role: Role | undefined;
   topics: { slug: string; name: string }[];
   websiteUrl: string;
+  /** Why the voice-overs chosen when the lesson was created didn't start, if they didn't. */
+  voiceError?: string | null;
 }) {
   const router = useRouter();
   const draft = localization.draft;
@@ -306,8 +293,9 @@ export function LessonEditor({
           siteId={lesson.site.id}
           editable={editable}
           textSaved={!textDirty}
-          characters={voiceCharacters(draft.body as JSONContent | undefined)}
+          characters={voiceCharacters(draft.body)}
           initial={draft.audioTracks}
+          initialError={voiceError}
         />
 
         <section aria-labelledby="exercises-heading" className="flex flex-col gap-4">

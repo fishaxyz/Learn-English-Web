@@ -1,23 +1,16 @@
 "use client";
 
-import type { AudioTrackFieldsFragment, VoiceCatalogQuery } from "@english/graphql";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import type { AudioTrackFieldsFragment } from "@english/graphql";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
+import { confirmVoiceovers, MAX_VOICE_CHARACTERS, VoicePicker, type Catalog } from "./voice-picker";
 
-type Catalog = VoiceCatalogQuery["voiceCatalog"];
-type Gender = "FEMALE" | "MALE";
-type Accent = "US" | "UK";
-
-const MAX_AT_ONCE = 4;
 const STATUS: Record<AudioTrackFieldsFragment["status"], { label: string; tone: string }> = {
   GENERATING: { label: "Being made…", tone: "bg-line/60 text-ink" },
   READY: { label: "Ready to check", tone: "bg-[#fdf0d5] text-[#7a4a00] dark:bg-[#3a2c10] dark:text-[#f3c770]" },
   APPROVED: { label: "Approved", tone: "bg-good-soft text-good" },
   FAILED: { label: "Failed", tone: "bg-bad-soft text-bad" },
 };
-
-const tag = (gender: Gender, accent: Accent) => `${gender === "FEMALE" ? "Woman" : "Man"} · ${accent}`;
-const number = (n: number) => n.toLocaleString("en");
 
 /**
  * Voice-overs for the draft: choose voices (filtered by man/woman and US/UK), see what it costs before anything is
@@ -31,6 +24,7 @@ export function VoiceoverPanel({
   textSaved,
   characters,
   initial,
+  initialError,
 }: {
   resourceId: string;
   localizationId: string;
@@ -41,21 +35,16 @@ export function VoiceoverPanel({
   /** About how many characters one voice-over of the saved text uses. */
   characters: number;
   initial: AudioTrackFieldsFragment[];
+  /** A problem starting voice-overs when the lesson was created. */
+  initialError?: string | null;
 }) {
   const [tracks, setTracks] = useState(initial);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [gender, setGender] = useState<Gender | null>(null);
-  const [accent, setAccent] = useState<Accent | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
-  const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(
+    initialError ? { tone: "bad", text: `The voice-overs weren't started: ${initialError}` } : null
+  );
   const [pending, start] = useTransition();
-  const preview = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    if (!editable) return;
-    void actions.voiceCatalog(siteId).then((r) => (r.ok ? setCatalog(r.catalog) : setCatalogError(r.message)));
-  }, [editable, siteId]);
 
   const refresh = useCallback(async () => {
     const r = await actions.draftTracks(resourceId);
@@ -70,21 +59,8 @@ export function VoiceoverPanel({
     return () => clearInterval(timer);
   }, [generating, refresh]);
 
-  const voices = (catalog?.voices ?? []).filter(
-    (v) => (!gender || v.gender === gender) && (!accent || v.accent === accent)
-  );
-  const cost = chosen.length * characters;
-  const remaining =
-    catalog?.charactersLimit != null && catalog.charactersUsed != null
-      ? catalog.charactersLimit - catalog.charactersUsed
-      : null;
-
   function generate() {
-    const confirmText =
-      catalog?.provider === "fake"
-        ? `Make ${chosen.length} test voice-over(s)? (No ElevenLabs key is set: they'll be silent.)`
-        : `Make ${chosen.length} voice-over(s)? This uses about ${number(cost)} ElevenLabs characters.`;
-    if (!window.confirm(confirmText)) return;
+    if (!confirmVoiceovers(catalog, chosen.length, characters)) return;
     start(async () => {
       const r = await actions.requestVoiceovers(localizationId, chosen);
       if (!r.ok) return setMessage({ tone: "bad", text: r.message });
@@ -101,9 +77,6 @@ export function VoiceoverPanel({
       await refresh();
     });
   }
-
-  const chip =
-    "rounded-full border border-line px-3 py-1 text-sm aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent";
 
   return (
     <section aria-labelledby="voice-heading" className="flex flex-col gap-4">
@@ -172,89 +145,22 @@ export function VoiceoverPanel({
           {!textSaved ? (
             <p className="text-sm text-bad">Save the text first: voice-overs read the saved text.</p>
           ) : null}
-          {catalogError ? <p className="text-sm text-bad">The voices couldn&apos;t be loaded: {catalogError}</p> : null}
-          {!catalog && !catalogError ? <p className="text-sm text-muted">Loading voices…</p> : null}
+          <VoicePicker
+            siteId={siteId}
+            characters={characters}
+            chosen={chosen}
+            onChange={setChosen}
+            onCatalog={setCatalog}
+          />
           {catalog ? (
-            <>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Filter voices">
-                {(["FEMALE", "MALE"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    aria-pressed={gender === g}
-                    onClick={() => setGender(gender === g ? null : g)}
-                    className={chip}
-                  >
-                    {g === "FEMALE" ? "Woman" : "Man"}
-                  </button>
-                ))}
-                <span aria-hidden="true" className="mx-1 w-px bg-line" />
-                {(["US", "UK"] as const).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    aria-pressed={accent === a}
-                    onClick={() => setAccent(accent === a ? null : a)}
-                    className={chip}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-              <ul className="grid max-h-72 gap-1 overflow-y-auto sm:grid-cols-2">
-                {voices.map((v) => {
-                  const on = chosen.includes(v.id);
-                  return (
-                    <li key={v.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-paper">
-                      <input
-                        id={`voice-${v.id}`}
-                        type="checkbox"
-                        checked={on}
-                        disabled={!on && chosen.length >= MAX_AT_ONCE}
-                        onChange={() => setChosen(on ? chosen.filter((x) => x !== v.id) : [...chosen, v.id])}
-                      />
-                      <label htmlFor={`voice-${v.id}`} className="min-w-0 flex-1 cursor-pointer truncate text-sm">
-                        <span className="font-medium">{v.name}</span>{" "}
-                        <span className="text-muted">{tag(v.gender, v.accent)}</span>
-                      </label>
-                      {v.previewUrl ? (
-                        <button
-                          type="button"
-                          aria-label={`Hear ${v.name}`}
-                          onClick={() => {
-                            preview.current?.pause();
-                            preview.current = new Audio(v.previewUrl ?? undefined);
-                            void preview.current.play();
-                          }}
-                          className="rounded-full border border-line px-2 py-0.5 text-xs hover:border-accent"
-                        >
-                          ▶
-                        </button>
-                      ) : null}
-                    </li>
-                  );
-                })}
-                {!voices.length ? <li className="text-sm text-muted">No voices match these filters.</li> : null}
-              </ul>
-              <p className="text-sm text-muted">
-                {chosen.length
-                  ? `${chosen.length} chosen · about ${number(cost)} characters (${number(characters)} per voice)`
-                  : `Choose up to ${MAX_AT_ONCE} voices.`}
-                {remaining != null ? ` · ${number(remaining)} characters left this month` : ""}
-                {catalog.provider === "fake" ? " · test mode: no ElevenLabs key, voice-overs are silent" : ""}
-              </p>
-              {remaining != null && cost > remaining ? (
-                <p className="text-sm text-bad">That&apos;s more than you have left this month.</p>
-              ) : null}
-              <button
-                type="button"
-                onClick={generate}
-                disabled={pending || !chosen.length || !textSaved || !characters}
-                className="self-start rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
-              >
-                {pending ? "Starting…" : "Make voice-over"}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={generate}
+              disabled={pending || !chosen.length || !textSaved || !characters || characters > MAX_VOICE_CHARACTERS}
+              className="self-start rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+            >
+              {pending ? "Starting…" : "Make voice-over"}
+            </button>
           ) : null}
         </div>
       ) : null}
