@@ -32,6 +32,8 @@ export function sectionStates(p: {
   keys: Set<string>;
   sets: EditorSet[];
   exercisesDirty: boolean;
+  /** Vocabulary suggestions still to approve or remove. */
+  toCheck?: number;
   /** New lessons: what will be made when the lesson is created ("Podcast · Lauren & Roger"). */
   voicePlan?: string | null;
 }): Record<SectionId, { summary: string; state: SectionState }> {
@@ -61,8 +63,10 @@ export function sectionStates(p: {
     },
     vocabulary: {
       summary: p.vocabulary.length
-        ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key`
-        : "No words linked yet",
+        ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key${p.toCheck ? ` · ${p.toCheck} suggested to check` : ""}`
+        : p.toCheck
+          ? `${p.toCheck} suggested to check`
+          : "No words linked yet",
       state: p.textDirty && p.vocabulary.length ? "unsaved" : p.vocabulary.length ? "done" : "todo",
     },
     questions: {
@@ -114,7 +118,7 @@ export function VocabularyList({
         to keep the links.
       </p>
       {sorted.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul aria-label="Linked words" className="grid gap-2 sm:grid-cols-2">
           {sorted.map((s) => {
             const key = keys.has(s.revisionId);
             return (
@@ -194,7 +198,7 @@ export type ScriptValues = { title: string; summary: string; level: CefrLevel | 
 
 /**
  * Section 1: title, (web address, for new lessons), summary, level, topics and the text editor. `footer` holds the
- * page's own button (Save text) or notes.
+ * page's own button (Save script) or notes.
  */
 export function ScriptFields({
   values,

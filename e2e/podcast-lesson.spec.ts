@@ -28,8 +28,8 @@ test("an editor makes a two-host podcast lesson and learners see and hear the ho
   await approveWhenReady(page);
   await expect(page.locator("#voice").getByText("Conversation · Kate & Max", { exact: true })).toBeVisible();
   await linkWord(page, "commute");
-  await page.getByRole("button", { name: "Save text" }).click();
-  await expect(page.getByRole("button", { name: "Text saved" })).toBeVisible();
+  await page.getByRole("button", { name: "Save script" }).click();
+  await expect(page.getByRole("button", { name: "Script saved" })).toBeVisible();
   await addQuestion(page, "Max's commute was short.", "FALSE");
 
   page.once("dialog", (d) => void d.accept());

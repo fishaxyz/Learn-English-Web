@@ -23,6 +23,7 @@ import {
   VocabularyList,
   type ScriptValues,
 } from "./lesson-parts";
+import { VocabularySuggestions } from "./vocabulary-suggestions";
 import { VoiceoverPanel } from "./voiceover-panel";
 
 type Lesson = NonNullable<EditorialLessonQuery["editorialResource"]>;
@@ -225,7 +226,7 @@ export function LessonEditor({
                     disabled={pending || !textDirty}
                     className="self-start rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
                   >
-                    {pending ? "Saving…" : textDirty ? "Save text" : "Text saved"}
+                    {pending ? "Saving…" : textDirty ? "Save script" : "Script saved"}
                   </button>
                 ) : null
               }
@@ -240,13 +241,27 @@ export function LessonEditor({
             state={parts.vocabulary.state}
             tint="bg-sun"
           >
-            <VocabularyList
-              vocabulary={vocabulary}
-              keys={keys}
-              siteId={lesson.site.id}
-              editable={editable}
-              onWrite={() => sections.open("script")}
-            />
+            <div className="flex flex-col gap-5">
+              <VocabularySuggestions
+                resourceId={lesson.id}
+                localizationId={localization.id}
+                lockVersion={lockVersion}
+                editable={editable}
+                saved={!dirty}
+                initial={draft.vocabularySuggestions}
+                onApproved={(text) => {
+                  setMessage({ tone: "good", text });
+                  router.refresh(); // the draft's text now has the new links: the editor reloads with it
+                }}
+              />
+              <VocabularyList
+                vocabulary={vocabulary}
+                keys={keys}
+                siteId={lesson.site.id}
+                editable={editable}
+                onWrite={() => sections.open("script")}
+              />
+            </div>
           </EditorSection>
 
           <EditorSection

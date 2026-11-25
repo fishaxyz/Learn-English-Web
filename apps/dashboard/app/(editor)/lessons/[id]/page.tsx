@@ -46,8 +46,9 @@ export default async function EditLesson({
         <p className="font-mono text-sm text-muted">/reading/{localization.slug}</p>
       </div>
       <LessonEditor
-        // A fresh editor when the draft itself changes (started, published), not on every save.
-        key={localization.draft?.id ?? "none"}
+        // A fresh editor when the draft itself changes (started, published, suggestions approved).
+        // Approving suggestions changes the draft's text on the server: a new lock version reloads the editor with it.
+        key={localization.draft ? `${localization.draft.id}:${localization.draft.lockVersion}` : "none"}
         lesson={lesson}
         localization={localization}
         role={roleOn(viewer, lesson.site.id)}

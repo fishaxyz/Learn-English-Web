@@ -53,12 +53,14 @@ def suggest(
                 use_model = False
             else:
                 meanings = {
-                    str(m.get("word", "")).lower(): _clean(m.get("definition"), 300)
-                    for m in answer.get("meanings", [])
-                    if isinstance(m, dict)
+                    str(m.get("word", "")).lower(): m for m in answer.get("meanings", []) if isinstance(m, dict)
                 }
                 for w in words:
-                    w.definition = meanings.get(w.display_form) or meanings.get(w.surface.lower())
+                    meaning = meanings.get(w.display_form) or meanings.get(w.surface.lower()) or {}
+                    w.definition = _clean(meaning.get("definition"), 300)
+                    # The model knows learners' levels better than word frequency does.
+                    if meaning.get("level") in LEVELS:
+                        w.level = str(meaning["level"])
                 for e in answer.get("expressions", []):
                     if not isinstance(e, dict) or e.get("kind") not in POS_OF_KIND:
                         continue

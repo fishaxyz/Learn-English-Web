@@ -27,8 +27,8 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await page.keyboard.type("Her commute is long.");
   await linkWord(page, "commute");
   await page.getByRole("checkbox", { name: "Travel" }).check();
-  await page.getByRole("button", { name: "Save text" }).click();
-  await expect(page.getByRole("button", { name: "Text saved" })).toBeVisible();
+  await page.getByRole("button", { name: "Save script" }).click();
+  await expect(page.getByRole("button", { name: "Script saved" })).toBeVisible();
 
   // Review waits until every part is finished.
   await expect(page.getByRole("button", { name: "Submit for review" })).toBeDisabled();

@@ -49,7 +49,7 @@ def test_the_model_adds_expressions_and_meanings_and_words_inside_them_are_dropp
             },
             {"text": "not in the text", "base_form": "x", "kind": "IDIOM", "definition": "?", "level": "B1"},
         ],
-        "meanings": [{"word": "bureaucracy", "definition": "rules and paperwork in offices"}],
+        "meanings": [{"word": "bureaucracy", "definition": "rules and paperwork in offices", "level": "C1"}],
     }
     renewed: list[int] = []
     result = suggest(
@@ -62,6 +62,7 @@ def test_the_model_adds_expressions_and_meanings_and_words_inside_them_are_dropp
     assert "x" not in items  # not in the text: never invented
     assert "cake" not in items  # inside the idiom
     assert items["bureaucracy"]["definition"] == "rules and paperwork in offices"
+    assert items["bureaucracy"]["cefrLevel"] == "C1"  # the model's level, not the frequency guess
 
 
 def test_without_the_model_suggestions_still_come_from_word_frequency() -> None:

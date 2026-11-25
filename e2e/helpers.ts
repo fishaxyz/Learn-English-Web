@@ -68,7 +68,7 @@ export async function linkWord(page: Page, word: string) {
     .getByRole("button", { name: new RegExp(word) })
     .first()
     .click();
-  await expect(page.locator("#vocabulary").getByText(word, { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Linked words" }).getByText(word, { exact: true })).toBeVisible();
 }
 
 /** Adds one True/False/Not given question and saves the exercises. */

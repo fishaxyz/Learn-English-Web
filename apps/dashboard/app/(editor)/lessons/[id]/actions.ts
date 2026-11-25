@@ -2,6 +2,11 @@
 
 import {
   ApproveAudioTrackDocument,
+  ApproveVocabularySuggestionsDocument,
+  DraftSuggestionsDocument,
+  RejectVocabularySuggestionsDocument,
+  SuggestVocabularyDocument,
+  type SuggestionsFieldsFragment,
   ArchiveResourceDocument,
   DeleteAudioTrackDocument,
   DraftAudioDocument,
@@ -156,6 +161,50 @@ export async function approveTrack(id: string): Promise<{ ok: boolean; message?:
 export async function deleteTrack(id: string): Promise<{ ok: boolean; message?: string }> {
   try {
     await editorMutation(DeleteAudioTrackDocument, { id });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+// --- Vocabulary suggestions
+
+export async function draftSuggestions(
+  resourceId: string
+): Promise<{ ok: true; suggestions: SuggestionsFieldsFragment } | { ok: false; message: string }> {
+  try {
+    const r = await editorQuery(DraftSuggestionsDocument, { id: resourceId });
+    const draft = r.editorialResource?.localizations[0]?.draft;
+    if (!draft) return { ok: false, message: "There's no draft." };
+    return { ok: true, suggestions: draft.vocabularySuggestions };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function approveSuggestions(localizationId: string, lockVersion: number, ids: string[]) {
+  return attempt(
+    async () =>
+      (await editorMutation(ApproveVocabularySuggestionsDocument, { localizationId, lockVersion, ids }))
+        .approveVocabularySuggestions
+  );
+}
+
+export async function rejectSuggestions(
+  localizationId: string,
+  ids: string[]
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(RejectVocabularySuggestionsDocument, { localizationId, ids });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function suggestAgain(localizationId: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(SuggestVocabularyDocument, { localizationId });
     return { ok: true };
   } catch (error) {
     return { ok: false, message: explain(error) };

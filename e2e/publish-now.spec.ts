@@ -15,8 +15,8 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   await page.getByLabel("Lesson text").click();
   await page.keyboard.type("Many people drink coffee before their commute. Others go for a run.");
   await linkWord(page, "commute");
-  await page.getByRole("button", { name: "Save text" }).click();
-  await expect(page.getByRole("button", { name: "Text saved" })).toBeVisible();
+  await page.getByRole("button", { name: "Save script" }).click();
+  await expect(page.getByRole("button", { name: "Script saved" })).toBeVisible();
 
   // Saved, but not finished: Publish now waits for the voice-over and the questions.
   await expect(page.getByRole("button", { name: "Publish now" })).toBeDisabled();

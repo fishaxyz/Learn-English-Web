@@ -225,13 +225,19 @@ export function NewLessonForm({
               state={parts.vocabulary.state}
               tint="bg-sun"
             >
-              <VocabularyList
-                vocabulary={vocabulary}
-                keys={keys}
-                siteId={site.id}
-                editable
-                onWrite={() => sections.open("script")}
-              />
+              <div className="flex flex-col gap-4">
+                <p className="rounded-2xl bg-sun/25 p-4 text-sm text-muted">
+                  After <strong className="text-ink">Save and Preview</strong>, words, phrases and idioms worth learning
+                  are suggested here from the script, to approve or remove.
+                </p>
+                <VocabularyList
+                  vocabulary={vocabulary}
+                  keys={keys}
+                  siteId={site.id}
+                  editable
+                  onWrite={() => sections.open("script")}
+                />
+              </div>
             </EditorSection>
 
             <EditorSection

@@ -30,8 +30,12 @@ SCHEMA: dict[str, Any] = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"word": {"type": "string"}, "definition": {"type": "string"}},
-                "required": ["word", "definition"],
+                "properties": {
+                    "word": {"type": "string"},
+                    "definition": {"type": "string"},
+                    "level": {"enum": LEVELS},
+                },
+                "required": ["word", "definition", "level"],
             },
         },
     },
@@ -62,7 +66,8 @@ class LanguageModel:
             "verbs, collocations, fixed phrases and sentence patterns (at most 8; none if there are none). For "
             "each: 'text' exactly as written in the paragraph, 'base_form' as in a dictionary (\"give up\", "
             '"a piece of cake", or a pattern like "like + verb-ing"), its kind, a definition and a CEFR level.\n'
-            f"2. Give a definition for each of these words as used in the paragraph: {', '.join(words) or '(none)'}."
+            "2. Give a definition and the CEFR level at which learners usually meet it, for each of these words as "
+            f"used in the paragraph: {', '.join(words) or '(none)'}."
         )
         try:
             res = self._http.post(

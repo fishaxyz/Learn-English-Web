@@ -126,6 +126,9 @@ query EditorialLesson($id: ID!) {
         audioTracks {
           ...AudioTrackFields
         }
+        vocabularySuggestions {
+          ...SuggestionsFields
+        }
       }
       published {
         ...RevisionFields
@@ -356,4 +359,51 @@ fragment ChecklistFields on LessonChecklist {
   vocabulary
   questions
   missing
+}
+
+fragment SuggestionsFields on VocabularySuggestions {
+  state
+  usedLanguageModel
+  items {
+    id
+    status
+    kind
+    displayForm
+    partOfSpeech
+    surfaceText
+    sentence
+    definition
+    cefrLevel
+    inWordBank
+    source
+  }
+}
+
+query DraftSuggestions($id: ID!) {
+  editorialResource(id: $id) {
+    id
+    localizations {
+      id
+      draft {
+        id
+        vocabularySuggestions {
+          ...SuggestionsFields
+        }
+      }
+    }
+  }
+}
+
+mutation ApproveVocabularySuggestions($localizationId: ID!, $lockVersion: Int!, $ids: [ID!]!) {
+  approveVocabularySuggestions(localizationId: $localizationId, lockVersion: $lockVersion, ids: $ids) {
+    ...EditorialSummary
+  }
+}
+
+mutation RejectVocabularySuggestions($localizationId: ID!, $ids: [ID!]!) {
+  rejectVocabularySuggestions(localizationId: $localizationId, ids: $ids)
+}
+
+mutation SuggestVocabulary($localizationId: ID!) {
+  suggestVocabulary(localizationId: $localizationId)
 }
