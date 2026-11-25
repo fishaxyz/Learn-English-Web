@@ -69,15 +69,19 @@ class LanguageModel:
             "2. Give a definition and the CEFR level at which learners usually meet it, for each of these words as "
             f"used in the paragraph: {', '.join(words) or '(none)'}."
         )
+        return self.json(SYSTEM, prompt, SCHEMA, max_tokens=1500)
+
+    def json(self, system: str, prompt: str, schema: dict[str, Any], max_tokens: int) -> dict[str, Any]:
+        """One chat request whose answer must follow `schema` (llama.cpp turns it into a grammar)."""
         try:
             res = self._http.post(
                 "/chat/completions",
                 json={
                     "model": self._model,
-                    "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                     "temperature": 0.2,
-                    "max_tokens": 1500,
-                    "response_format": {"type": "json_schema", "json_schema": {"name": "vocabulary", "schema": SCHEMA}},
+                    "max_tokens": max_tokens,
+                    "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "schema": schema}},
                     "chat_template_kwargs": {"enable_thinking": False},
                 },
             )

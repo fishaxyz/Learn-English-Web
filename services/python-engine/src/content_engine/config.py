@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # suggestions come from word frequency only.
     llm_base_url: HttpUrl | None = None
     llm_model: str = "qwen3-14b"
-    llm_timeout_seconds: float = Field(default=240.0, gt=0, le=1800)
+    llm_timeout_seconds: float = Field(default=600.0, gt=0, le=1800)
     # Where upload URLs' origin should point from inside Docker (the local storage driver lives in the API).
     media_upload_origin: HttpUrl | None = None
     log_level: Literal["debug", "info", "warn", "error"] = "info"

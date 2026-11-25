@@ -10,6 +10,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from .graphql_client import GraphQLResponseError, GraphQLTransportError
+from .questions.draft import draft_questions
 from .tts.alignment import Block, WordTiming, turn_timings, word_timings
 from .tts.providers import ProviderError, Speech, SpeechProvider, join_audio
 from .vocab.llm import LanguageModel
@@ -25,7 +26,7 @@ FAIL = """mutation Fail($job: ID!, $token: String!, $error: String!, $retryable:
 
 RENEW = """mutation Renew($job: ID!, $token: String!) { renewJobLease(jobId: $job, claimToken: $token) }"""
 
-JOB_TYPES = ["tts.generate", "vocab.suggest"]
+JOB_TYPES = ["tts.generate", "vocab.suggest", "questions.suggest"]
 
 
 class Executor(Protocol):
@@ -119,6 +120,8 @@ class JobRunner:
         try:
             if job.type == "vocab.suggest":
                 self._vocabulary(job)
+            elif job.type == "questions.suggest":
+                self._questions(job)
             elif job.type == "tts.generate":
                 self._tts(job)
             else:
@@ -152,6 +155,15 @@ class JobRunner:
             self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
 
         result = suggest(payload.blocks, payload.level, self._model, self._log, keep_alive=renew)
+        self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
+
+    def _questions(self, job: Claimed) -> None:
+        payload = VocabPayload.model_validate(job.payload)
+
+        def renew() -> None:
+            self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
+
+        result = draft_questions(payload.blocks, payload.level, self._model, self._log, keep_alive=renew)
         self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
 
     def _tts(self, job: Claimed) -> None:
