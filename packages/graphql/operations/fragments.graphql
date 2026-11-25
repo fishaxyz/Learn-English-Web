@@ -57,6 +57,47 @@ fragment ExerciseSetView on ExerciseSet {
         }
       }
     }
+    ... on MultipleChoiceQuestion {
+      stem
+      choose
+      options {
+        id
+        content
+      }
+    }
+    ... on YesNoNotGivenQuestion {
+      statement
+    }
+    ... on MatchingQuestion {
+      matchingVariant: variant
+      reuse
+      items {
+        itemId
+        text
+      }
+      options {
+        id
+        content
+      }
+    }
+    ... on CompletionQuestion {
+      completionVariant: variant
+      wordLimit
+      wordBox
+      segments {
+        __typename
+        ... on TextSegment {
+          text
+        }
+        ... on GapSegment {
+          gapId
+        }
+      }
+    }
+    ... on ShortAnswerQuestion {
+      question
+      wordLimit
+    }
   }
 }
 
@@ -83,6 +124,18 @@ fragment PracticeResultView on PracticeResult {
           gapId
           text
         }
+      }
+      ... on ChoicesAnswer {
+        optionIds
+      }
+      ... on MatchesAnswer {
+        matches {
+          itemId
+          optionId
+        }
+      }
+      ... on TextAnswer {
+        text
       }
     }
   }

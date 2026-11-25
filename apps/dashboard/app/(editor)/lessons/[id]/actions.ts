@@ -3,6 +3,11 @@
 import {
   ApproveAudioTrackDocument,
   ApproveVocabularySuggestionsDocument,
+  ApproveQuestionSuggestionsDocument,
+  DraftQuestionSuggestionsDocument,
+  RejectQuestionSuggestionsDocument,
+  SuggestQuestionsDocument,
+  type QuestionSuggestionsFieldsFragment,
   DraftSuggestionsDocument,
   RejectVocabularySuggestionsDocument,
   SuggestVocabularyDocument,
@@ -205,6 +210,50 @@ export async function rejectSuggestions(
 export async function suggestAgain(localizationId: string): Promise<{ ok: boolean; message?: string }> {
   try {
     await editorMutation(SuggestVocabularyDocument, { localizationId });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+// --- Suggested questions
+
+export async function draftQuestionSuggestions(
+  resourceId: string
+): Promise<{ ok: true; suggestions: QuestionSuggestionsFieldsFragment } | { ok: false; message: string }> {
+  try {
+    const r = await editorQuery(DraftQuestionSuggestionsDocument, { id: resourceId });
+    const draft = r.editorialResource?.localizations[0]?.draft;
+    if (!draft) return { ok: false, message: "There's no draft." };
+    return { ok: true, suggestions: draft.questionSuggestions };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function approveQuestions(localizationId: string, lockVersion: number, ids: string[]) {
+  return attempt(
+    async () =>
+      (await editorMutation(ApproveQuestionSuggestionsDocument, { localizationId, lockVersion, ids }))
+        .approveQuestionSuggestions
+  );
+}
+
+export async function rejectQuestions(
+  localizationId: string,
+  ids: string[]
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(RejectQuestionSuggestionsDocument, { localizationId, ids });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function suggestQuestionsAgain(localizationId: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(SuggestQuestionsDocument, { localizationId });
     return { ok: true };
   } catch (error) {
     return { ok: false, message: explain(error) };

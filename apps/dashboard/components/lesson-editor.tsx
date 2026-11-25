@@ -1,6 +1,6 @@
 "use client";
 
-import type { SuggestionsFieldsFragment } from "@english/graphql";
+import type { QuestionSuggestionsFieldsFragment, SuggestionsFieldsFragment } from "@english/graphql";
 import type { CefrLevel, EditorialLessonQuery, EditorialSummaryFragment, SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
 import Link from "next/link";
@@ -24,6 +24,7 @@ import {
   VocabularyList,
   type ScriptValues,
 } from "./lesson-parts";
+import { QuestionSuggestions } from "./question-suggestions";
 import { VocabularySuggestions } from "./vocabulary-suggestions";
 import { VoiceoverPanel } from "./voiceover-panel";
 
@@ -137,6 +138,9 @@ export function LessonEditor({
   );
   const [tracks, setTracks] = useState(draft?.audioTracks ?? []);
   const [savedBody, setSavedBody] = useState<unknown>(draft?.body);
+  const [questionDrafts, setQuestionDrafts] = useState<QuestionSuggestionsFieldsFragment>(
+    draft?.questionSuggestions ?? { state: "IDLE", usedLanguageModel: null, items: [] }
+  );
   const [suggestions, setSuggestions] = useState<SuggestionsFieldsFragment>(
     draft?.vocabularySuggestions ?? { state: "IDLE", usedLanguageModel: null, items: [] }
   );
@@ -147,6 +151,8 @@ export function LessonEditor({
     level: script.level,
     toCheck: suggestions.items.filter((i) => i.status === "PENDING").length,
     findingWords: suggestions.state === "WORKING",
+    questionsToCheck: questionDrafts.items.filter((i) => i.status === "PENDING").length,
+    findingQuestions: questionDrafts.state === "WORKING",
     textDirty,
     tracks,
     vocabulary,
@@ -279,6 +285,20 @@ export function LessonEditor({
             tint="bg-good-soft"
           >
             <div className="flex flex-col gap-4">
+              <QuestionSuggestions
+                resourceId={lesson.id}
+                localizationId={localization.id}
+                lockVersion={lockVersion}
+                editable={editable}
+                saved={!dirty}
+                paragraphs={paragraphs(savedBody)}
+                data={questionDrafts}
+                onData={setQuestionDrafts}
+                onApproved={(text) => {
+                  setMessage({ tone: "good", text });
+                  router.refresh(); // the exercises changed on the server: the editor reloads with them
+                }}
+              />
               <ExercisesEditor
                 sets={sets}
                 disabled={!editable}

@@ -3,52 +3,7 @@
 import type { SuggestionsFieldsFragment } from "@english/graphql";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import * as actions from "../app/(editor)/lessons/[id]/actions";
-import { Spinner } from "./editor-section";
-
-const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-
-/**
- * While the worker looks for vocabulary: a moving bar, how long it has been, about how long it takes (the local AI
- * reads one paragraph in about a minute), and placeholders where the suggestions will appear.
- */
-function Working({ paragraphs }: { paragraphs: number }) {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const minutes = Math.max(1, paragraphs); // about a minute per paragraph on this Mac's CPU
-  return (
-    <div role="status" className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Spinner className="size-4" />
-        Finding words, phrases and idioms in the script…
-        <span className="ml-auto tabular-nums text-muted">{clock(seconds)} so far</span>
-      </div>
-      <div className="relative h-1.5 overflow-hidden rounded-full bg-line/70" aria-hidden="true">
-        <div className="vocab-progress absolute inset-y-0 w-1/3 rounded-full bg-accent" />
-      </div>
-      <p className="text-sm text-muted">
-        The local AI reads one paragraph at a time: about {minutes} minute{minutes === 1 ? "" : "s"} for{" "}
-        {paragraphs || 1} paragraph{paragraphs === 1 ? "" : "s"}. You can keep working; suggestions appear here.
-      </p>
-      <ul className="flex flex-col gap-2" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <li
-            key={i}
-            className="flex animate-pulse gap-3 rounded-2xl border border-line bg-surface p-3 motion-reduce:animate-none"
-          >
-            <span className="mt-1 size-4 rounded bg-line" />
-            <span className="flex flex-1 flex-col gap-2">
-              <span className="h-3 w-1/3 rounded bg-line" />
-              <span className="h-3 w-5/6 rounded bg-line/70" />
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+import { Working } from "./working";
 
 type Suggestion = SuggestionsFieldsFragment["items"][number];
 
@@ -195,7 +150,14 @@ export function VocabularySuggestions({
           ? " · The local AI wasn't running, so these come from word frequency only (no idioms, no meanings). Start it, then “Suggest again”."
           : ""}
       </p>
-      {data.state === "WORKING" ? <Working paragraphs={paragraphs} /> : null}
+      {data.state === "WORKING" ? (
+        <Working
+          label="Finding words, phrases and idioms in the script…"
+          note={`The local AI reads one paragraph at a time: about ${Math.max(1, paragraphs)} minute${
+            paragraphs > 1 ? "s" : ""
+          } for ${paragraphs || 1} paragraph${paragraphs === 1 ? "" : "s"}. You can keep working; suggestions appear here.`}
+        />
+      ) : null}
       {!saved && open.length ? <p className="text-sm text-bad">Save your changes before approving.</p> : null}
 
       {open.length ? (

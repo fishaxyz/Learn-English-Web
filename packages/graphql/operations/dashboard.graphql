@@ -129,6 +129,9 @@ query EditorialLesson($id: ID!) {
         vocabularySuggestions {
           ...SuggestionsFields
         }
+        questionSuggestions {
+          ...QuestionSuggestionsFields
+        }
       }
       published {
         ...RevisionFields
@@ -406,4 +409,44 @@ mutation RejectVocabularySuggestions($localizationId: ID!, $ids: [ID!]!) {
 
 mutation SuggestVocabulary($localizationId: ID!) {
   suggestVocabulary(localizationId: $localizationId)
+}
+
+fragment QuestionSuggestionsFields on QuestionSuggestions {
+  state
+  usedLanguageModel
+  items {
+    id
+    status
+    type
+    question
+  }
+}
+
+query DraftQuestionSuggestions($id: ID!) {
+  editorialResource(id: $id) {
+    id
+    localizations {
+      id
+      draft {
+        id
+        questionSuggestions {
+          ...QuestionSuggestionsFields
+        }
+      }
+    }
+  }
+}
+
+mutation ApproveQuestionSuggestions($localizationId: ID!, $lockVersion: Int!, $ids: [ID!]!) {
+  approveQuestionSuggestions(localizationId: $localizationId, lockVersion: $lockVersion, ids: $ids) {
+    ...EditorialSummary
+  }
+}
+
+mutation RejectQuestionSuggestions($localizationId: ID!, $ids: [ID!]!) {
+  rejectQuestionSuggestions(localizationId: $localizationId, ids: $ids)
+}
+
+mutation SuggestQuestions($localizationId: ID!) {
+  suggestQuestions(localizationId: $localizationId)
 }

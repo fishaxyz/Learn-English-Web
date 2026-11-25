@@ -86,7 +86,7 @@ def build_questions(answer: dict[str, Any], letters: list[str], text: str) -> li
     out: list[dict[str, Any]] = []
 
     def explained(q: dict[str, Any], evidence: object) -> dict[str, Any]:
-        quote = _str(evidence, 300)
+        quote = _str(re.sub(r"^\s*Paragraph [A-Z]:\s*", "", evidence) if isinstance(evidence, str) else None, 300)
         return {**q, "explanation": f"From the text: {quote}"} if quote else q
 
     for kind, answers, items in (

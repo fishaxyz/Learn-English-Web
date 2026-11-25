@@ -49,3 +49,86 @@ describe("payload round trip", () => {
     expect(fromPayload(payload)[0]!.questions[2]).toMatchObject({ text: "About [forty|40] minutes." });
   });
 });
+
+describe("IELTS question types in the editor", () => {
+  const payload = [
+    {
+      title: "Mixed",
+      questions: [
+        {
+          type: "MULTIPLE_CHOICE",
+          points: 1,
+          prompt: { stem: "Which TWO?", choose: 2 },
+          options: ["a", "b", "c", "d", "e"],
+          grading: { type: "MULTIPLE_CHOICE", correctOptions: [1, 3] },
+        },
+        {
+          type: "YES_NO_NOT_GIVEN",
+          points: 1,
+          prompt: { statement: "Cycling is best." },
+          grading: { type: "YES_NO_NOT_GIVEN", answer: "YES" },
+        },
+        {
+          type: "MATCHING",
+          points: 1,
+          prompt: {
+            variant: "INFORMATION",
+            items: [
+              { itemId: "i1", text: "a delay" },
+              { itemId: "i2", text: "a view" },
+            ],
+            reuse: true,
+          },
+          options: ["A", "B", "C"],
+          grading: {
+            type: "MATCHING",
+            matches: [
+              { itemId: "i1", option: 1 },
+              { itemId: "i2", option: 1 },
+            ],
+          },
+        },
+        {
+          type: "COMPLETION",
+          points: 1,
+          prompt: {
+            variant: "SUMMARY",
+            segments: [{ text: "She takes the " }, { gapId: "gap-1" }, { text: "." }],
+            wordLimit: 1,
+            wordBox: ["bus", "train"],
+          },
+          grading: { type: "COMPLETION", gaps: [{ gapId: "gap-1", accepted: ["bus"], caseSensitive: false }] },
+        },
+        {
+          type: "SHORT_ANSWER",
+          points: 1,
+          prompt: { question: "How long?", wordLimit: 3 },
+          grading: { type: "SHORT_ANSWER", accepted: ["forty minutes", "40 minutes"] },
+        },
+      ],
+    },
+  ];
+
+  it("reads every type into editor fields and writes it back unchanged", () => {
+    const sets = fromPayload(payload);
+    expect(sets[0]?.questions.map((q) => q.type)).toEqual([
+      "MULTIPLE_CHOICE",
+      "YES_NO_NOT_GIVEN",
+      "MATCHING",
+      "COMPLETION",
+      "SHORT_ANSWER",
+    ]);
+    expect(sets[0]?.questions[2]).toMatchObject({ items: ["a delay", "a view"], answers: [1, 1], reuse: true });
+    expect(sets[0]?.questions[3]).toMatchObject({ text: "She takes the [bus].", wordBox: "bus, train" });
+    expect(sets[0]?.questions[4]).toMatchObject({ answers: "forty minutes | 40 minutes" });
+    expect(toPayload(sets)).toEqual(payload);
+  });
+
+  it("says what's wrong in editor terms", () => {
+    const sets = fromPayload(payload);
+    const q = sets[0]!.questions[0]!;
+    expect(toPayload([{ ...sets[0]!, questions: [{ ...q, correct: [1] } as typeof q] }])).toMatch(
+      /at least two correct/
+    );
+  });
+});

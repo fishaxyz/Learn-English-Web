@@ -1,15 +1,440 @@
 "use client";
 
-import { blankQuestion, type EditorQuestion, type EditorSet, type Judgement } from "../lib/exercises";
+import {
+  blankQuestion,
+  COMPLETION_LABEL,
+  MATCHING_LABEL,
+  TYPE_LABEL,
+  type CompletionVariant,
+  type EditorQuestion,
+  type EditorSet,
+  type Judgement,
+  type MatchingVariant,
+  type View,
+} from "../lib/exercises";
 
 const field =
   "w-full rounded-md border border-line bg-surface px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-accent disabled:bg-paper";
+const smallLink = "self-start text-sm font-medium text-accent hover:underline";
+const letter = (i: number) => String.fromCharCode(65 + i);
 
-const TYPE_LABEL = {
-  SINGLE_CHOICE: "Multiple choice",
-  TRUE_FALSE_NOT_GIVEN: "True / False / Not given",
-  GAP_FILL: "Fill the gap",
-};
+function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  help,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  help?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={id}>
+      {label}
+      <input
+        id={id}
+        className={field}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {help ? <span className="font-normal text-muted">{help}</span> : null}
+    </label>
+  );
+}
+
+/** A list of short texts (options, items) that can grow and shrink. */
+function ListField({
+  label,
+  values,
+  min,
+  max,
+  mark,
+  onChange,
+  renderExtra,
+  onRemove,
+}: {
+  label: string;
+  values: string[];
+  min: number;
+  max: number;
+  mark: (i: number) => string;
+  onChange: (values: string[]) => void;
+  renderExtra?: (i: number) => React.ReactNode;
+  onRemove?: (i: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">{label}</p>
+      {values.map((value, i) => (
+        <div key={i} className="flex items-center gap-2">
+          {renderExtra ? renderExtra(i) : null}
+          <span className="w-6 text-sm font-semibold text-muted">{mark(i)}</span>
+          <input
+            aria-label={`${label} ${mark(i)}`}
+            className={field}
+            value={value}
+            onChange={(e) => onChange(values.map((x, j) => (j === i ? e.target.value : x)))}
+          />
+          {values.length > min ? (
+            <button
+              type="button"
+              aria-label={`Remove ${mark(i)}`}
+              className="text-sm text-muted hover:text-bad"
+              onClick={() => (onRemove ? onRemove(i) : onChange(values.filter((_, j) => j !== i)))}
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
+      ))}
+      {values.length < max ? (
+        <button type="button" className={smallLink} onClick={() => onChange([...values, ""])}>
+          Add
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function JudgementField<T extends string>({
+  id,
+  value,
+  choices,
+  onChange,
+}: {
+  id: string;
+  value: T;
+  choices: [T, string][];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm font-medium" htmlFor={id}>
+      Answer
+      <select id={id} className={`${field} w-auto`} value={value} onChange={(e) => onChange(e.target.value as T)}>
+        {choices.map(([v, label]) => (
+          <option key={v} value={v}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+const GAP_HELP = "Put each gap's answer in square brackets. Separate other accepted answers with |, like [forty|40].";
+
+/** The fields for one question, by type. */
+export function QuestionFields({
+  q,
+  id,
+  onChange,
+}: {
+  q: EditorQuestion;
+  id: string;
+  onChange: (q: EditorQuestion) => void;
+}) {
+  switch (q.type) {
+    case "SINGLE_CHOICE":
+    case "MULTIPLE_CHOICE": {
+      const many = q.type === "MULTIPLE_CHOICE";
+      const isRight = (i: number) => (many ? q.correct.includes(i) : q.correct === i);
+      return (
+        <>
+          <TextField id={`${id}-stem`} label="Question" value={q.stem} onChange={(stem) => onChange({ ...q, stem })} />
+          <ListField
+            label={
+              many ? "Choices (tick every correct one; learners choose that many)" : "Choices (select the right one)"
+            }
+            values={q.options}
+            min={many ? 3 : 2}
+            max={10}
+            mark={letter}
+            onChange={(options) => onChange({ ...q, options })}
+            onRemove={(o) =>
+              many
+                ? onChange({
+                    ...q,
+                    options: q.options.filter((_, i) => i !== o),
+                    correct: q.correct.filter((c) => c !== o).map((c) => (c > o ? c - 1 : c)),
+                  })
+                : onChange({
+                    ...q,
+                    options: q.options.filter((_, i) => i !== o),
+                    correct: q.correct > o ? q.correct - 1 : q.correct === o ? 0 : q.correct,
+                  })
+            }
+            renderExtra={(o) => (
+              <input
+                type={many ? "checkbox" : "radio"}
+                name={`${id}-correct`}
+                aria-label={`Choice ${letter(o)} is correct`}
+                checked={isRight(o)}
+                onChange={() =>
+                  many
+                    ? onChange({ ...q, correct: isRight(o) ? q.correct.filter((c) => c !== o) : [...q.correct, o] })
+                    : onChange({ ...q, correct: o })
+                }
+              />
+            )}
+          />
+        </>
+      );
+    }
+    case "TRUE_FALSE_NOT_GIVEN":
+      return (
+        <>
+          <TextField
+            id={`${id}-statement`}
+            label="Statement"
+            value={q.statement}
+            onChange={(statement) => onChange({ ...q, statement })}
+          />
+          <JudgementField<Judgement>
+            id={`${id}-answer`}
+            value={q.answer}
+            choices={[
+              ["TRUE", "True"],
+              ["FALSE", "False"],
+              ["NOT_GIVEN", "Not given"],
+            ]}
+            onChange={(answer) => onChange({ ...q, answer })}
+          />
+        </>
+      );
+    case "YES_NO_NOT_GIVEN":
+      return (
+        <>
+          <TextField
+            id={`${id}-statement`}
+            label="Statement about the writer's views"
+            value={q.statement}
+            onChange={(statement) => onChange({ ...q, statement })}
+          />
+          <JudgementField<View>
+            id={`${id}-answer`}
+            value={q.answer}
+            choices={[
+              ["YES", "Yes"],
+              ["NO", "No"],
+              ["NOT_GIVEN", "Not given"],
+            ]}
+            onChange={(answer) => onChange({ ...q, answer })}
+          />
+        </>
+      );
+    case "MATCHING": {
+      const optionMark = (i: number) =>
+        q.variant === "HEADINGS"
+          ? (["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"][i] ?? `${i + 1}`)
+          : letter(i);
+      return (
+        <>
+          <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`${id}-variant`}>
+            Kind
+            <select
+              id={`${id}-variant`}
+              className={`${field} w-auto`}
+              value={q.variant}
+              onChange={(e) => onChange({ ...q, variant: e.target.value as MatchingVariant })}
+            >
+              {(Object.keys(MATCHING_LABEL) as MatchingVariant[]).map((v) => (
+                <option key={v} value={v}>
+                  {MATCHING_LABEL[v]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ListField
+            label={q.variant === "HEADINGS" ? "Headings" : q.variant === "INFORMATION" ? "Paragraphs" : "Options"}
+            values={q.options}
+            min={2}
+            max={20}
+            mark={optionMark}
+            onChange={(options) =>
+              onChange({ ...q, options, answers: q.answers.map((a) => Math.min(a, options.length - 1)) })
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">
+              {q.variant === "HEADINGS"
+                ? "Paragraphs"
+                : q.variant === "SENTENCE_ENDINGS"
+                  ? "Sentence beginnings"
+                  : "Statements"}{" "}
+              and their answers
+            </p>
+            {q.items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  aria-label={`Item ${i + 1}`}
+                  className={field}
+                  value={item}
+                  onChange={(e) => onChange({ ...q, items: q.items.map((x, j) => (j === i ? e.target.value : x)) })}
+                />
+                <select
+                  aria-label={`Answer for item ${i + 1}`}
+                  className={`${field} w-auto`}
+                  value={q.answers[i] ?? 0}
+                  onChange={(e) =>
+                    onChange({
+                      ...q,
+                      answers: q.items.map((_, j) => (j === i ? Number(e.target.value) : (q.answers[j] ?? 0))),
+                    })
+                  }
+                >
+                  {q.options.map((o, k) => (
+                    <option key={k} value={k}>
+                      {optionMark(k)} {o.slice(0, 30)}
+                    </option>
+                  ))}
+                </select>
+                {q.items.length > 1 ? (
+                  <button
+                    type="button"
+                    aria-label={`Remove item ${i + 1}`}
+                    className="text-sm text-muted hover:text-bad"
+                    onClick={() =>
+                      onChange({
+                        ...q,
+                        items: q.items.filter((_, j) => j !== i),
+                        answers: q.answers.filter((_, j) => j !== i),
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            ))}
+            <button
+              type="button"
+              className={smallLink}
+              onClick={() => onChange({ ...q, items: [...q.items, ""], answers: [...q.answers, 0] })}
+            >
+              Add an item
+            </button>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={q.reuse} onChange={(e) => onChange({ ...q, reuse: e.target.checked })} />
+            An option may be the answer more than once
+          </label>
+        </>
+      );
+    }
+    case "COMPLETION":
+      return (
+        <>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`${id}-variant`}>
+              Kind
+              <select
+                id={`${id}-variant`}
+                className={`${field} w-auto`}
+                value={q.variant}
+                onChange={(e) => onChange({ ...q, variant: e.target.value as CompletionVariant })}
+              >
+                {(Object.keys(COMPLETION_LABEL) as CompletionVariant[]).map((v) => (
+                  <option key={v} value={v}>
+                    {COMPLETION_LABEL[v]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`${id}-limit`}>
+              No more than
+              <select
+                id={`${id}-limit`}
+                className={`${field} w-auto`}
+                value={q.wordLimit}
+                onChange={(e) => onChange({ ...q, wordLimit: Number(e.target.value) })}
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n} word{n === 1 ? "" : "s"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`${id}-text`}>
+            Text with gaps
+            <textarea
+              id={`${id}-text`}
+              rows={q.variant === "SENTENCE" ? 1 : 4}
+              className={field}
+              value={q.text}
+              placeholder="Mia cycles along the [river] to the station."
+              onChange={(e) => onChange({ ...q, text: e.target.value })}
+            />
+            <span className="font-normal text-muted">{GAP_HELP}</span>
+          </label>
+          <TextField
+            id={`${id}-box`}
+            label="Word box (optional)"
+            value={q.wordBox}
+            placeholder="river, road, park, station"
+            help="Words separated by commas: learners choose each answer from these instead of typing."
+            onChange={(wordBox) => onChange({ ...q, wordBox })}
+          />
+        </>
+      );
+    case "SHORT_ANSWER":
+      return (
+        <>
+          <TextField
+            id={`${id}-question`}
+            label="Question"
+            value={q.question}
+            onChange={(question) => onChange({ ...q, question })}
+          />
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="min-w-60 flex-1">
+              <TextField
+                id={`${id}-answers`}
+                label="Accepted answers"
+                value={q.answers}
+                placeholder="forty minutes | 40 minutes"
+                help="Separate accepted answers with |."
+                onChange={(answers) => onChange({ ...q, answers })}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`${id}-limit`}>
+              No more than
+              <select
+                id={`${id}-limit`}
+                className={`${field} w-auto`}
+                value={q.wordLimit}
+                onChange={(e) => onChange({ ...q, wordLimit: Number(e.target.value) })}
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n} word{n === 1 ? "" : "s"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </>
+      );
+    case "GAP_FILL":
+      return (
+        <TextField
+          id={`${id}-text`}
+          label="Sentence with gaps"
+          value={q.text}
+          placeholder="Her commute takes about [forty|40] minutes."
+          help={GAP_HELP}
+          onChange={(text) => onChange({ ...q, text })}
+        />
+      );
+  }
+}
 
 function QuestionEditor({
   q,
@@ -27,114 +452,13 @@ function QuestionEditor({
   return (
     <fieldset disabled={disabled} className="flex flex-col gap-3 rounded-xl border border-line p-4">
       <legend className="px-1 text-sm font-semibold text-muted">{TYPE_LABEL[q.type]}</legend>
-      {q.type === "SINGLE_CHOICE" ? (
-        <>
-          <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`${id}-stem`}>
-            Question
-            <input
-              id={`${id}-stem`}
-              className={field}
-              value={q.stem}
-              onChange={(e) => onChange({ ...q, stem: e.target.value })}
-            />
-          </label>
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Choices (select the right one)</p>
-            {q.options.map((option, o) => (
-              <div key={o} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name={`${id}-correct`}
-                  aria-label={`Choice ${o + 1} is correct`}
-                  checked={q.correct === o}
-                  onChange={() => onChange({ ...q, correct: o })}
-                />
-                <input
-                  aria-label={`Choice ${o + 1}`}
-                  className={field}
-                  value={option}
-                  onChange={(e) => onChange({ ...q, options: q.options.map((x, i) => (i === o ? e.target.value : x)) })}
-                />
-                {q.options.length > 2 ? (
-                  <button
-                    type="button"
-                    aria-label={`Remove choice ${o + 1}`}
-                    className="text-sm text-muted hover:text-bad"
-                    onClick={() =>
-                      onChange({
-                        ...q,
-                        options: q.options.filter((_, i) => i !== o),
-                        correct: q.correct > o ? q.correct - 1 : q.correct === o ? 0 : q.correct,
-                      })
-                    }
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-            ))}
-            {q.options.length < 8 ? (
-              <button
-                type="button"
-                className="self-start text-sm font-medium text-accent hover:underline"
-                onClick={() => onChange({ ...q, options: [...q.options, ""] })}
-              >
-                Add a choice
-              </button>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-      {q.type === "TRUE_FALSE_NOT_GIVEN" ? (
-        <>
-          <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`${id}-statement`}>
-            Statement
-            <input
-              id={`${id}-statement`}
-              className={field}
-              value={q.statement}
-              onChange={(e) => onChange({ ...q, statement: e.target.value })}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`${id}-answer`}>
-            Answer
-            <select
-              id={`${id}-answer`}
-              className={`${field} w-auto`}
-              value={q.answer}
-              onChange={(e) => onChange({ ...q, answer: e.target.value as Judgement })}
-            >
-              <option value="TRUE">True</option>
-              <option value="FALSE">False</option>
-              <option value="NOT_GIVEN">Not given</option>
-            </select>
-          </label>
-        </>
-      ) : null}
-      {q.type === "GAP_FILL" ? (
-        <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`${id}-text`}>
-          Sentence with gaps
-          <input
-            id={`${id}-text`}
-            className={field}
-            value={q.text}
-            placeholder="Her commute takes about [forty|40] minutes."
-            onChange={(e) => onChange({ ...q, text: e.target.value })}
-          />
-          <span className="font-normal text-muted">
-            Put each gap&apos;s answer in square brackets. Separate other accepted answers with |, like [forty|40].
-          </span>
-        </label>
-      ) : null}
-      <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`${id}-explanation`}>
-        Explanation (shown after checking)
-        <input
-          id={`${id}-explanation`}
-          className={field}
-          value={q.explanation}
-          onChange={(e) => onChange({ ...q, explanation: e.target.value })}
-        />
-      </label>
+      <QuestionFields q={q} id={id} onChange={onChange} />
+      <TextField
+        id={`${id}-explanation`}
+        label="Explanation (shown after checking)"
+        value={q.explanation}
+        onChange={(explanation) => onChange({ ...q, explanation })}
+      />
       <button type="button" onClick={onRemove} className="self-start text-sm text-muted hover:text-bad">
         Remove question
       </button>

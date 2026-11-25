@@ -35,6 +35,10 @@ export function sectionStates(p: {
   toCheck?: number;
   /** The worker is looking for vocabulary suggestions right now. */
   findingWords?: boolean;
+  /** Drafted questions still to approve or remove. */
+  questionsToCheck?: number;
+  /** The worker is drafting questions right now. */
+  findingQuestions?: boolean;
   /** New lessons: what will be made when the lesson is created ("Podcast · Lauren & Roger"). */
   voicePlan?: string | null;
 }): Record<SectionId, { summary: string; state: SectionState }> {
@@ -79,10 +83,11 @@ export function sectionStates(p: {
             : "todo",
     },
     questions: {
-      summary: p.sets.length
-        ? `${plural(p.sets.length, "set")} · ${plural(questions, "question")}`
-        : "No questions yet",
-      state: p.exercisesDirty ? "unsaved" : questions ? "done" : "todo",
+      summary: p.findingQuestions
+        ? "Writing IELTS-style questions…"
+        : (p.sets.length ? `${plural(p.sets.length, "set")} · ${plural(questions, "question")}` : "No questions yet") +
+          (p.questionsToCheck ? ` · ${p.questionsToCheck} suggested to check` : ""),
+      state: p.findingQuestions ? "busy" : p.exercisesDirty ? "unsaved" : questions ? "done" : "todo",
     },
   };
 }
