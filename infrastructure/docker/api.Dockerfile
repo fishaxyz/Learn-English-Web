@@ -18,6 +18,8 @@ COPY --from=build /out/package.json ./package.json
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/dist ./dist
 COPY --from=build /out/migrations ./migrations
+# Where the local media driver keeps files (a volume in Compose), writable by the unprivileged user.
+RUN mkdir -p /data/media && chown node:node /data/media
 USER node
 EXPOSE 4400
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \

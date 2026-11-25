@@ -77,7 +77,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The dashboard (running as the image's node user) writes development sign-in links here.
       - run: mkdir -p .dev-mailbox && chmod 777 .dev-mailbox
-      - run: cp .env.example .env && printf "REVALIDATION_SECRET=%s\nAUTH_SECRET=%s\n" "$(openssl rand -base64 32)" "$(openssl rand -base64 32)" >> .env
+      - run: cp .env.example .env && printf "REVALIDATION_SECRET=%s\nAUTH_SECRET=%s\nMEDIA_SIGNING_SECRET=%s\nWORKER_SERVICE_TOKEN=%s\n" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
       - name: Start every service and wait until all are healthy
         run: docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait --wait-timeout 300
       - name: Load the sample content

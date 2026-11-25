@@ -8,9 +8,11 @@ from pathlib import Path
 from types import FrameType
 from typing import Protocol
 
-from .config import Settings, SettingsError, load_settings
+from .config import Settings, SettingsError, load_settings, tts_provider_name
 from .graphql_client import GraphQLClient, GraphQLResponseError, GraphQLTransportError
+from .jobs import JobRunner
 from .logs import setup_logging
+from .tts.providers import ElevenLabs, SilentFake, SpeechProvider
 
 HEALTH_QUERY = "query WorkerHealth { health { status database } }"
 
@@ -20,10 +22,13 @@ class Executor(Protocol):
 
 
 class Worker:
-    def __init__(self, client: Executor, settings: Settings, log: logging.Logger) -> None:
+    def __init__(
+        self, client: Executor, settings: Settings, log: logging.Logger, jobs: JobRunner | None = None
+    ) -> None:
         self._client = client
         self._settings = settings
         self._log = log
+        self._jobs = jobs
         self._stop = threading.Event()
         self.api_healthy = False
         self._first = True
@@ -49,6 +54,15 @@ class Worker:
         self._log.info("worker started", extra={"poll_interval_seconds": self._settings.worker_poll_interval_seconds})
         while not self._stop.is_set():
             self.run_once()
+            # Work through waiting jobs one by one, then rest until the next poll.
+            while self._jobs and self.api_healthy and not self._stop.is_set():
+                try:
+                    if not self._jobs.run_next():
+                        break
+                except (GraphQLTransportError, GraphQLResponseError) as error:
+                    self._log.warning("could not claim a job", extra={"reason": str(error)})
+                    break
+                write_heartbeat(self._settings.worker_heartbeat_file)
             self._stop.wait(self._settings.worker_poll_interval_seconds)
         self._log.info("worker stopped")
 
@@ -75,7 +89,17 @@ def main() -> int:
         token=settings.worker_service_token,
         timeout=settings.worker_request_timeout_seconds,
     ) as client:
-        worker = Worker(client, settings, log)
+        jobs = None
+        if settings.worker_service_token:
+            provider: SpeechProvider
+            if tts_provider_name(settings) == "elevenlabs" and settings.elevenlabs_api_key:
+                provider = ElevenLabs(settings.elevenlabs_api_key, settings.elevenlabs_model_id)
+            else:
+                provider = SilentFake()
+            log.info("jobs enabled", extra={"tts_provider": provider.name})
+            origin = str(settings.media_upload_origin) if settings.media_upload_origin else None
+            jobs = JobRunner(client, provider, log, upload_origin=origin)
+        worker = Worker(client, settings, log, jobs)
 
         def on_signal(signum: int, _frame: FrameType | None) -> None:
             log.info("stopping", extra={"signal": signal.Signals(signum).name})

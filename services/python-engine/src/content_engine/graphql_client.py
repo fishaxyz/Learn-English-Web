@@ -31,7 +31,7 @@ class GraphQLClient:
     ) -> None:
         headers = {"content-type": "application/json", "user-agent": "content-engine"}
         if token is not None:
-            headers["authorization"] = f"Bearer {token.get_secret_value()}"
+            headers["x-worker-token"] = token.get_secret_value()
         self._http = httpx.Client(base_url=api_url.rstrip("/"), headers=headers, timeout=timeout, transport=transport)
 
     def execute(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:

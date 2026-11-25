@@ -11,8 +11,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore", frozen=True)
 
     graphql_api_url: HttpUrl
-    # The worker's own narrow credential (AGENTS.md §10). Optional until job mutations exist in Phase 4.
+    # The worker's own narrow credential (AGENTS.md §10): without it the worker only checks the API's health.
     worker_service_token: SecretStr | None = None
+    # Text to speech. Without a key the "fake" provider makes silent audio (tests, and running without credits).
+    elevenlabs_api_key: SecretStr | None = None
+    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    tts_provider: Literal["elevenlabs", "fake"] | None = None
+    # Where upload URLs' origin should point from inside Docker (the local storage driver lives in the API).
+    media_upload_origin: HttpUrl | None = None
     log_level: Literal["debug", "info", "warn", "error"] = "info"
     worker_poll_interval_seconds: float = Field(default=10.0, gt=0, le=3600)
     worker_request_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
@@ -31,3 +37,10 @@ def load_settings(**overrides: object) -> Settings:
     except ValidationError as error:
         problems = [f"{'.'.join(str(p) for p in e['loc']).upper() or '(root)'}: {e['msg']}" for e in error.errors()]
         raise SettingsError(problems) from None
+
+
+def tts_provider_name(settings: Settings) -> Literal["elevenlabs", "fake"]:
+    """The provider to use: as configured, otherwise ElevenLabs when a key is set, otherwise the silent fake."""
+    if settings.tts_provider:
+        return settings.tts_provider
+    return "elevenlabs" if settings.elevenlabs_api_key else "fake"

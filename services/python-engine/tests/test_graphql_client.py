@@ -16,7 +16,7 @@ def test_posts_the_query_with_the_token() -> None:
 
     def handle(request: httpx.Request) -> httpx.Response:
         seen["url"] = str(request.url)
-        seen["auth"] = request.headers.get("authorization")
+        seen["auth"] = request.headers.get("x-worker-token")
         seen["body"] = json.loads(request.content)
         return httpx.Response(200, json={"data": {"health": {"status": "OK"}}})
 
@@ -24,7 +24,7 @@ def test_posts_the_query_with_the_token() -> None:
         assert c.execute("{ health { status } }", {"a": 1}) == {"health": {"status": "OK"}}
     assert seen == {
         "url": "http://api.test/graphql",
-        "auth": "Bearer t0ken",
+        "auth": "t0ken",
         "body": {"query": "{ health { status } }", "variables": {"a": 1}},
     }
 
