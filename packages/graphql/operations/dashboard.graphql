@@ -74,6 +74,9 @@ query EditorialList($siteId: ID!) {
           slug
           name
         }
+        checklist {
+          ...ChecklistFields
+        }
       }
       published {
         id
@@ -82,6 +85,9 @@ query EditorialList($siteId: ID!) {
         topics {
           slug
           name
+        }
+        checklist {
+          ...ChecklistFields
         }
       }
     }
@@ -342,4 +348,12 @@ mutation RequestConversationVoiceover($input: ConversationVoiceoverInput!) {
   requestConversationVoiceover(input: $input) {
     ...AudioTrackFields
   }
+}
+
+fragment ChecklistFields on LessonChecklist {
+  script
+  voiceover
+  vocabulary
+  questions
+  missing
 }

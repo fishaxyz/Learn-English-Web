@@ -4,7 +4,8 @@ import Link from "next/link";
 import * as I from "../../components/icons";
 import { StatusPill } from "../../components/status";
 import { editorQuery } from "../../lib/api";
-import { inTab, readingRows, topicEmoji } from "../../lib/readings";
+import { PART_ICONS } from "../../components/part-tags";
+import { inTab, isReady, PARTS, readingRows, topicEmoji } from "../../lib/readings";
 import { can, getViewer, membershipFor } from "../../lib/viewer";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -28,6 +29,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     .slice(0, 6);
   const waiting = rows.filter((r) => inTab(r, "review"));
   const words = editorialSenses.length;
+  // Lessons still being worked on: drafts and lessons in review.
+  const open = rows.filter((r) => inTab(r, "drafts") || inTab(r, "review"));
+  const ready = open.filter(isReady).length;
 
   const cards = [
     { label: "Published readings", value: count("published"), href: "/lessons?tab=published", tone: "bg-pink" },
@@ -103,6 +107,39 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </section>
 
         <div className="flex flex-col gap-6">
+          <section
+            aria-labelledby="unfinished"
+            className="flex flex-col gap-3 rounded-3xl border border-line bg-surface p-5"
+          >
+            <h2 id="unfinished" className="text-xl font-semibold">
+              Left to finish
+            </h2>
+            <p className="text-sm text-muted">
+              {open.length
+                ? `${ready} of ${open.length} unpublished reading(s) ready to publish.`
+                : "Nothing is being worked on."}
+            </p>
+            <ul className="flex flex-col gap-1">
+              {PARTS.map((p) => {
+                const Icon = PART_ICONS[p.id];
+                const missing = open.filter((r) => !r.parts[p.id]).length;
+                return (
+                  <li key={p.id}>
+                    <Link
+                      href={`/lessons?tab=drafts&needs=${p.id}`}
+                      className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-paper"
+                    >
+                      <span className="grid size-9 place-items-center rounded-full bg-paper">
+                        <Icon />
+                      </span>
+                      <span className="flex-1">{p.filter}</span>
+                      <span className={`text-lg font-semibold ${missing ? "" : "text-muted"}`}>{missing}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
           <section aria-labelledby="waiting" className="flex flex-col gap-3 rounded-3xl bg-sky/45 p-5">
             <h2 id="waiting" className="text-xl font-semibold">
               Waiting for review

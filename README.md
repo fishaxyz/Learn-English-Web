@@ -96,7 +96,8 @@ GRAPHQL_API_URL=http://localhost:4400 uv run content-engine-worker
 ```sh
 pnpm check                # format, lint, type checks and tests (TypeScript)
 pnpm build                # production builds of the API, website and dashboard
-pnpm e2e                  # browser test against the running stack (needs the seed and an invited owner@example.test)
+pnpm e2e:stack            # the stack with free, silent test voices (TTS_PROVIDER=fake): run before pnpm e2e
+pnpm e2e                  # browser tests against the running stack (needs the seed and an invited owner@example.test)
 pnpm codegen              # regenerate GraphQL types after editing packages/graphql/schema
 pnpm --filter @english/database db:generate --name=<change>   # a migration after editing the Drizzle schema
 

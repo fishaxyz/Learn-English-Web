@@ -78,6 +78,7 @@ export function createApp(deps: ApiDependencies, options: AppOptions) {
         storage: deps.storage,
         voices: deps.voices,
         isWorker: isWorkerToken(request.headers.get("x-worker-token"), deps.workerToken),
+        requiredParts: deps.requiredParts ?? [],
       };
     },
   });

@@ -1,3 +1,4 @@
+import { checklistFrom, missingParts } from "../modules/resources/checklist";
 import { schema } from "@english/database";
 import { asc, eq } from "drizzle-orm";
 import { authorize } from "../auth/actor";
@@ -128,7 +129,7 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.submit");
       return editorialResource(
         ctx,
-        await editorial.moveDraft(ctx.db, userId, localizationId, lockVersion, "IN_REVIEW")
+        await editorial.moveDraft(ctx.db, userId, localizationId, lockVersion, "IN_REVIEW", null, ctx.requiredParts)
       );
     },
     returnToDraft: async (_, { localizationId, lockVersion, note }, ctx) => {
@@ -140,7 +141,10 @@ export const resourceResolvers: Resolvers = {
     },
     publishResource: async (_, { localizationId, lockVersion }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.publish");
-      return revalidate(ctx, await editorial.publishResource(ctx.db, userId, localizationId, lockVersion));
+      return revalidate(
+        ctx,
+        await editorial.publishResource(ctx.db, userId, localizationId, lockVersion, { required: ctx.requiredParts })
+      );
     },
     saveExerciseSets: async (_, { localizationId, lockVersion, sets }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
@@ -154,7 +158,10 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.publishNow");
       return revalidate(
         ctx,
-        await editorial.publishResource(ctx.db, userId, localizationId, lockVersion, { skipReview: true })
+        await editorial.publishResource(ctx.db, userId, localizationId, lockVersion, {
+          skipReview: true,
+          required: ctx.requiredParts,
+        })
       );
     },
     archiveResource: async (_, { resourceId }, ctx) => {
@@ -192,6 +199,28 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    checklist: async (r, _, ctx) => {
+      const [tracks, senses, sets] = await Promise.all([
+        ctx.loaders.audioTracksByRevision.load(r.id),
+        ctx.loaders.annotatedSensesByRevision.load(r.id),
+        ctx.loaders.exerciseSetsByRevision.load(r.id),
+      ]);
+      const questions = (await Promise.all(sets.map((set) => ctx.loaders.questionsBySet.load(set.id)))).flat();
+      const done = checklistFrom({
+        plainText: r.plainText,
+        richText: r.richText,
+        tracks,
+        linkedSenses: senses.length,
+        questions: questions.length,
+      });
+      return {
+        script: done.SCRIPT,
+        voiceover: done.VOICEOVER,
+        vocabulary: done.VOCABULARY,
+        questions: done.QUESTIONS,
+        missing: missingParts(done, ctx.requiredParts),
+      };
+    },
     speakerNames: (r) => speakerNames(r.speakerNames),
     topics: (r, _, ctx) => ctx.loaders.topicsByRevision.load(r.id),
     vocabulary: (r, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(r.id),

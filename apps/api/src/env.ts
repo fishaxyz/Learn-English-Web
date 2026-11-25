@@ -37,6 +37,8 @@ const schema = z.object({
     z.string().min(32, "must be at least 32 characters").optional()
   ),
   /** Lists voices for editors. Without it, test voices are offered and the worker makes silent audio. */
+  /** "fake" forces the silent test voices even when a key is set (end-to-end tests: no credits spent). */
+  TTS_PROVIDER: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["elevenlabs", "fake"]).optional()),
   ELEVENLABS_API_KEY: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(10).optional()),
   /** Browser origins allowed to call the API, comma-separated. Server-to-server calls don't need it. */
   CORS_ORIGINS: z

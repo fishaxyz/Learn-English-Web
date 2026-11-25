@@ -149,7 +149,31 @@ extend type Query {
 
 # --- Editorial
 
+"The four parts of a reading lesson."
+enum LessonPart {
+  SCRIPT
+  VOICEOVER
+  VOCABULARY
+  QUESTIONS
+}
+
+"Which parts of a lesson are finished. Review and publishing wait until none is missing."
+type LessonChecklist {
+  "The text isn't empty."
+  script: Boolean!
+  "An approved voice-over that still matches the text."
+  voiceover: Boolean!
+  "At least one word or phrase linked."
+  vocabulary: Boolean!
+  "At least one question."
+  questions: Boolean!
+  "Required parts that aren't finished yet."
+  missing: [LessonPart!]!
+}
+
 type Revision {
+  "Editorial: which parts are finished."
+  checklist: LessonChecklist!
   speakerNames: SpeakerNames
   id: ID!
   revisionNo: Int!

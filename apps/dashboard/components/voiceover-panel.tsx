@@ -26,7 +26,8 @@ export function VoiceoverPanel({
   textSaved,
   text,
   speakerNames,
-  initial,
+  tracks,
+  onTracks: setTracks,
   initialError,
 }: {
   resourceId: string;
@@ -39,11 +40,12 @@ export function VoiceoverPanel({
   text: VoiceText;
   /** The draft's host names, to start the podcast settings with. */
   speakerNames?: { host1?: string | null; host2?: string | null } | null;
-  initial: AudioTrackFieldsFragment[];
+  /** The draft's voice-overs; kept by the page, which sums them up in the section header. */
+  tracks: AudioTrackFieldsFragment[];
+  onTracks: (tracks: AudioTrackFieldsFragment[]) => void;
   /** A problem starting voice-overs when the lesson was created. */
   initialError?: string | null;
 }) {
-  const [tracks, setTracks] = useState(initial);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [choice, setChoice] = useState(() => initialChoice(speakerNames));
   const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(
@@ -54,7 +56,7 @@ export function VoiceoverPanel({
   const refresh = useCallback(async () => {
     const r = await actions.draftTracks(resourceId);
     if (r.ok) setTracks(r.tracks);
-  }, [resourceId]);
+  }, [resourceId, setTracks]);
 
   // While any voice-over is being made, check every few seconds.
   const generating = tracks.some((t) => t.status === "GENERATING");
@@ -96,11 +98,7 @@ export function VoiceoverPanel({
   }
 
   return (
-    <section aria-labelledby="voice-heading" className="flex flex-col gap-4">
-      <h2 id="voice-heading" className="font-display text-2xl font-semibold">
-        Voice-over
-      </h2>
-
+    <div className="flex flex-col gap-4">
       {tracks.length ? (
         <ul className="flex flex-col gap-3">
           {tracks.map((t) => (
@@ -181,6 +179,6 @@ export function VoiceoverPanel({
       <p aria-live="polite" className={`text-sm ${message?.tone === "bad" ? "text-bad" : "text-good"}`}>
         {message?.text}
       </p>
-    </section>
+    </div>
   );
 }

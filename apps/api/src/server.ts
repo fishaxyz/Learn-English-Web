@@ -1,3 +1,4 @@
+import { LESSON_PARTS } from "./modules/resources/checklist";
 import { createServer } from "node:http";
 import { createDatabase } from "@english/database";
 import { createApp } from "./app";
@@ -27,7 +28,10 @@ const { handler } = createApp(
     trustProxy: env.TRUST_PROXY,
     storage: media.storage,
     mediaHandler: media.handle,
-    voices: env.ELEVENLABS_API_KEY ? elevenLabsCatalog(env.ELEVENLABS_API_KEY) : fakeCatalog,
+    // Every part of a reading lesson must be finished before it's reviewed or published.
+    requiredParts: LESSON_PARTS,
+    voices:
+      env.ELEVENLABS_API_KEY && env.TTS_PROVIDER !== "fake" ? elevenLabsCatalog(env.ELEVENLABS_API_KEY) : fakeCatalog,
     workerToken: env.WORKER_SERVICE_TOKEN,
   },
   {

@@ -13,7 +13,19 @@ export type ReadingRow = {
   topics: { slug: string; name: string }[];
   updatedAt: string;
   live: boolean;
+  /** Which of the four parts are finished (for the current draft, or the live lesson). */
+  parts: Record<Part, boolean>;
 };
+
+/** The four parts of a reading lesson; review and publishing wait until all are finished. */
+export const PARTS = [
+  { id: "script", label: "Script", missing: "No script", filter: "Needs a script" },
+  { id: "voiceover", label: "Voice-over", missing: "No voice-over", filter: "Needs a voice-over" },
+  { id: "vocabulary", label: "Vocabulary", missing: "No vocabulary", filter: "Needs vocabulary" },
+  { id: "questions", label: "Questions", missing: "No questions", filter: "Needs questions" },
+] as const;
+export type Part = (typeof PARTS)[number]["id"];
+export const isReady = (row: ReadingRow) => PARTS.every((p) => row.parts[p.id]);
 
 export type LibraryTab = "all" | "published" | "drafts" | "review" | "archived";
 
@@ -51,6 +63,12 @@ export function readingRows(resources: Resource[]): ReadingRow[] {
         topics: current?.topics ?? [],
         updatedAt: current?.updatedAt ?? r.createdAt,
         live: !!l?.published && !r.archivedAt,
+        parts: {
+          script: current?.checklist.script ?? false,
+          voiceover: current?.checklist.voiceover ?? false,
+          vocabulary: current?.checklist.vocabulary ?? false,
+          questions: current?.checklist.questions ?? false,
+        },
       };
     });
 }

@@ -241,6 +241,24 @@ export type JudgementAnswer = {
   judgement: Judgement;
 };
 
+/** Which parts of a lesson are finished. Review and publishing wait until none is missing. */
+export type LessonChecklist = {
+  __typename?: "LessonChecklist";
+  /** Required parts that aren't finished yet. */
+  missing: Array<LessonPart>;
+  /** At least one question. */
+  questions: Scalars["Boolean"]["output"];
+  /** The text isn't empty. */
+  script: Scalars["Boolean"]["output"];
+  /** At least one word or phrase linked. */
+  vocabulary: Scalars["Boolean"]["output"];
+  /** An approved voice-over that still matches the text. */
+  voiceover: Scalars["Boolean"]["output"];
+};
+
+/** The four parts of a reading lesson. */
+export type LessonPart = "QUESTIONS" | "SCRIPT" | "VOCABULARY" | "VOICEOVER";
+
 export type LexicalCollectionResource = Resource & {
   __typename?: "LexicalCollectionResource";
   body: Scalars["RichText"]["output"];
@@ -698,6 +716,8 @@ export type Revision = {
   audioTracks: Array<AudioTrack>;
   body: Scalars["RichText"]["output"];
   cefrLevel?: Maybe<CefrLevel>;
+  /** Editorial: which parts are finished. */
+  checklist: LessonChecklist;
   createdAt: Scalars["DateTime"]["output"];
   /** The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only. */
   exercises: Scalars["ExercisePayload"]["output"];
@@ -1017,6 +1037,8 @@ export type ResolversTypes = {
   JobPayload: ResolverTypeWrapper<Scalars["JobPayload"]["output"]>;
   Judgement: Judgement;
   JudgementAnswer: ResolverTypeWrapper<JudgementAnswer>;
+  LessonChecklist: ResolverTypeWrapper<LessonChecklist>;
+  LessonPart: LessonPart;
   LexicalCollectionResource: ResolverTypeWrapper<PublishedResourceModel>;
   LexicalEntry: ResolverTypeWrapper<LexicalEntryModel>;
   LexicalEntryKind: LexicalEntryKind;
@@ -1107,6 +1129,7 @@ export type ResolversParentTypes = {
   Int: Scalars["Int"]["output"];
   JobPayload: Scalars["JobPayload"]["output"];
   JudgementAnswer: JudgementAnswer;
+  LessonChecklist: LessonChecklist;
   LexicalCollectionResource: PublishedResourceModel;
   LexicalEntry: LexicalEntryModel;
   LexicalExample: LexicalExample;
@@ -1345,6 +1368,17 @@ export type JudgementAnswerResolvers<
 > = {
   judgement?: Resolver<ResolversTypes["Judgement"], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type LessonChecklistResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["LessonChecklist"] = ResolversParentTypes["LessonChecklist"],
+> = {
+  missing?: Resolver<Array<ResolversTypes["LessonPart"]>, ParentType, ContextType>;
+  questions?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  script?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  vocabulary?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  voiceover?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
 };
 
 export type LexicalCollectionResourceResolvers<
@@ -1746,6 +1780,7 @@ export type RevisionResolvers<
   audioTracks?: Resolver<Array<ResolversTypes["AudioTrack"]>, ParentType, ContextType>;
   body?: Resolver<ResolversTypes["RichText"], ParentType, ContextType>;
   cefrLevel?: Resolver<Maybe<ResolversTypes["CefrLevel"]>, ParentType, ContextType>;
+  checklist?: Resolver<ResolversTypes["LessonChecklist"], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes["DateTime"], ParentType, ContextType>;
   exercises?: Resolver<ResolversTypes["ExercisePayload"], ParentType, ContextType>;
   id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
@@ -1947,6 +1982,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Health?: HealthResolvers<ContextType>;
   JobPayload?: GraphQLScalarType;
   JudgementAnswer?: JudgementAnswerResolvers<ContextType>;
+  LessonChecklist?: LessonChecklistResolvers<ContextType>;
   LexicalCollectionResource?: LexicalCollectionResourceResolvers<ContextType>;
   LexicalEntry?: LexicalEntryResolvers<ContextType>;
   LexicalExample?: LexicalExampleResolvers<ContextType>;

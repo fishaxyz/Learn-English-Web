@@ -40,3 +40,63 @@ export function inviteFreshEditor(role = "EDITOR"): string {
   });
   return email;
 }
+
+/** Selects `word` in the lesson text the way a mouse would, and links it to its first meaning in the word bank. */
+export async function linkWord(page: Page, word: string) {
+  const text = page.getByLabel("Lesson text");
+  await text.click(); // the editor follows the selection only while it has focus
+  await text.evaluate((el, w) => {
+    for (const p of el.querySelectorAll("p")) {
+      const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const start = (node.textContent ?? "").indexOf(w);
+        if (start < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + w.length);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        return;
+      }
+    }
+    throw new Error(`"${w}" isn't in the text`);
+  }, word);
+  await page.getByRole("button", { name: "Link word to its meaning" }).click();
+  await page
+    .getByRole("region", { name: "Link a word to its meaning" })
+    .getByRole("button", { name: new RegExp(word) })
+    .first()
+    .click();
+  await expect(page.locator("#vocabulary").getByText(word, { exact: true })).toBeVisible();
+}
+
+/** Adds one True/False/Not given question and saves the exercises. */
+export async function addQuestion(page: Page, statement: string, answer: "TRUE" | "FALSE" | "NOT_GIVEN") {
+  await page.getByRole("button", { name: "Add an exercise set" }).click();
+  await page.getByRole("button", { name: "True / False / Not given" }).click();
+  await page.getByLabel("Statement").fill(statement);
+  await page.getByLabel("Answer").selectOption(answer);
+  await page.getByRole("button", { name: "Save exercises" }).click();
+  await expect(page.getByRole("button", { name: "Exercises saved" })).toBeVisible();
+}
+
+/**
+ * Makes a voice-over with the first test voice and approves it. The end-to-end stack runs with TTS_PROVIDER=fake,
+ * so the voice is silent and nothing is spent.
+ */
+export async function makeTestVoiceover(page: Page) {
+  const voice = page.locator("#voice");
+  await voice.locator('input[type="checkbox"][id^="voice-"]').first().check();
+  page.once("dialog", (d) => void d.accept());
+  await voice.getByRole("button", { name: "Make voice-over" }).click();
+  await approveWhenReady(page);
+}
+
+/** Waits for the worker to finish the voice-over (it polls every few seconds), then approves it. */
+export async function approveWhenReady(page: Page) {
+  const voice = page.locator("#voice");
+  await expect(voice.getByText("Ready to check")).toBeVisible({ timeout: 60_000 });
+  await voice.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(voice.getByText("Approved", { exact: true })).toBeVisible();
+}

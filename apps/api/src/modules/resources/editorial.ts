@@ -6,6 +6,7 @@ import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
 import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio/service";
+import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
 import {
@@ -273,7 +274,8 @@ export async function moveDraft(
   localizationId: string,
   lockVersion: number,
   to: "IN_REVIEW" | "DRAFT",
-  note?: string | null
+  note?: string | null,
+  required: readonly LessonPart[] = []
 ) {
   if (note && note.length > 2000) throw invalid("The note must be at most 2000 characters");
   return db.transaction(async (tx) => {
@@ -281,6 +283,7 @@ export async function moveDraft(
     const draft = await draftOf(tx, l.draftRevisionId, lockVersion);
     const from = to === "IN_REVIEW" ? "DRAFT" : "IN_REVIEW";
     if (draft.status !== from) throw conflict(to === "IN_REVIEW" ? "It's already in review" : "It isn't in review");
+    if (to === "IN_REVIEW") await assertComplete(tx, l.resourceId, draft, required);
     await tx
       .update(rev)
       .set({ status: to, submittedAt: to === "IN_REVIEW" ? new Date() : null, lockVersion: draft.lockVersion + 1 })
@@ -307,7 +310,7 @@ export async function publishResource(
   actorUserId: string | null,
   localizationId: string,
   lockVersion: number,
-  options: { skipReview?: boolean } = {}
+  options: { skipReview?: boolean; required?: readonly LessonPart[] } = {}
 ) {
   return translateDbErrors(() =>
     db.transaction(async (tx) => {
@@ -325,6 +328,7 @@ export async function publishResource(
           union select sense_revision_id from lexical_annotations where revision_id = ${draft.id})
         limit 1`);
       if (unpublished.length) throw conflict("Publish the linked word senses first");
+      await assertComplete(tx, l.resourceId, draft, options.required ?? []);
       await prepareTracksForPublish(tx, draft.id, draft.richText as RichTextDocument);
 
       if (l.publishedRevisionId) {

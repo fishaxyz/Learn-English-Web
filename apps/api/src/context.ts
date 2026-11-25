@@ -7,6 +7,7 @@ import type { SiteModel } from "./models";
 import type { RateLimiter, RateLimitName } from "./modules/rate-limit";
 import type { MediaStorage } from "./modules/media/storage";
 import type { Revalidator } from "./modules/revalidate";
+import type { LessonPart } from "./modules/resources/checklist";
 import type { VoiceCatalog } from "./modules/tts/voices";
 
 /** What the API's resolvers get for each request. Request-scoped: nothing here is shared between users. */
@@ -29,6 +30,8 @@ export type GraphQLContext = {
   voices: VoiceCatalog;
   /** True when the request carries the Python worker's service token (never an editor session). */
   isWorker: boolean;
+  /** Parts a reading lesson must have finished before review or publishing. */
+  requiredParts: readonly LessonPart[];
 };
 
 /** Long-lived things the server is built from. */
@@ -46,6 +49,8 @@ export type ApiDependencies = {
   voices: VoiceCatalog;
   /** The worker's shared secret; worker operations are refused when it isn't set. */
   workerToken: string | undefined;
+  /** Parts a reading lesson must have finished before review or publishing (the server requires all four). */
+  requiredParts?: readonly LessonPart[];
   /** Serves /media/... for the local storage driver; returns false for other paths. */
   mediaHandler?: (req: IncomingMessage, res: ServerResponse) => boolean;
 };

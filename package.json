@@ -25,6 +25,7 @@
     "docker:invite": "docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm api node dist/invite.js",
     "invite": "pnpm --filter @english/api invite",
     "e2e": "playwright test",
+    "e2e:stack": "TTS_PROVIDER=fake pnpm docker:up",
     "docker:prune-cache": "docker builder prune -f --max-used-space 8gb >/dev/null",
     "docker:trim": "colima ssh -- sudo fstrim -av"
   },

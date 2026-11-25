@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { inTab, levelTone, TABS, TINTS, topicEmoji, type LibraryTab, type ReadingRow } from "../lib/readings";
+import {
+  inTab,
+  isReady,
+  levelTone,
+  PARTS,
+  TABS,
+  TINTS,
+  topicEmoji,
+  type LibraryTab,
+  type Part,
+  type ReadingRow,
+} from "../lib/readings";
+import { PartTags } from "./part-tags";
 import * as I from "./icons";
 import { StatusPill } from "./status";
 
@@ -26,23 +38,37 @@ const when = (iso: string) =>
     hourCycle: "h23",
   });
 
+/** Under the button, or above it near the bottom of the window. */
+const placeBelowOrAbove = (r: DOMRect) => {
+  const right = window.innerWidth - r.right;
+  return r.bottom + 180 > window.innerHeight
+    ? { bottom: window.innerHeight - r.top + 4, right }
+    : { top: r.bottom + 4, right };
+};
+
 /** The "…" menu on each reading: edit, preview, and the live page when there is one. */
 function RowMenu({ row, websiteUrl }: { row: ReadingRow; websiteUrl: string }) {
   // Placed against the window, so the table's sideways scrolling can't clip it; above the button near the bottom.
   const [open, setOpen] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const isOpen = open !== null;
+  // Follows its button when the page or the table scrolls.
   useEffect(() => {
-    if (!open) return;
-    const shut = () => setOpen(null);
-    window.addEventListener("scroll", shut, { passive: true, capture: true });
-    window.addEventListener("resize", shut);
-    return () => {
-      window.removeEventListener("scroll", shut, { capture: true });
-      window.removeEventListener("resize", shut);
+    if (!isOpen) return;
+    const place = () => {
+      const r = button.current?.getBoundingClientRect();
+      if (r) setOpen(placeBelowOrAbove(r));
     };
-  }, [open]);
+    window.addEventListener("scroll", place, { passive: true, capture: true });
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, { capture: true });
+      window.removeEventListener("resize", place);
+    };
+  }, [isOpen]);
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
     const close = (e: Event) => {
       if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setOpen(null);
     };
@@ -52,7 +78,7 @@ function RowMenu({ row, websiteUrl }: { row: ReadingRow; websiteUrl: string }) {
       document.removeEventListener("pointerdown", close);
       document.removeEventListener("keydown", close);
     };
-  }, [open]);
+  }, [isOpen]);
   const item = "block rounded-xl px-3 py-2 text-sm hover:bg-paper";
   return (
     <div ref={box} className="relative inline-block">
@@ -60,16 +86,8 @@ function RowMenu({ row, websiteUrl }: { row: ReadingRow; websiteUrl: string }) {
         type="button"
         aria-label={`Actions for “${row.title}”`}
         aria-expanded={!!open}
-        onClick={(e) => {
-          if (open) return setOpen(null);
-          const r = e.currentTarget.getBoundingClientRect();
-          const right = window.innerWidth - r.right;
-          setOpen(
-            r.bottom + 180 > window.innerHeight
-              ? { bottom: window.innerHeight - r.top + 4, right }
-              : { top: r.bottom + 4, right }
-          );
-        }}
+        ref={button}
+        onClick={(e) => setOpen(open ? null : placeBelowOrAbove(e.currentTarget.getBoundingClientRect()))}
         className="grid size-9 place-items-center rounded-xl border border-line bg-surface hover:border-ink"
       >
         <I.MoreIcon />
@@ -145,6 +163,7 @@ export function ReadingLibrary({
   const level = params.get("level") ?? "";
   const sort = (SORTS.some((s) => s.id === params.get("sort")) ? params.get("sort") : "updated-desc") as Sort;
   const view = (params.get("view") === "grid" ? "grid" : "list") as View;
+  const needs = params.get("needs") ?? "";
   const [search, setSearch] = useState(q);
   const topicsRow = useRef<HTMLUListElement>(null);
 
@@ -192,6 +211,7 @@ export function ReadingLibrary({
         inTab(r, tab) &&
         (!topic || r.topics.some((t) => t.slug === topic)) &&
         (!level || r.level === level) &&
+        (!needs || (needs === "ready" ? isReady(r) : !r.parts[needs as Part])) &&
         (!needle ||
           r.title.toLowerCase().includes(needle) ||
           r.slug.includes(needle) ||
@@ -204,7 +224,7 @@ export function ReadingLibrary({
           ? a.updatedAt.localeCompare(b.updatedAt)
           : b.updatedAt.localeCompare(a.updatedAt)
     );
-  }, [rows, tab, topic, level, q, sort]);
+  }, [rows, tab, topic, level, needs, q, sort]);
 
   const stats = [
     {
@@ -235,7 +255,7 @@ export function ReadingLibrary({
   ] as const;
   const select =
     "rounded-xl border border-line bg-surface py-2 pl-3 pr-8 text-sm focus-visible:outline-2 focus-visible:outline-accent";
-  const filtered = !!(q || topic || level);
+  const filtered = !!(q || topic || level || needs);
   const cards = (
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {shown.map((r) => (
@@ -253,6 +273,7 @@ export function ReadingLibrary({
             <Level level={r.level} />
             <StatusPill status={r.status} />
           </div>
+          <PartTags parts={r.parts} />
           <div className="mt-auto flex items-center justify-between gap-2 text-sm text-muted">
             <Topic topics={r.topics} />
             <time dateTime={r.updatedAt} suppressHydrationWarning>
@@ -401,6 +422,18 @@ export function ReadingLibrary({
             </option>
           ))}
         </select>
+        <label className="sr-only" htmlFor="filter-needs">
+          Progress
+        </label>
+        <select id="filter-needs" value={needs} onChange={(e) => set({ needs: e.target.value })} className={select}>
+          <option value="">Progress: All</option>
+          <option value="ready">Ready to publish</option>
+          {PARTS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.filter}
+            </option>
+          ))}
+        </select>
         <label className="sr-only" htmlFor="sort">
           Sort
         </label>
@@ -443,7 +476,7 @@ export function ReadingLibrary({
               type="button"
               onClick={() => {
                 setSearch("");
-                set({ q: "", topic: "", level: "" });
+                set({ q: "", topic: "", level: "", needs: "" });
               }}
               className="rounded-full border border-line px-4 py-1.5 text-sm text-ink hover:border-ink"
             >
@@ -458,13 +491,14 @@ export function ReadingLibrary({
           {/* On phones the table becomes cards. */}
           <div className="sm:hidden">{cards}</div>
           <div className="hidden overflow-x-auto rounded-3xl border border-line bg-surface sm:block">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="bg-panel/60 text-xs text-muted">
                 <tr>
                   <th className="px-5 py-3 font-medium">Title</th>
                   <th className="px-4 py-3 font-medium">Topic</th>
                   <th className="px-4 py-3 font-medium">Level</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Parts</th>
                   <th className="px-4 py-3 font-medium">Updated</th>
                   <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
@@ -496,6 +530,9 @@ export function ReadingLibrary({
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill status={r.status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <PartTags parts={r.parts} />
                     </td>
                     <td className="px-4 py-3 text-muted">
                       <time dateTime={r.updatedAt} suppressHydrationWarning>

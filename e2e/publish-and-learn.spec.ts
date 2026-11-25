@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 
 // Phase 2's acceptance test (AGENTS.md §13): an editor signs in, writes a reading lesson with a vocabulary
 // link and an exercise, it's reviewed and published, and a learner reads it, opens the word and is graded.
-import { EDITOR, signIn, WEBSITE } from "./helpers";
+import { addQuestion, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE } from "./helpers";
 
 test("an editor publishes a reading lesson and a learner uses it", async ({ page }) => {
+  test.setTimeout(120_000);
   page.on("console", (m) => {
     if (m.type() === "error") console.log("browser error:", m.text());
   });
@@ -23,38 +24,20 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   // Text, with "commute" linked to its meaning.
-  const text = page.getByLabel("Lesson text");
-  await text.click();
+  await page.getByLabel("Lesson text").click();
   await page.keyboard.type("Her commute is long.");
-  // Select "commute" the way a mouse would: a DOM selection, which the editor follows.
-  await text.evaluate((el) => {
-    const node = el.querySelector("p")?.firstChild;
-    if (!node) throw new Error("no text");
-    const start = (node.textContent ?? "").indexOf("commute");
-    const range = document.createRange();
-    range.setStart(node, start);
-    range.setEnd(node, start + "commute".length);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  });
-  await page.getByRole("button", { name: "Link word to its meaning" }).click();
-  await page
-    .getByRole("region", { name: "Link a word to its meaning" })
-    .getByRole("button", { name: /commute/ })
-    .click();
-  await expect(page.getByRole("complementary").getByText("commute", { exact: true })).toBeVisible();
+  await linkWord(page, "commute");
   await page.getByRole("checkbox", { name: "Travel" }).check();
   await page.getByRole("button", { name: "Save text" }).click();
   await expect(page.getByRole("button", { name: "Text saved" })).toBeVisible();
 
-  // One exercise.
-  await page.getByRole("button", { name: "Add an exercise set" }).click();
-  await page.getByRole("button", { name: "True / False / Not given" }).click();
-  await page.getByLabel("Statement").fill("Her commute is short.");
-  await page.getByLabel("Answer").selectOption("FALSE");
-  await page.getByRole("button", { name: "Save exercises" }).click();
-  await expect(page.getByRole("button", { name: "Exercises saved" })).toBeVisible();
+  // Review waits until every part is finished.
+  await expect(page.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  await expect(page.getByText("Finish before it can go out:")).toBeVisible();
+
+  // A voice-over (the free test voice), then one exercise.
+  await makeTestVoiceover(page);
+  await addQuestion(page, "Her commute is short.", "FALSE");
 
   // Still private while it's a draft.
   expect((await page.request.get(`${WEBSITE}/reading/${slug}`)).status()).toBe(404);
