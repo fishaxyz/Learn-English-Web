@@ -73,6 +73,30 @@
   border-color: var(--color-line);
 }
 
+/* Everything clickable shows the hand cursor (Tailwind v4 no longer sets it on buttons); disabled controls show
+   they can't be used. In the base layer, so a component's own cursor class still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  select:not(:disabled),
+  summary,
+  label:has(> input[type="checkbox"]:not(:disabled)),
+  label:has(> input[type="radio"]:not(:disabled)) {
+    cursor: pointer;
+  }
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 /* Conversation turns: the speaker's name in front of what they say. */
 .rich-text .speaker-name {
   display: inline-block;
