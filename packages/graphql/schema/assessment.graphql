@@ -9,12 +9,32 @@ enum QuestionType {
   SINGLE_CHOICE
   TRUE_FALSE_NOT_GIVEN
   GAP_FILL
+  MULTIPLE_CHOICE
+  YES_NO_NOT_GIVEN
+  MATCHING
+  COMPLETION
+  SHORT_ANSWER
 }
 
 enum Judgement {
   TRUE
   FALSE
   NOT_GIVEN
+  YES
+  NO
+}
+
+enum MatchingVariant {
+  HEADINGS
+  INFORMATION
+  FEATURES
+  SENTENCE_ENDINGS
+}
+
+enum CompletionVariant {
+  SENTENCE
+  SUMMARY
+  NOTE
 }
 
 "A question as the learner sees it. Answers are never part of it: they come back from gradePractice."
@@ -65,6 +85,67 @@ type GapFillQuestion implements Question {
   segments: [GapFillSegment!]!
 }
 
+"Choose TWO (or more) letters: one mark per correct letter."
+type MultipleChoiceQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  stem: String!
+  choose: Int!
+  options: [QuestionOption!]!
+}
+
+"Do the statements agree with the views of the writer?"
+type YesNoNotGivenQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  statement: String!
+}
+
+type MatchingItem {
+  itemId: String!
+  text: String!
+}
+
+"Match each item (paragraph, statement, sentence beginning) to one option. One mark per item."
+type MatchingQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  variant: MatchingVariant!
+  items: [MatchingItem!]!
+  options: [QuestionOption!]!
+  "An option may be the answer for more than one item."
+  reuse: Boolean!
+}
+
+"Complete the sentences, summary or notes: one mark per gap, answers within the word limit."
+type CompletionQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  variant: CompletionVariant!
+  segments: [GapFillSegment!]!
+  "NO MORE THAN this many WORDS."
+  wordLimit: Int!
+  "When set, answers are chosen from these words."
+  wordBox: [String!]
+}
+
+type ShortAnswerQuestion implements Question {
+  id: ID!
+  type: QuestionType!
+  position: Int!
+  points: Int!
+  question: String!
+  wordLimit: Int!
+}
+
 type ExerciseSet {
   id: ID!
   title: String!
@@ -77,12 +158,23 @@ input GapAnswerInput {
   text: String!
 }
 
-"One answer: optionId for single choice, judgement for true/false/not given, gaps for gap fill."
+input MatchAnswerInput {
+  itemId: String!
+  optionId: ID!
+}
+
+"""
+One answer: optionId (single choice), optionIds (multiple choice), judgement (TFNG, YNNG), matches (matching),
+gaps (gap fill, completion) or text (short answer).
+"""
 input PracticeAnswerInput {
   questionId: ID!
   optionId: ID
+  optionIds: [ID!]
   judgement: Judgement
+  matches: [MatchAnswerInput!]
   gaps: [GapAnswerInput!]
+  text: String
 }
 
 input GradePracticeInput {
@@ -109,7 +201,25 @@ type GapsAnswer {
   gaps: [GapAnswer!]!
 }
 
-union CorrectAnswer = ChoiceAnswer | JudgementAnswer | GapsAnswer
+type ChoicesAnswer {
+  optionIds: [ID!]!
+}
+
+type MatchAnswer {
+  itemId: String!
+  optionId: ID!
+}
+
+type MatchesAnswer {
+  matches: [MatchAnswer!]!
+}
+
+type TextAnswer {
+  "The first accepted answer."
+  text: String!
+}
+
+union CorrectAnswer = ChoiceAnswer | ChoicesAnswer | JudgementAnswer | MatchesAnswer | GapsAnswer | TextAnswer
 
 type QuestionResult {
   questionId: ID!
@@ -135,4 +245,43 @@ extend type Query {
 extend type Mutation {
   "Grades answers on the server. Nothing is stored: practice is anonymous in the MVP."
   gradePractice(input: GradePracticeInput!): PracticeResult!
+}
+
+# --- Suggested questions (editorial: drafted by the local language model from a draft's script)
+
+enum QuestionSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+"A drafted question, answer key included, for an editor to check. Approving adds it to the draft's exercises."
+type QuestionSuggestion {
+  id: ID!
+  status: QuestionSuggestionStatus!
+  type: QuestionType!
+  "The question as editors write it (prompt, options, grading, explanation): the same shape as ExercisePayload."
+  question: ExercisePayload!
+}
+
+type QuestionSuggestions {
+  "Same states as vocabulary suggestions."
+  state: VocabularySuggestionsState!
+  "False when the language model wasn't reachable (no questions can be drafted without it)."
+  usedLanguageModel: Boolean
+  items: [QuestionSuggestion!]!
+}
+
+extend type Revision {
+  "Editorial: questions drafted for this draft's current script."
+  questionSuggestions: QuestionSuggestions!
+}
+
+extend type Mutation {
+  "Editors: add the chosen drafted questions to the draft's exercises (one set per question type)."
+  approveQuestionSuggestions(localizationId: ID!, lockVersion: Int!, ids: [ID!]!): EditorialResource!
+  "Editors: take drafted questions off the list."
+  rejectQuestionSuggestions(localizationId: ID!, ids: [ID!]!): Boolean!
+  "Editors: draft questions again for the current script."
+  suggestQuestions(localizationId: ID!): Boolean!
 }

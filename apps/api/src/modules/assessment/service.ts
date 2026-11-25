@@ -3,8 +3,16 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { invalid, notFound } from "../../errors";
 import { one } from "../../rows";
 import type { ExerciseSetModel } from "../../models";
-import { grade, GRADING_VERSION, type Correct } from "./grading";
-import { checkConsistency, exerciseSetInput, grading, QUESTION_SCHEMA_VERSION, type ExerciseSetInput } from "./schemas";
+import { grade, GRADING_VERSION, type Correct, type Judgement } from "./grading";
+import {
+  checkConsistency,
+  exerciseSetInput,
+  grading,
+  hasOptions,
+  marksOf,
+  QUESTION_SCHEMA_VERSION,
+  type ExerciseSetInput,
+} from "./schemas";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Db = Database | Tx;
@@ -39,13 +47,14 @@ export async function addExerciseSets(tx: Tx, siteId: string, revisionId: string
             exerciseSetId: row.id,
             type: q.type,
             position: qPos,
-            points: q.points,
+            // Multi-mark types are worth one mark per letter, item or gap.
+            points: marksOf(q),
             promptJson: q.prompt,
             schemaVersion: QUESTION_SCHEMA_VERSION,
           })
           .returning({ id: schema.questions.id })
       );
-      if (q.type === "SINGLE_CHOICE") {
+      if ("options" in q) {
         await tx
           .insert(schema.questionOptions)
           .values(q.options.map((content, i) => ({ questionId: question.id, content, position: i })));
@@ -92,7 +101,7 @@ export async function exerciseSetsForEditing(db: Db, revisionId: string): Promis
         type: question.type,
         points: question.points,
         prompt: question.promptJson,
-        ...(question.type === "SINGLE_CHOICE" ? { options: options.map((o) => o.content) } : {}),
+        ...(hasOptions(question.type) ? { options: options.map((o) => o.content) } : {}),
         grading: key.gradingJson,
         ...(key.explanation ? { explanation: key.explanation } : {}),
       } as ExerciseSetInput["questions"][number]);
@@ -162,14 +171,20 @@ export async function publishedExerciseSet(db: Db, siteId: string, id: string): 
 export type PracticeAnswer = {
   questionId: string;
   optionId?: string | null;
-  judgement?: "TRUE" | "FALSE" | "NOT_GIVEN" | null;
+  optionIds?: string[] | null;
+  judgement?: Judgement | null;
+  matches?: { itemId: string; optionId: string }[] | null;
   gaps?: { gapId: string; text: string }[] | null;
+  text?: string | null;
 };
 
 export type CorrectAnswerResult =
   | { __typename: "ChoiceAnswer"; optionId: string }
-  | { __typename: "JudgementAnswer"; judgement: "TRUE" | "FALSE" | "NOT_GIVEN" }
-  | { __typename: "GapsAnswer"; gaps: { gapId: string; text: string }[] };
+  | { __typename: "ChoicesAnswer"; optionIds: string[] }
+  | { __typename: "JudgementAnswer"; judgement: Judgement }
+  | { __typename: "MatchesAnswer"; matches: { itemId: string; optionId: string }[] }
+  | { __typename: "GapsAnswer"; gaps: { gapId: string; text: string }[] }
+  | { __typename: "TextAnswer"; text: string };
 
 const LIMITS = { answers: 100, gaps: 50, text: 200 };
 
@@ -203,23 +218,36 @@ export async function gradePractice(db: Db, siteId: string, exerciseSetId: strin
     if (!ids.includes(a.questionId)) throw invalid("An answer is for a question outside this exercise set");
     if (byQuestion.has(a.questionId)) throw invalid("A question is answered twice");
     if ((a.gaps?.length ?? 0) > LIMITS.gaps) throw invalid("Too many gap answers");
-    if (a.gaps?.some((g) => g.text.length > LIMITS.text))
-      throw invalid(`Gap answers are at most ${LIMITS.text} characters`);
+    if (a.gaps?.some((g) => g.text.length > LIMITS.text) || (a.text?.length ?? 0) > LIMITS.text)
+      throw invalid(`Typed answers are at most ${LIMITS.text} characters`);
+    if ((a.optionIds?.length ?? 0) > 20 || (a.matches?.length ?? 0) > 20) throw invalid("Too many choices");
     byQuestion.set(a.questionId, a);
   }
 
   const results = qs.map(({ question, key }) => {
     const answer = byQuestion.get(question.id);
     const opts = optionsOf(question.id);
-    const optionIndex = answer?.optionId ? opts.findIndex((o) => o.id === answer.optionId) : undefined;
+    const indexOf = (optionId: string) => opts.findIndex((o) => o.id === optionId);
+    const optionIndex = answer?.optionId ? indexOf(answer.optionId) : undefined;
+    const limit = (question.promptJson as { wordLimit?: number }).wordLimit;
     const graded = grade(
       grading.parse(key.gradingJson),
       {
         ...(optionIndex !== undefined && optionIndex >= 0 ? { optionIndex } : {}),
+        ...(answer?.optionIds ? { optionIndexes: answer.optionIds.map(indexOf).filter((i) => i >= 0) } : {}),
         ...(answer?.judgement ? { judgement: answer.judgement } : {}),
+        ...(answer?.matches
+          ? {
+              matches: answer.matches
+                .map((m) => ({ itemId: m.itemId, optionIndex: indexOf(m.optionId) }))
+                .filter((m) => m.optionIndex >= 0),
+            }
+          : {}),
         ...(answer?.gaps ? { gaps: answer.gaps } : {}),
+        ...(typeof answer?.text === "string" ? { text: answer.text } : {}),
       },
-      question.points
+      question.points,
+      limit
     );
     return {
       questionId: question.id,
@@ -243,9 +271,18 @@ function toResult(answer: Correct, options: { id: string }[]): CorrectAnswerResu
   switch (answer.kind) {
     case "choice":
       return { __typename: "ChoiceAnswer", optionId: options[answer.optionIndex]?.id ?? "" };
+    case "choices":
+      return { __typename: "ChoicesAnswer", optionIds: answer.optionIndexes.map((i) => options[i]?.id ?? "") };
     case "judgement":
       return { __typename: "JudgementAnswer", judgement: answer.judgement };
+    case "matches":
+      return {
+        __typename: "MatchesAnswer",
+        matches: answer.matches.map((m) => ({ itemId: m.itemId, optionId: options[m.optionIndex]?.id ?? "" })),
+      };
     case "gaps":
       return { __typename: "GapsAnswer", gaps: answer.gaps };
+    case "text":
+      return { __typename: "TextAnswer", text: answer.text };
   }
 }

@@ -6,6 +6,7 @@ import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
 import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio/service";
+import { queueQuestionSuggestions } from "../assessment/suggestions";
 import { queueSuggestions } from "../lexicon/suggestions";
 import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
@@ -145,7 +146,10 @@ export async function createResource(db: Database, actorUserId: string | null, i
         await tx.update(loc).set({ draftRevisionId: draft.id }).where(eq(loc.id, localization.id));
         if (input.topicSlugs) await setTopics(tx, input.siteId, draft.id, input.topicSlugs);
         await writeAnnotations(tx, input.siteId, draft.id, body);
-        if (input.kind === "READING") await queueSuggestions(tx, draft, body, actorUserId);
+        if (input.kind === "READING") {
+          await queueSuggestions(tx, draft, body, actorUserId);
+          await queueQuestionSuggestions(tx, draft, body, actorUserId);
+        }
         await audit(tx, {
           siteId: input.siteId,
           actorUserId,
@@ -261,6 +265,7 @@ export async function updateDraft(db: Database, actorUserId: string | null, inpu
         // A saved script gets vocabulary suggestions (once per text; the worker makes them in the background).
         const level = input.cefrLevel !== undefined ? input.cefrLevel : draft.cefrLevel;
         await queueSuggestions(tx, { ...draft, cefrLevel: level }, body, actorUserId);
+        await queueQuestionSuggestions(tx, { ...draft, cefrLevel: level }, body, actorUserId);
       }
       await audit(tx, {
         siteId: l.siteId,

@@ -5,6 +5,7 @@ import type { Resolvers } from "../generated/resolvers";
 import type { AudioTrackModel, RevisionModel } from "../models";
 import * as audio from "../modules/audio/service";
 import { claimJob, heldJob, jobTypeOf, renewLease } from "../modules/jobs/service";
+import { completeQuestionJob, QUESTIONS_JOB } from "../modules/assessment/suggestions";
 import { completeSuggestJob, VOCAB_JOB } from "../modules/lexicon/suggestions";
 import { siteOfLocalization } from "../modules/resources/editorial";
 import type { RichTextDocument } from "../modules/rich-text";
@@ -72,7 +73,11 @@ export const audioResolvers: Resolvers = {
     },
     completeJob: async (_, { jobId, claimToken, result }, ctx) => {
       worker(ctx);
-      if ((await jobTypeOf(ctx.db, jobId)) === VOCAB_JOB) {
+      const type = await jobTypeOf(ctx.db, jobId);
+      if (type === QUESTIONS_JOB) {
+        return ctx.db.transaction(async (tx) => completeQuestionJob(tx, await heldJob(tx, jobId, claimToken), result));
+      }
+      if (type === VOCAB_JOB) {
         return ctx.db.transaction(async (tx) => completeSuggestJob(tx, await heldJob(tx, jobId, claimToken), result));
       }
       return audio.completeJob(ctx.db, jobId, claimToken, result);

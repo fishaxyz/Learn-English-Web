@@ -58,8 +58,10 @@ export type GradePracticeInput = {
 
 export type Judgement =
   | 'FALSE'
+  | 'NO'
   | 'NOT_GIVEN'
-  | 'TRUE';
+  | 'TRUE'
+  | 'YES';
 
 /** The four parts of a reading lesson. */
 export type LessonPart =
@@ -107,12 +109,23 @@ export type ManageLexicalSenseInput = {
   usageNote?: string | null | undefined;
 };
 
-/** One answer: optionId for single choice, judgement for true/false/not given, gaps for gap fill. */
+export type MatchAnswerInput = {
+  itemId: string;
+  optionId: string;
+};
+
+/**
+ * One answer: optionId (single choice), optionIds (multiple choice), judgement (TFNG, YNNG), matches (matching),
+ * gaps (gap fill, completion) or text (short answer).
+ */
 export type PracticeAnswerInput = {
   gaps?: Array<GapAnswerInput> | null | undefined;
   judgement?: Judgement | null | undefined;
+  matches?: Array<MatchAnswerInput> | null | undefined;
   optionId?: string | null | undefined;
+  optionIds?: Array<string> | null | undefined;
   questionId: string;
+  text?: string | null | undefined;
 };
 
 export type PronunciationInput = {
@@ -429,18 +442,26 @@ export type SuggestVocabularyMutation = { suggestVocabulary: boolean };
 export type SenseCardFragment = { id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, translations: Array<{ locale: string, text: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } };
 
 export type ExerciseSetViewFragment = { id: string, title: string, instructions: string | null, questions: Array<
+    | { __typename: 'CompletionQuestion', id: string, position: number, points: number }
     | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
         | { __typename: 'GapSegment', gapId: string }
         | { __typename: 'TextSegment', text: string }
       > }
+    | { __typename: 'MatchingQuestion', id: string, position: number, points: number }
+    | { __typename: 'MultipleChoiceQuestion', id: string, position: number, points: number }
+    | { __typename: 'ShortAnswerQuestion', id: string, position: number, points: number }
     | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
     | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+    | { __typename: 'YesNoNotGivenQuestion', id: string, position: number, points: number }
   > };
 
 export type PracticeResultViewFragment = { exerciseSetId: string, score: number, maxScore: number, questions: Array<{ questionId: string, correct: boolean, awardedPoints: number, maxPoints: number, explanation: string | null, correctAnswer:
       | { __typename: 'ChoiceAnswer', optionId: string }
+      | { __typename: 'ChoicesAnswer' }
       | { __typename: 'GapsAnswer', gaps: Array<{ gapId: string, text: string }> }
       | { __typename: 'JudgementAnswer', judgement: Judgement }
+      | { __typename: 'MatchesAnswer' }
+      | { __typename: 'TextAnswer' }
      }> };
 
 export type VocabularyItemViewFragment = { isKey: boolean, sense: { id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, translations: Array<{ locale: string, text: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }, occurrences: Array<{ blockId: string, start: number, end: number, text: string, sentence: string }> };
@@ -481,36 +502,56 @@ export type ReadingLessonQueryVariables = Exact<{
 
 export type ReadingLessonQuery = { resourceBySlug:
     | { __typename: 'ArticleResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'CompletionQuestion', id: string, position: number, points: number }
           | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
               | { __typename: 'GapSegment', gapId: string }
               | { __typename: 'TextSegment', text: string }
             > }
+          | { __typename: 'MatchingQuestion', id: string, position: number, points: number }
+          | { __typename: 'MultipleChoiceQuestion', id: string, position: number, points: number }
+          | { __typename: 'ShortAnswerQuestion', id: string, position: number, points: number }
           | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
           | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+          | { __typename: 'YesNoNotGivenQuestion', id: string, position: number, points: number }
         > }>, topics: Array<{ slug: string, name: string }> }
     | { __typename: 'LexicalCollectionResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'CompletionQuestion', id: string, position: number, points: number }
           | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
               | { __typename: 'GapSegment', gapId: string }
               | { __typename: 'TextSegment', text: string }
             > }
+          | { __typename: 'MatchingQuestion', id: string, position: number, points: number }
+          | { __typename: 'MultipleChoiceQuestion', id: string, position: number, points: number }
+          | { __typename: 'ShortAnswerQuestion', id: string, position: number, points: number }
           | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
           | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+          | { __typename: 'YesNoNotGivenQuestion', id: string, position: number, points: number }
         > }>, topics: Array<{ slug: string, name: string }> }
     | { __typename: 'ListeningResource', body: unknown, revisionNo: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'CompletionQuestion', id: string, position: number, points: number }
           | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
               | { __typename: 'GapSegment', gapId: string }
               | { __typename: 'TextSegment', text: string }
             > }
+          | { __typename: 'MatchingQuestion', id: string, position: number, points: number }
+          | { __typename: 'MultipleChoiceQuestion', id: string, position: number, points: number }
+          | { __typename: 'ShortAnswerQuestion', id: string, position: number, points: number }
           | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
           | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+          | { __typename: 'YesNoNotGivenQuestion', id: string, position: number, points: number }
         > }>, topics: Array<{ slug: string, name: string }> }
     | { __typename: 'ReadingResource', wordCount: number, body: unknown, revisionNo: number, estimatedReadingSeconds: number, id: string, kind: ResourceKind, slug: string, title: string, summary: string | null, cefrLevel: CefrLevel | null, publishedAt: string, vocabulary: Array<{ id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, translations: Array<{ locale: string, text: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }>, vocabularyItems: Array<{ isKey: boolean, sense: { id: string, revisionId: string, senseKey: string, partOfSpeech: string, definition: string, cefrLevel: CefrLevel | null, usageNote: string | null, register: string | null, examples: Array<{ sentence: string }>, pronunciations: Array<{ accent: string, ipa: string }>, translations: Array<{ locale: string, text: string }>, entry: { id: string, displayForm: string, kind: LexicalEntryKind } }, occurrences: Array<{ blockId: string, start: number, end: number, text: string, sentence: string }> }>, speakerNames: { host1: string | null, host2: string | null } | null, audioTracks: Array<{ id: string, label: string, url: string | null, durationMs: number | null, wordTimings: Array<{ blockId: string, start: number, end: number, startMs: number, endMs: number }> }>, examLabels: Array<{ code: string, name: string }>, exerciseSets: Array<{ id: string, title: string, instructions: string | null, questions: Array<
+          | { __typename: 'CompletionQuestion', id: string, position: number, points: number }
           | { __typename: 'GapFillQuestion', id: string, position: number, points: number, segments: Array<
               | { __typename: 'GapSegment', gapId: string }
               | { __typename: 'TextSegment', text: string }
             > }
+          | { __typename: 'MatchingQuestion', id: string, position: number, points: number }
+          | { __typename: 'MultipleChoiceQuestion', id: string, position: number, points: number }
+          | { __typename: 'ShortAnswerQuestion', id: string, position: number, points: number }
           | { __typename: 'SingleChoiceQuestion', stem: string, id: string, position: number, points: number, options: Array<{ id: string, content: string }> }
           | { __typename: 'TrueFalseNotGivenQuestion', statement: string, id: string, position: number, points: number }
+          | { __typename: 'YesNoNotGivenQuestion', id: string, position: number, points: number }
         > }>, topics: Array<{ slug: string, name: string }> }
    | null };
 
@@ -526,8 +567,11 @@ export type GradePracticeMutationVariables = Exact<{
 
 export type GradePracticeMutation = { gradePractice: { exerciseSetId: string, score: number, maxScore: number, questions: Array<{ questionId: string, correct: boolean, awardedPoints: number, maxPoints: number, explanation: string | null, correctAnswer:
         | { __typename: 'ChoiceAnswer', optionId: string }
+        | { __typename: 'ChoicesAnswer' }
         | { __typename: 'GapsAnswer', gaps: Array<{ gapId: string, text: string }> }
         | { __typename: 'JudgementAnswer', judgement: Judgement }
+        | { __typename: 'MatchesAnswer' }
+        | { __typename: 'TextAnswer' }
        }> } };
 
 export const RevisionFieldsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"RevisionFields"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Revision"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"revisionNo"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"cefrLevel"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"speakerNames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"host1"}},{"kind":"Field","name":{"kind":"Name","value":"host2"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lockVersion"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"submittedAt"}},{"kind":"Field","name":{"kind":"Name","value":"publishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"topics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<RevisionFieldsFragment, unknown>;

@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, foreignKey, integer, jsonb, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
-import { id, questionType } from "./common";
+import { check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { createdAt, id, questionType } from "./common";
 import { resourceRevisions } from "./content";
-import { sites } from "./identity";
+import { sites, users } from "./identity";
 
 const siteRef = () =>
   uuid()
@@ -74,3 +74,36 @@ export const answerKeys = pgTable("answer_keys", {
   explanation: text(),
   gradingVersion: integer().notNull().default(1),
 });
+
+/**
+ * Questions drafted by the local language model for a draft's script (the worker's questions.suggest job). An
+ * editor approves each one, which adds it to the draft's exercises (where it can still be edited), or removes it.
+ * Editorial only: never learner-facing. `questionJson` is a full question as editors write it (validated by the
+ * API, answer key included); `textHash` says which script it was drafted from.
+ */
+export const questionSuggestions = pgTable(
+  "question_suggestions",
+  {
+    id: id(),
+    siteId: siteRef(),
+    revisionId: uuid().notNull(),
+    /** PENDING, APPROVED or REJECTED. */
+    status: text().notNull().default("PENDING"),
+    type: questionType().notNull(),
+    questionJson: jsonb().notNull(),
+    textHash: text().notNull(),
+    position: integer().notNull().default(0),
+    decidedBy: uuid().references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "question_suggestions_revision_fk",
+      columns: [t.revisionId, t.siteId],
+      foreignColumns: [resourceRevisions.id, resourceRevisions.siteId],
+    }).onDelete("cascade"),
+    index("question_suggestions_revision").on(t.revisionId, t.status),
+    check("question_suggestions_status", sql`${t.status} in ('PENDING', 'APPROVED', 'REJECTED')`),
+  ]
+);

@@ -1,3 +1,4 @@
+import * as questionDrafts from "../modules/assessment/suggestions";
 import * as suggestions from "../modules/lexicon/suggestions";
 import { checklistFrom, missingParts } from "../modules/resources/checklist";
 import { schema } from "@english/database";
@@ -176,6 +177,21 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return suggestions.rejectSuggestions(ctx.db, userId, localizationId, ids);
     },
+    approveQuestionSuggestions: async (_, { localizationId, lockVersion, ids }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return editorialResource(
+        ctx,
+        await questionDrafts.approveQuestionSuggestions(ctx.db, userId, localizationId, lockVersion, ids)
+      );
+    },
+    rejectQuestionSuggestions: async (_, { localizationId, ids }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return questionDrafts.rejectQuestionSuggestions(ctx.db, userId, localizationId, ids);
+    },
+    suggestQuestions: async (_, { localizationId }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return questionDrafts.suggestQuestionsAgain(ctx.db, userId, localizationId);
+    },
     suggestVocabulary: async (_, { localizationId }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return suggestions.suggestAgain(ctx.db, userId, localizationId);
@@ -215,6 +231,21 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    questionSuggestions: async (r, _, ctx) => {
+      if (r.status === "PUBLISHED" || r.status === "SUPERSEDED") {
+        return { state: "IDLE", usedLanguageModel: null, items: [] };
+      }
+      const found = await questionDrafts.questionSuggestionsFor(ctx.db, r);
+      return {
+        ...found,
+        items: found.items.map((i) => ({
+          id: i.id,
+          status: i.status as "PENDING" | "APPROVED" | "REJECTED",
+          type: i.type,
+          question: i.questionJson,
+        })),
+      };
+    },
     vocabularySuggestions: async (r, _, ctx) => {
       if (r.status === "PUBLISHED" || r.status === "SUPERSEDED")
         return { state: "IDLE", usedLanguageModel: null, items: [] };

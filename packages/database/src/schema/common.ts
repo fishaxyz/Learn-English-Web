@@ -27,7 +27,16 @@ export const lexicalRelationKind = pgEnum("lexical_relation_kind", [
 export const jobStatus = pgEnum("job_status", ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]);
 /** GENERATING → READY (waiting for an editor) → APPROVED (shown to learners once published); or FAILED. */
 export const audioTrackStatus = pgEnum("audio_track_status", ["GENERATING", "READY", "APPROVED", "FAILED"]);
-export const questionType = pgEnum("question_type", ["SINGLE_CHOICE", "TRUE_FALSE_NOT_GIVEN", "GAP_FILL"]);
+export const questionType = pgEnum("question_type", [
+  "SINGLE_CHOICE",
+  "TRUE_FALSE_NOT_GIVEN",
+  "GAP_FILL",
+  "MULTIPLE_CHOICE",
+  "YES_NO_NOT_GIVEN",
+  "MATCHING",
+  "COMPLETION",
+  "SHORT_ANSWER",
+]);
 
 export const id = () => uuid().primaryKey().defaultRandom();
 export const createdAt = () => timestamp({ withTimezone: true }).notNull().defaultNow();
