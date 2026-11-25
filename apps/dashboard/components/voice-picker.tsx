@@ -78,7 +78,7 @@ export function VoicePicker({
           </button>
         ))}
       </div>
-      <ul className="grid max-h-72 gap-1 overflow-y-auto sm:grid-cols-2">
+      <ul className="grid max-h-72 gap-1 overflow-y-auto">
         {voices.map((v) => {
           const on = chosen.includes(v.id);
           return (

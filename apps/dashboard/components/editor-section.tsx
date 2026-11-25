@@ -79,7 +79,8 @@ export function EditorSection({
   children,
 }: {
   id: string;
-  step: number;
+  /** The badge: the section's number, or an icon for a section outside the numbered steps. */
+  step: ReactNode;
   title: string;
   /** One line on where this part stands ("320 words · B1"). */
   summary: string;

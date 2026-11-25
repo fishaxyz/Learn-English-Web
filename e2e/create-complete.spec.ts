@@ -9,9 +9,11 @@ test("an editor fills in all four parts on the New lesson page and publishes aft
   const title = `Complete ${slug.slice(9)}`;
   await signIn(page, EDITOR);
   await page.goto(`${DASHBOARD}/lessons/new`);
+  // Script, vocabulary and questions on the left; the voice-over in the side panel.
   for (const part of ["Script", "Voice-over", "Lexical vocabulary", "Questions & quizzes"]) {
-    await expect(page.getByRole("navigation", { name: "Lesson parts" }).getByText(part)).toBeVisible();
+    await expect(page.getByRole("region", { name: part })).toBeVisible();
   }
+  await expect(page.getByRole("complementary").getByRole("region", { name: "Voice-over" })).toBeVisible();
 
   // 1. Script, with a linked word.
   await page.getByLabel("Title").fill(title);

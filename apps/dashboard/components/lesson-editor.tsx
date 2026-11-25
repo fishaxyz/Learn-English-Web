@@ -9,13 +9,13 @@ import * as actions from "../app/(editor)/lessons/[id]/actions";
 import { fromPayload, toPayload, type EditorSet } from "../lib/exercises";
 import { voiceText } from "../lib/voice-text";
 import { EditorSection, useCollapsed } from "./editor-section";
+import { HeadphonesIcon } from "./icons";
 import { ExercisesEditor } from "./exercises-editor";
 import {
   countWords,
   keyIds,
   LessonFrame,
   linkedIds,
-  PartsNav,
   ScriptFields,
   SECTION_IDS,
   sectionStates,
@@ -233,30 +233,8 @@ export function LessonEditor({
           </EditorSection>
 
           <EditorSection
-            id="voice"
-            step={2}
-            title="Voice-over"
-            summary={parts.voice.summary}
-            state={parts.voice.state}
-            tint="bg-sky"
-          >
-            <VoiceoverPanel
-              resourceId={lesson.id}
-              localizationId={localization.id}
-              siteId={lesson.site.id}
-              editable={editable}
-              textSaved={!textDirty}
-              text={voiceText(savedBody)}
-              speakerNames={draft.speakerNames}
-              tracks={tracks}
-              onTracks={setTracks}
-              initialError={voiceError}
-            />
-          </EditorSection>
-
-          <EditorSection
             id="vocabulary"
-            step={3}
+            step={2}
             title="Lexical vocabulary"
             summary={parts.vocabulary.summary}
             state={parts.vocabulary.state}
@@ -273,7 +251,7 @@ export function LessonEditor({
 
           <EditorSection
             id="questions"
-            step={4}
+            step={3}
             title="Questions & quizzes"
             summary={parts.questions.summary}
             state={parts.questions.state}
@@ -423,7 +401,27 @@ export function LessonEditor({
             </div>
           </div>
 
-          <PartsNav parts={parts} />
+          <EditorSection
+            id="voice"
+            step={<HeadphonesIcon />}
+            title="Voice-over"
+            summary={parts.voice.summary}
+            state={parts.voice.state}
+            tint="bg-sky"
+          >
+            <VoiceoverPanel
+              resourceId={lesson.id}
+              localizationId={localization.id}
+              siteId={lesson.site.id}
+              editable={editable}
+              textSaved={!textDirty}
+              text={voiceText(savedBody)}
+              speakerNames={draft.speakerNames}
+              tracks={tracks}
+              onTracks={setTracks}
+              initialError={voiceError}
+            />
+          </EditorSection>
 
           {(role === "OWNER" || role === "ADMIN") && published && !lesson.archivedAt ? (
             <button

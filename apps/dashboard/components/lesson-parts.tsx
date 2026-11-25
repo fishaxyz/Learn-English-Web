@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { searchSenses } from "../app/(editor)/lessons/[id]/actions";
 import type { EditorSet } from "../lib/exercises";
-import { StateChip, useCollapsed, type SectionState } from "./editor-section";
+import { useCollapsed, type SectionState } from "./editor-section";
 import { RichTextEditor } from "./rich-text-editor";
 
 /*
@@ -19,7 +19,6 @@ export const LEVELS: CefrLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 export const SECTION_IDS = ["script", "voice", "vocabulary", "questions"] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 export const TITLES = ["Script", "Voice-over", "Lexical vocabulary", "Questions & quizzes"];
-export const TINTS = ["bg-pink", "bg-sky", "bg-sun", "bg-good-soft"];
 export const smallButton = "rounded-full border border-line px-3 py-1 hover:border-ink";
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -310,7 +309,7 @@ export function SectionsToolbar() {
   const sections = useCollapsed();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-      <p className="text-muted">Four parts: open the one you&apos;re working on.</p>
+      <p className="text-muted">Open the part you&apos;re working on. The voice-over is on the right.</p>
       <div className="flex gap-2">
         <button type="button" onClick={() => sections.setAll(SECTION_IDS, false)} className={smallButton}>
           Collapse all
@@ -323,41 +322,18 @@ export function SectionsToolbar() {
   );
 }
 
-/** The side list of the four parts, each with its state; a click opens and jumps to it. */
-export function PartsNav({ parts }: { parts: Record<SectionId, { state: SectionState }> }) {
-  const sections = useCollapsed();
-  return (
-    <nav aria-label="Lesson parts" className="flex flex-col gap-1 rounded-2xl border border-line bg-surface p-3">
-      {SECTION_IDS.map((id, i) => (
-        <a
-          key={id}
-          href={`#${id}`}
-          onClick={() => sections.open(id)}
-          className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm hover:bg-paper"
-        >
-          <span
-            aria-hidden="true"
-            className={`grid size-6 place-items-center rounded-lg text-xs font-semibold text-on-pastel ${TINTS[i]}`}
-          >
-            {i + 1}
-          </span>
-          <span className="flex-1">{TITLES[i]}</span>
-          <StateChip state={parts[id].state} />
-        </a>
-      ))}
-    </nav>
-  );
-}
-
-/** The two-column frame both pages share: sections on the left, the page's card and the parts list on the right. */
+/** The two-column frame both pages share: script, vocabulary and questions on the left; the page's card and the
+ * voice-over on the right. */
 export function LessonFrame({ sections, side }: { sections: ReactNode; side: ReactNode }) {
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
       <div className="flex min-w-0 flex-col gap-4">
         <SectionsToolbar />
         {sections}
       </div>
-      <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">{side}</aside>
+      <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto">
+        {side}
+      </aside>
     </div>
   );
 }

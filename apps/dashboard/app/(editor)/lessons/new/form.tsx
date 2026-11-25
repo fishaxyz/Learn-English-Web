@@ -4,6 +4,7 @@ import type { SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
 import { useMemo, useState, useTransition } from "react";
 import { EditorSection, useCollapsed } from "../../../../components/editor-section";
+import { HeadphonesIcon } from "../../../../components/icons";
 import { ExercisesEditor } from "../../../../components/exercises-editor";
 import {
   countWords,
@@ -11,7 +12,6 @@ import {
   keyIds,
   LessonFrame,
   linkedIds,
-  PartsNav,
   ScriptFields,
   sectionStates,
   VocabularyList,
@@ -190,38 +190,8 @@ export function NewLessonForm({
           </EditorSection>
 
           <EditorSection
-            id="voice"
-            step={2}
-            title="Voice-over"
-            summary={parts.voice.summary}
-            state={parts.voice.state}
-            tint="bg-sky"
-          >
-            <div className="flex flex-col gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={make} onChange={(e) => setMake(e.target.checked)} />
-                Make it now
-              </label>
-              <div className={make ? "" : "opacity-60"}>
-                <VoiceSettings
-                  siteId={site.id}
-                  text={text}
-                  value={choice}
-                  onChange={setChoice}
-                  onCatalog={setCatalog}
-                />
-              </div>
-              <p className="text-sm text-muted">
-                {make
-                  ? "Made right after the lesson is created. Listen to each one and approve it before publishing."
-                  : "No voice-over now; you can make one on the lesson page."}
-              </p>
-            </div>
-          </EditorSection>
-
-          <EditorSection
             id="vocabulary"
-            step={3}
+            step={2}
             title="Lexical vocabulary"
             summary={parts.vocabulary.summary}
             state={parts.vocabulary.state}
@@ -238,7 +208,7 @@ export function NewLessonForm({
 
           <EditorSection
             id="questions"
-            step={4}
+            step={3}
             title="Questions & quizzes"
             summary={parts.questions.summary}
             state={parts.questions.state}
@@ -271,7 +241,35 @@ export function NewLessonForm({
               {pending ? "Creating…" : button}
             </button>
           </div>
-          <PartsNav parts={parts} />
+          <EditorSection
+            id="voice"
+            step={<HeadphonesIcon />}
+            title="Voice-over"
+            summary={parts.voice.summary}
+            state={parts.voice.state}
+            tint="bg-sky"
+          >
+            <div className="flex flex-col gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={make} onChange={(e) => setMake(e.target.checked)} />
+                Make it now
+              </label>
+              <div className={make ? "" : "opacity-60"}>
+                <VoiceSettings
+                  siteId={site.id}
+                  text={text}
+                  value={choice}
+                  onChange={setChoice}
+                  onCatalog={setCatalog}
+                />
+              </div>
+              <p className="text-sm text-muted">
+                {make
+                  ? "Made right after the lesson is created. Listen to each one and approve it before publishing."
+                  : "No voice-over now; you can make one on the lesson page."}
+              </p>
+            </div>
+          </EditorSection>
         </>
       }
     />
