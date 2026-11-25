@@ -20,7 +20,7 @@ export default async function WordBank({ searchParams }: { searchParams: Promise
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted">{membership.site.name}</p>
-          <h1 className="font-display text-3xl font-semibold">Word bank</h1>
+          <h1 className="text-4xl font-medium tracking-tight">Word bank</h1>
           <p className="text-muted">Words and structures, prepared once and linked in any text.</p>
         </div>
         {can.write(membership.role) ? (

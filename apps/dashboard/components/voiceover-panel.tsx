@@ -7,7 +7,7 @@ import { confirmVoiceovers, MAX_VOICE_CHARACTERS, VoicePicker, type Catalog } fr
 
 const STATUS: Record<AudioTrackFieldsFragment["status"], { label: string; tone: string }> = {
   GENERATING: { label: "Being made…", tone: "bg-line/60 text-ink" },
-  READY: { label: "Ready to check", tone: "bg-[#fdf0d5] text-[#7a4a00] dark:bg-[#3a2c10] dark:text-[#f3c770]" },
+  READY: { label: "Ready to check", tone: "bg-sun text-on-pastel" },
   APPROVED: { label: "Approved", tone: "bg-good-soft text-good" },
   FAILED: { label: "Failed", tone: "bg-bad-soft text-bad" },
 };

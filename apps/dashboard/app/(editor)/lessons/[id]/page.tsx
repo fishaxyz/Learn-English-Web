@@ -40,7 +40,7 @@ export default async function EditLesson({
           ← All lessons
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl font-semibold">{title}</h1>
+          <h1 className="text-4xl font-medium tracking-tight">{title}</h1>
           <StatusChip archivedAt={lesson.archivedAt} localization={localization} />
         </div>
         <p className="font-mono text-sm text-muted">/reading/{localization.slug}</p>

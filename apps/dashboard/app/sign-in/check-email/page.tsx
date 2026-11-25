@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Check your email" };
 export default function CheckEmail() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 py-16">
-      <h1 className="font-display text-3xl font-semibold">Check your email</h1>
+      <h1 className="text-4xl font-medium tracking-tight">Check your email</h1>
       <p className="text-muted">
         If that address has been invited to the dashboard, a sign-in link is on its way. It works once and expires in 15
         minutes.

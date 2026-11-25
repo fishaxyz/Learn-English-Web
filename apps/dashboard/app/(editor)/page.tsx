@@ -1,6 +1,7 @@
 import { EditorialListDocument } from "@english/graphql";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PlusIcon } from "../../components/icons";
 import { StatusChip, statusOf } from "../../components/status";
 import { editorQuery } from "../../lib/api";
 import { can, getViewer, membershipFor } from "../../lib/viewer";
@@ -17,9 +18,21 @@ export default async function Lessons({ searchParams }: { searchParams: Promise<
   const rows = editorialResources.filter(
     (r) => show !== "review" || statusOf(r.archivedAt, r.localizations[0]).label === "In review"
   );
-  const inReview = editorialResources.filter(
-    (r) => statusOf(r.archivedAt, r.localizations[0]).label === "In review"
-  ).length;
+  const count = (...labels: string[]) =>
+    editorialResources.filter((r) => labels.includes(statusOf(r.archivedAt, r.localizations[0]).label)).length;
+  const inReview = count("In review");
+  const cards = [
+    {
+      label: "Published",
+      value: count("Published", "Published · new draft"),
+      note: "Live on the website",
+      tone: "bg-pink",
+    },
+    { label: "In review", value: inReview, note: "Waiting for a reviewer", tone: "bg-sky" },
+    { label: "Drafts", value: count("Draft", "Published · new draft"), note: "Being written", tone: "bg-sun" },
+  ];
+  const pill =
+    "rounded-full border border-line px-4 py-1.5 font-medium hover:border-ink aria-[current=page]:border-accent aria-[current=page]:bg-accent aria-[current=page]:text-on-accent";
   const q = (extra: Record<string, string>) => `/?${new URLSearchParams({ site: membership.site.id, ...extra })}`;
 
   return (
@@ -29,17 +42,27 @@ export default async function Lessons({ searchParams }: { searchParams: Promise<
           <p className="text-sm text-muted">
             {membership.site.name} · you&apos;re {membership.role.toLowerCase()}
           </p>
-          <h1 className="font-display text-3xl font-semibold">Lessons</h1>
+          <h1 className="text-4xl font-medium tracking-tight sm:text-5xl">Your lessons</h1>
         </div>
         {can.write(membership.role) ? (
           <Link
             href={`/lessons/new?site=${membership.site.id}`}
-            className="rounded-full bg-accent px-5 py-2 font-semibold text-on-accent hover:bg-accent-strong"
+            className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 font-semibold text-on-accent hover:bg-accent-strong"
           >
-            New lesson
+            <PlusIcon /> New lesson
           </Link>
         ) : null}
       </div>
+
+      <ul className="grid gap-3 sm:grid-cols-3">
+        {cards.map((c) => (
+          <li key={c.label} className={`flex flex-col gap-1 rounded-3xl p-5 text-on-pastel ${c.tone}`}>
+            <p className="font-semibold">{c.label}</p>
+            <p className="text-4xl font-medium tracking-tight">{c.value}</p>
+            <p className="text-xs opacity-75">{c.note}</p>
+          </li>
+        ))}
+      </ul>
 
       {viewer.memberships.length > 1 ? (
         <nav aria-label="Sites" className="flex flex-wrap gap-2 text-sm">
@@ -48,7 +71,7 @@ export default async function Lessons({ searchParams }: { searchParams: Promise<
               key={m.site.id}
               href={`/?site=${m.site.id}`}
               aria-current={m.site.id === membership.site.id ? "page" : undefined}
-              className="rounded-full border border-line px-3 py-1 aria-[current=page]:border-accent aria-[current=page]:text-accent"
+              className={pill}
             >
               {m.site.name}
             </Link>
@@ -57,30 +80,22 @@ export default async function Lessons({ searchParams }: { searchParams: Promise<
       ) : null}
 
       <nav aria-label="Filter" className="flex gap-2 text-sm">
-        <Link
-          href={q({})}
-          aria-current={show !== "review" ? "page" : undefined}
-          className="rounded-full border border-line px-3 py-1 aria-[current=page]:border-accent aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent"
-        >
+        <Link href={q({})} aria-current={show !== "review" ? "page" : undefined} className={pill}>
           All
         </Link>
-        <Link
-          href={q({ show: "review" })}
-          aria-current={show === "review" ? "page" : undefined}
-          className="rounded-full border border-line px-3 py-1 aria-[current=page]:border-accent aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent"
-        >
+        <Link href={q({ show: "review" })} aria-current={show === "review" ? "page" : undefined} className={pill}>
           Needs review ({inReview})
         </Link>
       </nav>
 
       {rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line p-10 text-center text-muted">
+        <p className="rounded-3xl border border-dashed border-line p-10 text-center text-muted">
           {show === "review" ? "Nothing is waiting for review." : "No lessons yet. Start with “New lesson”."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+        <div className="overflow-x-auto rounded-3xl bg-panel p-2">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-line text-muted">
+            <thead className="text-xs text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Type</th>
@@ -93,9 +108,9 @@ export default async function Lessons({ searchParams }: { searchParams: Promise<
                 const l = r.localizations[0];
                 const title = l?.draft?.title ?? l?.published?.title ?? "Untitled";
                 return (
-                  <tr key={r.id} className="border-b border-line last:border-0 hover:bg-paper">
+                  <tr key={r.id} className="border-t border-line/70 hover:bg-surface/70">
                     <td className="px-4 py-3">
-                      <Link href={`/lessons/${r.id}`} className="font-semibold hover:text-accent hover:underline">
+                      <Link href={`/lessons/${r.id}`} className="font-semibold hover:underline">
                         {title}
                       </Link>
                     </td>

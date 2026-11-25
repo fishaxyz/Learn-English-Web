@@ -14,7 +14,7 @@ export default async function NewLesson({ searchParams }: { searchParams: Promis
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm text-muted">{membership.site.name}</p>
-        <h1 className="font-display text-3xl font-semibold">New lesson</h1>
+        <h1 className="text-4xl font-medium tracking-tight">New lesson</h1>
       </div>
       <NewLessonForm siteId={membership.site.id} />
     </div>

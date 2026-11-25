@@ -24,7 +24,7 @@ export default async function EditWord({ params }: { params: Promise<{ id: strin
         <Link href={`/words?site=${sense.site.id}`} className="text-sm text-accent hover:underline">
           ← Word bank
         </Link>
-        <h1 className="font-display text-3xl font-semibold">{sense.entry.displayForm}</h1>
+        <h1 className="text-4xl font-medium tracking-tight">{sense.entry.displayForm}</h1>
         <p className="text-muted">
           {kindLabel(sense.entry.kind)} · {senseStatus(sense)}
           {sense.published ? ` · revision ${sense.published.revisionNo} is live` : ""}

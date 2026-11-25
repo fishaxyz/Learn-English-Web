@@ -18,7 +18,7 @@ export default async function NewWord({
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm text-muted">{membership.site.name} · Word bank</p>
-        <h1 className="font-display text-3xl font-semibold">New word or structure</h1>
+        <h1 className="text-4xl font-medium tracking-tight">New word or structure</h1>
       </div>
       <SenseForm
         siteId={membership.site.id}

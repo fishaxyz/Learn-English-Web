@@ -3,6 +3,79 @@
 /* Shared components live outside this app, so Tailwind must scan them too. */
 @source "../../../packages/ui/src";
 
+/* The dashboard's own look: warm cream, a black sidebar, black pill buttons and soft pastel cards (pink, sky,
+   sun). Only the dashboard changes; the learner website keeps the shared reading palette. */
+@theme {
+  --color-paper: #f3eee3;
+  --color-surface: #fbf8f2;
+  --color-panel: #e9e2d4;
+  --color-ink: #141414;
+  --color-muted: #625b50;
+  --color-line: #ddd4c4;
+  --color-accent: #141414;
+  --color-accent-strong: #3a3a3a;
+  --color-accent-soft: #f8d3e5;
+  --color-on-accent: #ffffff;
+  --color-good: #2c6419;
+  --color-good-soft: #d3eab9;
+  --color-bad: #a1271d;
+  --color-bad-soft: #f8d5ce;
+  --color-pink: #f6bdd9;
+  --color-sky: #bfcff2;
+  --color-sun: #f7dc6f;
+  --color-sidebar: #111111;
+  --color-on-pastel: #141414;
+
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #121110;
+    --color-surface: #1c1a17;
+    --color-panel: #24211d;
+    --color-ink: #f3eee6;
+    --color-muted: #aaa298;
+    --color-line: #36312a;
+    --color-accent: #f3eee6;
+    --color-accent-strong: #ffffff;
+    --color-accent-soft: #4b2b3c;
+    --color-on-accent: #141414;
+    --color-good: #9fd889;
+    --color-good-soft: #243a1c;
+    --color-bad: #f2a397;
+    --color-bad-soft: #3d211d;
+    --color-pink: #e7a9c8;
+    --color-sky: #a9bde6;
+    --color-sun: #e8cb5c;
+    --color-sidebar: #000000;
+  }
+}
+
+/* The lesson preview shows the lesson as learners will see it: the website's fonts and colours. */
+.website-look {
+  --font-display: var(--font-literata), Georgia, "Times New Roman", serif;
+  --color-surface: #ffffff;
+  --color-muted: #586663;
+  --color-line: #d9e0de;
+  --color-accent: #136f63;
+  --color-accent-strong: #0d5a50;
+  --color-accent-soft: #dcefeb;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  .website-look {
+    --color-surface: #18201f;
+    --color-muted: #9aa8a5;
+    --color-line: #2c3735;
+    --color-accent: #5cc4b3;
+    --color-accent-strong: #7dd6c7;
+    --color-accent-soft: #1d3934;
+    --color-on-accent: #0b1513;
+  }
+}
+
 /* The editor's text area looks like the lesson will. */
 .editor-surface .ProseMirror {
   min-height: 16rem;
@@ -12,12 +85,12 @@
   margin-top: 1em;
 }
 .editor-surface .ProseMirror h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-reading);
   font-size: 1.5em;
   font-weight: 600;
 }
 .editor-surface .ProseMirror h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-reading);
   font-size: 1.25em;
   font-weight: 600;
 }

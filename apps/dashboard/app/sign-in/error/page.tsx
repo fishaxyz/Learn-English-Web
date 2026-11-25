@@ -24,7 +24,7 @@ export default async function SignInError({ searchParams }: { searchParams: Prom
   const message = (reason && MESSAGES[reason]) || DEFAULT;
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 py-16">
-      <h1 className="font-display text-3xl font-semibold">{message.title}</h1>
+      <h1 className="text-4xl font-medium tracking-tight">{message.title}</h1>
       <p className="text-muted">{message.body}</p>
       <Link href="/sign-in" className="self-start rounded-full bg-accent px-5 py-2 font-semibold text-on-accent">
         Back to sign-in

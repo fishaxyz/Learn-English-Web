@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Literata } from "next/font/google";
+import { Literata, Outfit } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", display: "swap" });
 const literata = Literata({ subsets: ["latin"], variable: "--font-literata", display: "swap" });
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${literata.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${literata.variable}`}>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">{children}</body>
     </html>
   );

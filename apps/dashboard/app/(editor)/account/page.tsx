@@ -11,7 +11,7 @@ export default async function Account() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="font-display text-3xl font-semibold">Account</h1>
+        <h1 className="text-4xl font-medium tracking-tight">Account</h1>
         <p className="text-muted">{viewer.email}</p>
       </div>
       <section aria-labelledby="roles" className="flex flex-col gap-2">

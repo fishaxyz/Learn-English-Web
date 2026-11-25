@@ -14,9 +14,9 @@ export function statusOf(archivedAt: string | null, l: Localization | undefined)
 
 const TONES = {
   muted: "bg-line/60 text-ink",
-  attention: "bg-[#fdf0d5] text-[#7a4a00] dark:bg-[#3a2c10] dark:text-[#f3c770]",
-  accent: "bg-accent-soft text-accent",
-  good: "bg-good-soft text-good",
+  attention: "bg-sun text-on-pastel",
+  accent: "bg-sky text-on-pastel",
+  good: "bg-pink text-on-pastel",
 };
 
 export function StatusChip({

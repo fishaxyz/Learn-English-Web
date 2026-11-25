@@ -17,23 +17,25 @@ export default async function Preview({ params }: { params: Promise<{ id: string
   const draft = localization?.draft;
   return (
     <div className="flex flex-col gap-8">
-      <p role="note" className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
+      <p role="note" className="rounded-2xl bg-sun px-4 py-3 text-sm text-on-pastel">
         Preview of{" "}
         {draft ? `the ${draft.status === "IN_REVIEW" ? "draft in review" : "draft"}` : "the published lesson"}. Saved
         changes only.
       </p>
-      <LessonLayout
-        kind={lesson.kind}
-        level={revision.cefrLevel}
-        title={revision.title}
-        summary={revision.summary}
-        meta={revision.topics.map((t) => (
-          <span key={t.slug}>{t.name}</span>
-        ))}
-        after={draft ? previewSets(draft.exercises).map((set) => <ExerciseRenderer key={set.id} set={set} />) : null}
-      >
-        <LinkedText body={revision.body} vocabulary={draft?.vocabulary ?? []} />
-      </LessonLayout>
+      <div className="website-look rounded-3xl bg-surface p-4 sm:p-8">
+        <LessonLayout
+          kind={lesson.kind}
+          level={revision.cefrLevel}
+          title={revision.title}
+          summary={revision.summary}
+          meta={revision.topics.map((t) => (
+            <span key={t.slug}>{t.name}</span>
+          ))}
+          after={draft ? previewSets(draft.exercises).map((set) => <ExerciseRenderer key={set.id} set={set} />) : null}
+        >
+          <LinkedText body={revision.body} vocabulary={draft?.vocabulary ?? []} />
+        </LessonLayout>
+      </div>
     </div>
   );
 }
