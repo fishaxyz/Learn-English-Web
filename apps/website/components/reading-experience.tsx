@@ -5,7 +5,15 @@ import { RichTextRenderer, type SpeakerNames } from "@english/ui";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { blockById, blockText, pointInText, rangeForSpan, sentenceAt } from "../lib/text-spans";
 import { AudioPlayer, type PlayerHandle, type Track } from "./audio-player";
+
+const SENTENCE_HIGHLIGHT = "sentence-hover";
+type HighlightRegistry = { set(name: string, h: unknown): void; delete(name: string): void };
+const highlightRegistry = (): HighlightRegistry | null =>
+  typeof CSS !== "undefined" && "highlights" in CSS
+    ? (CSS as unknown as { highlights: HighlightRegistry }).highlights
+    : null;
 import { SUGGESTED_PER_READING, useMyWords, type SavedItem } from "../lib/my-words";
 import { isStructure, languageName, WordCard } from "./word-card";
 
@@ -160,10 +168,43 @@ export function ReadingExperience({
     words.add(saved);
   }
 
-  // Tapping a word nobody prepared yet: say so, without interrupting the reading.
+  // With a voice-over, a sentence can be heard on its own: hover colours it, a click plays it.
+  const canHearSentences = tracks.some((t) => t.wordTimings.length > 0);
+  const hovered = useRef<string | null>(null);
+
+  function sentenceUnder(x: number, y: number) {
+    const container = text.current;
+    const at = container ? pointInText(container, x, y) : null;
+    const block = container && at ? blockById(container, at.blockId) : null;
+    const span = block && at ? sentenceAt(blockText(block), at.offset) : null;
+    return at && span ? { blockId: at.blockId, ...span } : null;
+  }
+
+  function showHover(sentence: { blockId: string; start: number; end: number } | null) {
+    const key = sentence ? `${sentence.blockId}:${sentence.start}` : null;
+    if (key === hovered.current) return;
+    hovered.current = key;
+    const registry = highlightRegistry();
+    const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+    const range =
+      sentence && text.current ? rangeForSpan(text.current, sentence.blockId, sentence.start, sentence.end) : null;
+    if (registry && Highlight && range) registry.set(SENTENCE_HIGHLIGHT, new Highlight(range));
+    else registry?.delete(SENTENCE_HIGHLIGHT);
+  }
+  useEffect(() => () => highlightRegistry()?.delete(SENTENCE_HIGHLIGHT), []);
+
   function onTextClick(e: MouseEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("button")) return; // a prepared word: its card opens
     if (window.getSelection()?.toString()) return; // they're selecting text, not tapping
+    if (canHearSentences) {
+      const sentence = sentenceUnder(e.clientX, e.clientY);
+      if (sentence) {
+        const played = player.current?.playSpan(sentence.blockId, sentence.start, sentence.end);
+        setNotice(played ? null : "This voice can’t play single sentences. Choose another voice above.");
+        return;
+      }
+    }
+    // Tapping a word nobody prepared yet: say so, without interrupting the reading.
     const word = wordAt(e.clientX, e.clientY);
     setNotice(word ? `“${word}” isn’t in our word list yet. Highlighted words and phrases can be added.` : null);
   }
@@ -202,7 +243,9 @@ export function ReadingExperience({
 
       <p className="font-sans text-sm text-muted">
         {mode === "choose"
-          ? "Read the text. Tap a word or phrase you want to learn, then add it to your list."
+          ? `Read the text. Tap a word or phrase you want to learn, then add it to your list.${
+              canHearSentences ? " Tap any sentence to hear it." : ""
+            }`
           : chosenHere.length
             ? "Your words are highlighted. Tap one to see it again."
             : "You haven’t chosen any words yet. Switch to “Read & choose” and add some."}
@@ -211,7 +254,11 @@ export function ReadingExperience({
       <div
         ref={text}
         onClick={onTextClick}
-        className="lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink"
+        onPointerMove={(e) => {
+          if (canHearSentences && e.pointerType === "mouse") showHover(sentenceUnder(e.clientX, e.clientY));
+        }}
+        onPointerLeave={() => showHover(null)}
+        className={`lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink ${canHearSentences ? "cursor-pointer" : ""}`}
       >
         <RichTextRenderer
           doc={body}

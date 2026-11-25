@@ -3,6 +3,11 @@
 /* Shared components live outside this app, so Tailwind must scan them too. */
 @source "../../../packages/ui/src";
 
+/* The sentence under the pointer, when it can be heard (a click plays it). */
+::highlight(sentence-hover) {
+  background-color: color-mix(in srgb, var(--color-accent-soft) 70%, transparent);
+}
+
 /* Read-along: the word the voice-over is saying (set by the audio player through CSS.highlights). */
 ::highlight(read-along) {
   background-color: var(--color-accent-soft);

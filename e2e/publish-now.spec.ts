@@ -31,4 +31,42 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await expect(page.getByText("Many people drink coffee before their commute.")).toBeVisible();
   await expect(page.getByRole("button", { name: "▶ Listen" })).toBeVisible();
+
+  // Tapping a sentence plays just that sentence, from where it starts in the voice-over.
+  await expect(page.getByText("Tap any sentence to hear it.")).toBeVisible();
+  /** Where a word of the lesson text is on screen. */
+  const pointAt = (word: string) =>
+    page
+      .locator("p[data-block-id]")
+      .first()
+      .evaluate((p, w) => {
+        const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+          const at = node.data.indexOf(w);
+          if (at < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, at + 1);
+          range.setEnd(node, at + 2);
+          const r = range.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+        throw new Error(`"${w}" isn't in the text`);
+      }, word);
+  const audio = page.locator("audio");
+  const time = () => audio.evaluate((a: HTMLAudioElement) => a.currentTime);
+  const paused = () => audio.evaluate((a: HTMLAudioElement) => a.paused);
+
+  // The first sentence plays, then stops before the second one starts (the test voice speaks 60 ms per character:
+  // "Others" starts about 2.8 s in).
+  const first = await pointAt("people");
+  await page.mouse.click(first.x, first.y);
+  await expect.poll(paused).toBe(false);
+  await expect.poll(paused, { timeout: 10_000 }).toBe(true);
+  expect(await time()).toBeGreaterThan(1.5);
+  expect(await time()).toBeLessThan(3.0);
+
+  // The second sentence plays from where it starts.
+  const second = await pointAt("Others");
+  await page.mouse.click(second.x, second.y);
+  await expect.poll(time).toBeGreaterThan(2.5);
 });

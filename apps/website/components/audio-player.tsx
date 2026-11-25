@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReadingLessonQuery } from "@english/graphql";
+import { rangeForSpan } from "../lib/text-spans";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type RefObject } from "react";
 
 type Lesson = Extract<NonNullable<ReadingLessonQuery["resourceBySlug"]>, { __typename: "ReadingResource" }>;
 export type Track = Lesson["audioTracks"][number];
-type Timing = Track["wordTimings"][number];
 
 export type PlayerHandle = {
   /** Plays the words between these code-point offsets of a block, if the current voice has timings for them. */
@@ -19,41 +19,6 @@ const clock = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
-
-/** A DOM range over code-point offsets of a block's text (the API counts code points; the DOM counts UTF-16). */
-function rangeFor(container: HTMLElement, t: Timing): Range | null {
-  const block = container.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(t.blockId)}"]`);
-  if (!block) return null;
-  // Skip additions that aren't lesson text: screen-reader notes ("(in your list)") and speaker names.
-  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) =>
-      n.parentElement?.closest(".sr-only, [data-extra]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
-  });
-  const range = document.createRange();
-  let codePoint = 0;
-  let started = false;
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node.textContent ?? "";
-    let unit = 0;
-    for (const char of text) {
-      if (!started && codePoint === t.start) {
-        range.setStart(node, unit);
-        started = true;
-      }
-      if (codePoint === t.end) {
-        range.setEnd(node, unit);
-        return started ? range : null;
-      }
-      codePoint += 1;
-      unit += char.length;
-    }
-    if (started && codePoint === t.end) {
-      range.setEnd(node, unit);
-      return range;
-    }
-  }
-  return null;
-}
 
 type HighlightRegistry = { set(name: string, h: unknown): void; delete(name: string): void };
 const highlights = (): HighlightRegistry | null =>
@@ -95,7 +60,8 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
           } else hi = mid - 1;
         }
         const word = found >= 0 ? timings[found] : undefined;
-        const range = word && ms <= word.endMs + 400 ? rangeFor(container, word) : null;
+        const range =
+          word && ms <= word.endMs + 400 ? rangeForSpan(container, word.blockId, word.start, word.end) : null;
         const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
         if (range && Highlight) registry.set(HIGHLIGHT, new Highlight(range));
         else registry.delete(HIGHLIGHT);
@@ -110,9 +76,19 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
         const el = audio.current;
         const words = track?.wordTimings.filter((t) => t.blockId === blockId && t.start < end && t.end > start) ?? [];
         if (!el || !words.length) return false;
-        el.currentTime = (words[0]?.startMs ?? 0) / 1000;
         stopAt.current = words[words.length - 1]?.endMs ?? null;
-        void el.play();
+        const from = (words[0]?.startMs ?? 0) / 1000;
+        const go = () => {
+          el.currentTime = from;
+          el.playbackRate = speed;
+          void el.play();
+        };
+        // Nothing is loaded until it's needed (preload="none"): seeking waits for the file's details.
+        if (el.readyState >= HTMLMediaElement.HAVE_METADATA) go();
+        else {
+          el.addEventListener("loadedmetadata", go, { once: true });
+          el.load();
+        }
         return true;
       },
     }));
