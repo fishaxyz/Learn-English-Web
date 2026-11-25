@@ -12,7 +12,7 @@ export function statusOf(archivedAt: string | null, l: Localization | undefined)
   return { label: "Empty", tone: "muted" as const };
 }
 
-const TONES = {
+export const TONES = {
   muted: "bg-line/60 text-ink",
   attention: "bg-sun text-on-pastel",
   accent: "bg-sky text-on-pastel",
@@ -29,5 +29,17 @@ export function StatusChip({
   const s = statusOf(archivedAt, localization);
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONES[s.tone]}`}>{s.label}</span>
+  );
+}
+
+/** A status chip for a status already worked out (lists that hold rows rather than localizations). */
+export function StatusPill({ status }: { status: ReturnType<typeof statusOf> }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONES[status.tone]}`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current opacity-70" />
+      {status.label}
+    </span>
   );
 }

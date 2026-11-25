@@ -29,7 +29,7 @@ export async function signIn(page: Page, email: string) {
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   await page.goto(await signInLink(email, asked));
-  await expect(page.getByRole("heading", { name: "Lessons" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
 }
 
 /** Invites a fresh editor through the real invite command, so each run starts from a clean account. */

@@ -36,8 +36,8 @@ export default async function EditLesson({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <Link href={`/?site=${lesson.site.id}`} className="text-sm text-accent hover:underline">
-          ← All lessons
+        <Link href={`/lessons?site=${lesson.site.id}`} className="text-sm text-accent hover:underline">
+          ← Reading Library
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-4xl font-medium tracking-tight">{title}</h1>

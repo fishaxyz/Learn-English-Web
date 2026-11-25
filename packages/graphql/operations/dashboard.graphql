@@ -60,6 +60,33 @@ fragment EditorialSummary on EditorialResource {
 query EditorialList($siteId: ID!) {
   editorialResources(siteId: $siteId) {
     ...EditorialSummary
+    localizations {
+      id
+      draft {
+        id
+        cefrLevel
+        updatedAt
+        topics {
+          slug
+          name
+        }
+      }
+      published {
+        id
+        cefrLevel
+        updatedAt
+        topics {
+          slug
+          name
+        }
+      }
+    }
+  }
+}
+
+query WordBankCount($siteId: ID!) {
+  editorialSenses(siteId: $siteId) {
+    id
   }
 }
 

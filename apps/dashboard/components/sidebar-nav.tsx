@@ -2,48 +2,78 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AccountIcon, LessonsIcon, WebsiteIcon, WordsIcon } from "./icons";
+import * as I from "./icons";
 
-const ICONS = { lessons: LessonsIcon, words: WordsIcon, account: AccountIcon, website: WebsiteIcon };
+const ICONS = {
+  home: I.HomeIcon,
+  book: I.BookIcon,
+  headphones: I.HeadphonesIcon,
+  layers: I.LayersIcon,
+  question: I.QuestionIcon,
+  article: I.ArticleIcon,
+  image: I.ImageIcon,
+  sparkles: I.SparklesIcon,
+  tag: I.TagIcon,
+  collection: I.CollectionIcon,
+  users: I.UsersIcon,
+  settings: I.SettingsIcon,
+};
 
 export type NavItem = {
-  href: string;
   label: string;
   icon: keyof typeof ICONS;
-  /** Paths that also count as this section (lesson pages belong to Lessons). */
+  /** Where it goes; sections without one aren't built yet and show "Soon". */
+  href?: string;
+  /** Paths that also count as this section. */
   also?: string[];
-  external?: boolean;
+  /** Only the exact path counts (the Dashboard home). */
+  exact?: boolean;
 };
 
 const isCurrent = (path: string, item: NavItem) =>
-  path === item.href ||
-  (item.href !== "/" && path.startsWith(`${item.href}/`)) ||
-  (item.also ?? []).some((p) => path === p || path.startsWith(`${p}/`));
+  !!item.href &&
+  (path === item.href ||
+    (!item.exact && path.startsWith(`${item.href}/`)) ||
+    (item.also ?? []).some((p) => path === p || path.startsWith(`${p}/`)));
 
-/** One group of sidebar links; the current section is marked with a pink icon. */
-export function SidebarNav({ title, items }: { title: string; items: NavItem[] }) {
+const row = "flex items-center gap-3 rounded-full px-3 py-1.5 text-sm whitespace-nowrap";
+
+/** One group of sidebar links. The current section gets a pink icon; unbuilt sections are greyed with "Soon". */
+export function SidebarNav({ title, items }: { title?: string; items: NavItem[] }) {
   const path = usePathname();
   return (
-    <div className="flex flex-col gap-1">
-      <p className="hidden px-3 pb-1 text-xs text-white/50 lg:block">{title}</p>
-      <ul className="flex flex-wrap gap-1 lg:flex-col">
+    <div className="flex shrink-0 gap-1 lg:flex-col">
+      {title ? <p className="hidden px-3 pb-1 pt-2 text-xs text-white/45 lg:block">{title}</p> : null}
+      <ul className="flex gap-1 lg:flex-col">
         {items.map((item) => {
-          const current = !item.external && isCurrent(path, item);
           const Icon = ICONS[item.icon];
+          const icon = (
+            <span className="grid size-7 shrink-0 place-items-center rounded-full group-aria-[current=page]:bg-pink group-aria-[current=page]:text-on-pastel">
+              <Icon />
+            </span>
+          );
+          if (!item.href) {
+            return (
+              <li key={item.label} className="hidden lg:block">
+                <span aria-disabled="true" className={`${row} cursor-default text-white/35`}>
+                  {icon}
+                  {item.label}
+                  <span className="ml-auto rounded-full border border-white/15 px-1.5 text-[10px] uppercase tracking-wider text-white/45">
+                    Soon
+                  </span>
+                </span>
+              </li>
+            );
+          }
           return (
-            <li key={item.href}>
+            <li key={item.label}>
               <Link
                 href={item.href}
-                aria-current={current ? "page" : undefined}
-                target={item.external ? "_blank" : undefined}
-                rel={item.external ? "noreferrer" : undefined}
-                className="group flex items-center gap-3 rounded-full px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-pink aria-[current=page]:text-white"
+                aria-current={isCurrent(path, item) ? "page" : undefined}
+                className={`group ${row} text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-pink aria-[current=page]:bg-white/10 aria-[current=page]:font-medium aria-[current=page]:text-white`}
               >
-                <span className="grid size-7 place-items-center rounded-full group-aria-[current=page]:bg-pink group-aria-[current=page]:text-on-pastel">
-                  <Icon />
-                </span>
+                {icon}
                 {item.label}
-                {item.external ? <span className="sr-only"> (opens in a new tab)</span> : null}
               </Link>
             </li>
           );

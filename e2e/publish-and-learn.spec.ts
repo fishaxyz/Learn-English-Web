@@ -15,7 +15,7 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await signIn(page, EDITOR);
 
   // A new reading lesson.
-  await page.getByRole("link", { name: "New lesson" }).click();
+  await page.getByRole("link", { name: "Create reading" }).click();
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Web address").fill(slug);
   await page.getByLabel("Level").selectOption("A2");
