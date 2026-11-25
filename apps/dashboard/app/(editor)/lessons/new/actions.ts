@@ -4,69 +4,89 @@ import {
   CreateResourceDocument,
   RequestConversationVoiceoverDocument,
   RequestVoiceoversDocument,
+  SaveExerciseSetsDocument,
   type CefrLevel,
-  type ResourceKind,
 } from "@english/graphql";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { editorMutation, explain } from "../../../../lib/api";
 
-export type CreateState = { message: string } | null;
+export type CreateResult = { message: string };
 
-// Essays are Reading lessons: that's the kind the website shows (Listening and Vocabulary pages come later).
-const KINDS: ResourceKind[] = ["READING"];
-const LEVELS: CefrLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
-const MAX_BODY_BYTES = 200_000;
-
+const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 const host = z.object({ voiceId: z.string().max(100), name: z.string().max(40) });
-/** The voice-over settings panel, as the form sends it (the API checks everything again). */
-const voiceChoice = z.object({
-  make: z.boolean(),
-  mode: z.enum(["single", "conversation"]),
-  voices: z.array(z.string().max(100)).max(4),
-  modelId: z.string().max(100),
-  host1: host,
-  host2: host,
+
+/** What the New lesson page sends: the same four parts as the lesson page (the API checks everything again). */
+const newLesson = z.object({
+  siteId: z.string().uuid(),
+  slug: z.string().max(120),
+  title: z.string().max(200),
+  summary: z.string().max(1000),
+  level: z.enum(LEVELS).or(z.literal("")),
+  topicSlugs: z.array(z.string().max(80)).max(20),
+  body: z.unknown(),
+  /** Exercise sets, already turned into the API's payload by the page. */
+  exercises: z.array(z.unknown()).max(20),
+  voice: z.object({
+    make: z.boolean(),
+    mode: z.enum(["single", "conversation"]),
+    voices: z.array(z.string().max(100)).max(4),
+    modelId: z.string().max(100),
+    host1: host,
+    host2: host,
+  }),
 });
+export type NewLesson = z.infer<typeof newLesson>;
 
-function json(value: FormDataEntryValue | null): unknown {
-  const text = typeof value === "string" ? value : "";
-  if (!text || text.length > MAX_BODY_BYTES) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
+/**
+ * Creates the draft with its script, then saves its questions and starts its voice-overs. The lesson exists once the
+ * first step works; if a later step fails, its page opens and says why, so it can be done again there.
+ */
+export async function createLesson(raw: NewLesson): Promise<CreateResult> {
+  const parsed = newLesson.safeParse(raw);
+  if (!parsed.success) return { message: "Something in the form isn't valid. Check the fields and try again." };
+  const input = parsed.data;
+  const conversation = input.voice.mode === "conversation";
 
-export async function createLesson(_: CreateState, form: FormData): Promise<CreateState> {
-  const kind = String(form.get("kind")) as ResourceKind;
-  const level = String(form.get("level") ?? "");
-  const parsed = voiceChoice.safeParse(json(form.get("voice")));
-  const voice = parsed.success ? parsed.data : null;
-  const conversation = voice?.mode === "conversation";
-  const input = {
-    siteId: String(form.get("siteId") ?? ""),
-    kind: KINDS.includes(kind) ? kind : "READING",
-    slug: String(form.get("slug") ?? "").trim(),
-    title: String(form.get("title") ?? "").trim(),
-    cefrLevel: LEVELS.includes(level as CefrLevel) ? (level as CefrLevel) : null,
-    body: json(form.get("body")),
-    // A conversation's host names are part of the lesson: learners see them instead of HOST1/HOST2.
-    speakerNames: conversation ? { host1: voice.host1.name || null, host2: voice.host2.name || null } : null,
-  };
   let id: string;
   let localizationId: string | undefined;
+  let lockVersion = 0;
   try {
-    const created = (await editorMutation(CreateResourceDocument, { input })).createResource;
+    const created = (
+      await editorMutation(CreateResourceDocument, {
+        input: {
+          siteId: input.siteId,
+          kind: "READING",
+          slug: input.slug.trim(),
+          title: input.title.trim(),
+          summary: input.summary.trim() || null,
+          cefrLevel: (input.level || null) as CefrLevel | null,
+          topicSlugs: input.topicSlugs,
+          body: input.body ?? null,
+          // A conversation's host names are part of the lesson: learners see them instead of HOST1/HOST2.
+          speakerNames: conversation
+            ? { host1: input.voice.host1.name || null, host2: input.voice.host2.name || null }
+            : null,
+        },
+      })
+    ).createResource;
     id = created.id;
     localizationId = created.localizations[0]?.id;
+    lockVersion = created.localizations[0]?.draft?.lockVersion ?? 0;
   } catch (error) {
     return { message: explain(error) };
   }
-  // The lesson exists now; if the voice-overs can't start, say why on its page, where they can be tried again.
-  let voiceError: string | null = null;
-  if (voice?.make && input.body && localizationId) {
+
+  const problems: string[] = [];
+  if (localizationId && input.exercises.length) {
+    try {
+      await editorMutation(SaveExerciseSetsDocument, { localizationId, lockVersion, sets: input.exercises });
+    } catch (error) {
+      problems.push(`The questions weren't saved: ${explain(error)}`);
+    }
+  }
+  const { voice } = input;
+  if (localizationId && voice.make && input.body) {
     try {
       if (voice.mode === "conversation") {
         await editorMutation(RequestConversationVoiceoverDocument, {
@@ -81,8 +101,10 @@ export async function createLesson(_: CreateState, form: FormData): Promise<Crea
         await editorMutation(RequestVoiceoversDocument, { localizationId, voiceIds: voice.voices });
       }
     } catch (error) {
-      voiceError = explain(error);
+      problems.push(explain(error));
     }
   }
-  redirect(voiceError ? `/lessons/${id}?${new URLSearchParams({ voiceError })}` : `/lessons/${id}`);
+  redirect(
+    problems.length ? `/lessons/${id}?${new URLSearchParams({ voiceError: problems.join(" ") })}` : `/lessons/${id}`
+  );
 }

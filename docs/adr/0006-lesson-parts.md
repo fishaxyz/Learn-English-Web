@@ -35,3 +35,9 @@
   - `Revision.checklist` reports each part and what's `missing`, batched through the existing loaders.
 - The rule is part of the server's configuration (`requiredParts`, all four in production). The seed script publishes sample lessons without audio, because audio files are never invented. Most API tests run without the rule, and one test turns it on and checks it.
 - **Tests never spend credits.** The end-to-end stack runs with `TTS_PROVIDER=fake` (`pnpm e2e:stack`), so the API offers the test voices and the worker makes silent audio. The browser tests make, approve and publish real (silent) voice-overs, including a two-host podcast.
+
+## Addendum: one editor for new and existing lessons
+
+- The New lesson page and the lesson page are built from the same components (`components/lesson-parts.tsx`, `EditorSection`, `VoiceSettings`, `ExercisesEditor`). Both show the same four sections, the same side list of parts and the same section states.
+- Only the right-hand card differs: **Create draft** on a new lesson, and Save, Publish and Review on an existing one.
+- Whatever is filled in when the lesson is created is saved with it: script, summary, level, topics, linked words and questions. The chosen voice-overs start right after.
