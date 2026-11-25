@@ -60,6 +60,8 @@ type ReadingResource implements Resource {
   vocabulary: [LexicalSense!]!
   "The same links as learners choose them: one item per word or structure, with key flags and sentences."
   vocabularyItems: [VocabularyItem!]!
+  "Approved voice-overs, each with its voice tags and word timings."
+  audioTracks: [AudioTrack!]!
   wordCount: Int!
   "At about 200 words a minute."
   estimatedReadingSeconds: Int!
@@ -157,6 +159,8 @@ type Revision {
   "The linked word senses, as in the text."
   vocabulary: [LexicalSense!]!
   vocabularyItems: [VocabularyItem!]!
+  "Every voice-over of this revision, in any state."
+  audioTracks: [AudioTrack!]!
   "The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only."
   exercises: ExercisePayload!
   "Pass this back when you change the revision; a mismatch means someone else changed it first."

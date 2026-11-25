@@ -1,0 +1,100 @@
+enum AudioTrackStatus {
+  GENERATING
+  READY
+  APPROVED
+  FAILED
+}
+
+enum VoiceGender {
+  MALE
+  FEMALE
+}
+
+enum VoiceAccent {
+  US
+  UK
+}
+
+"When a word is spoken in a track: its block, code-point offsets in that block's text, and milliseconds."
+type WordTiming {
+  blockId: String!
+  start: Int!
+  end: Int!
+  startMs: Int!
+  endMs: Int!
+}
+
+"One voice reading a revision's text."
+type AudioTrack {
+  id: ID!
+  status: AudioTrackStatus!
+  voiceName: String!
+  gender: VoiceGender!
+  accent: VoiceAccent!
+  "For learners: \"Woman · UK\"."
+  label: String!
+  "A time-limited address for the audio file, once it exists."
+  url: String
+  durationMs: Int
+  "Empty when the provider gave no timings: they're never invented."
+  wordTimings: [WordTiming!]!
+  characters: Int!
+  "Editorial: the text changed after this voice-over was made."
+  stale: Boolean!
+  error: String
+  createdAt: DateTime!
+}
+
+type Voice {
+  id: ID!
+  name: String!
+  gender: VoiceGender!
+  accent: VoiceAccent!
+  previewUrl: String
+}
+
+type VoiceCatalog {
+  "elevenlabs, or fake when no key is set."
+  provider: String!
+  voices: [Voice!]!
+  charactersUsed: Int
+  charactersLimit: Int
+}
+
+extend type Query {
+  "Editorial: voices to choose from (US and UK, man or woman) and this month's character use."
+  voiceCatalog(siteId: ID!): VoiceCatalog!
+}
+
+extend type Mutation {
+  "Editors: start a voice-over of the draft's text for each voice (at most 4 at a time). Runs in the background."
+  requestVoiceovers(localizationId: ID!, voiceIds: [ID!]!): [AudioTrack!]!
+  "Editors: keep a finished voice-over; only approved ones go live."
+  approveAudioTrack(id: ID!): AudioTrack!
+  deleteAudioTrack(id: ID!): Boolean!
+}
+
+# --- The Python worker (authenticated with its own service token, never an editor's session)
+
+"Job data, validated per job type by the API."
+scalar JobPayload
+
+type ClaimedJob {
+  id: ID!
+  type: String!
+  payload: JobPayload!
+  claimToken: String!
+  attempt: Int!
+}
+
+type MediaUpload {
+  objectKey: String!
+  uploadUrl: String!
+}
+
+extend type Mutation {
+  claimJob(types: [String!]!): ClaimedJob
+  createJobUpload(jobId: ID!, claimToken: String!, contentType: String!): MediaUpload!
+  completeJob(jobId: ID!, claimToken: String!, result: JobPayload!): Boolean!
+  failJob(jobId: ID!, claimToken: String!, error: String!, retryable: Boolean!): Boolean!
+}

@@ -24,6 +24,9 @@ export const lexicalRelationKind = pgEnum("lexical_relation_kind", [
   "WORD_FAMILY",
   "RELATED_COLLOCATION",
 ]);
+export const jobStatus = pgEnum("job_status", ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]);
+/** GENERATING → READY (waiting for an editor) → APPROVED (shown to learners once published); or FAILED. */
+export const audioTrackStatus = pgEnum("audio_track_status", ["GENERATING", "READY", "APPROVED", "FAILED"]);
 export const questionType = pgEnum("question_type", ["SINGLE_CHOICE", "TRUE_FALSE_NOT_GIVEN", "GAP_FILL"]);
 
 export const id = () => uuid().primaryKey().defaultRandom();

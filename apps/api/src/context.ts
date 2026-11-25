@@ -1,10 +1,13 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Database } from "@english/database";
 import type { Actor } from "./auth/actor";
 import type { Loaders } from "./graphql/loaders";
 import type { Logger } from "./logger";
 import type { SiteModel } from "./models";
 import type { RateLimiter, RateLimitName } from "./modules/rate-limit";
+import type { MediaStorage } from "./modules/media/storage";
 import type { Revalidator } from "./modules/revalidate";
+import type { VoiceCatalog } from "./modules/tts/voices";
 
 /** What the API's resolvers get for each request. Request-scoped: nothing here is shared between users. */
 export type GraphQLContext = {
@@ -22,6 +25,10 @@ export type GraphQLContext = {
   limit: (name: RateLimitName) => void;
   /** Tells the website which cached pages to refresh (in the background). */
   revalidator: Revalidator;
+  storage: MediaStorage;
+  voices: VoiceCatalog;
+  /** True when the request carries the Python worker's service token (never an editor session). */
+  isWorker: boolean;
 };
 
 /** Long-lived things the server is built from. */
@@ -35,4 +42,10 @@ export type ApiDependencies = {
   revalidator: Revalidator;
   /** Believe x-forwarded-for (true only behind our own website server or proxy). */
   trustProxy: boolean;
+  storage: MediaStorage;
+  voices: VoiceCatalog;
+  /** The worker's shared secret; worker operations are refused when it isn't set. */
+  workerToken: string | undefined;
+  /** Serves /media/... for the local storage driver; returns false for other paths. */
+  mediaHandler?: (req: IncomingMessage, res: ServerResponse) => boolean;
 };

@@ -11,6 +11,7 @@ import { exerciseSetsForEditing } from "../modules/assessment/service";
 import type { ExerciseSetInput } from "../modules/assessment/schemas";
 import { tagsForResource } from "../modules/revalidate";
 import { vocabularyItems } from "../modules/lexicon/vocabulary-items";
+import { publicTracks } from "./audio";
 import { readingSeconds, wordCount } from "../modules/rich-text";
 import { invalid } from "../errors";
 import { present } from "../rows";
@@ -161,6 +162,7 @@ export const resourceResolvers: Resolvers = {
     ...common,
     vocabulary: (p, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(p.revision.id),
     vocabularyItems: (p, _, ctx) => vocabularyItems(ctx, p.revision),
+    audioTracks: (p, _, ctx) => publicTracks(ctx, p.revision),
     wordCount: (p) => wordCount(p.revision.plainText),
     estimatedReadingSeconds: (p) => readingSeconds(wordCount(p.revision.plainText)),
   },
@@ -184,6 +186,7 @@ export const resourceResolvers: Resolvers = {
     topics: (r, _, ctx) => ctx.loaders.topicsByRevision.load(r.id),
     vocabulary: (r, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(r.id),
     vocabularyItems: (r, _, ctx) => vocabularyItems(ctx, r),
+    audioTracks: (r, _, ctx) => ctx.loaders.audioTracksByRevision.load(r.id),
     // Answer keys, for editors: a Revision is only reachable through editorialResource(s), which authorize.
     exercises: (r, _, ctx) => exerciseSetsForEditing(ctx.db, r.id),
   },

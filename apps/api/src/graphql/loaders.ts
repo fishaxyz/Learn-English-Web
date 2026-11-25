@@ -219,6 +219,25 @@ export function createLoaders(db: Database) {
       (r) => r.senseRevisionId
     ),
 
+    audioTracksByRevision: grouped<string, typeof s.audioTracks.$inferSelect>(
+      (ids) =>
+        db
+          .select()
+          .from(s.audioTracks)
+          .where(inArray(s.audioTracks.revisionId, [...ids]))
+          .orderBy(asc(s.audioTracks.position)),
+      (r) => r.revisionId
+    ),
+
+    mediaAsset: single<string, typeof s.mediaAssets.$inferSelect>(
+      (ids) =>
+        db
+          .select()
+          .from(s.mediaAssets)
+          .where(inArray(s.mediaAssets.id, [...ids])),
+      (r) => r.id
+    ),
+
     senseRevision: single<string, LexicalSenseModel["revision"]>(
       (ids) =>
         db

@@ -50,6 +50,20 @@
       "when": 1795543530848,
       "tag": "0006_user_passwords",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795588816390,
+      "tag": "0007_voiceover",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795588816893,
+      "tag": "0008_audio_frozen",
+      "breakpoints": true
     }
   ]
 }

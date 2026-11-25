@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 // Only the schema text: the API doesn't need the clients' typed documents or urql.
 import { typeDefs } from "@english/graphql/typedefs";
@@ -22,6 +22,13 @@ export type AppOptions = {
 
 export const LIVE_PATH = "/health/live";
 export const READY_PATH = "/health/ready";
+
+function isWorkerToken(given: string | null, expected: string | undefined): boolean {
+  if (!given || !expected) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /** Caches an async value for the lifetime of one request. */
 function once<T>(load: () => Promise<T>): () => Promise<T> {
@@ -68,6 +75,9 @@ export function createApp(deps: ApiDependencies, options: AppOptions) {
         loaders: createLoaders(deps.db),
         limit: (name) => deps.rateLimiter.hit(name, client),
         revalidator: deps.revalidator,
+        storage: deps.storage,
+        voices: deps.voices,
+        isWorker: isWorkerToken(request.headers.get("x-worker-token"), deps.workerToken),
       };
     },
   });
@@ -87,6 +97,7 @@ export function createApp(deps: ApiDependencies, options: AppOptions) {
   const handler = (req: IncomingMessage, res: ServerResponse) => {
     const path = (req.url ?? "/").split("?")[0];
     if (path === READY_PATH && (req.method === "GET" || req.method === "HEAD")) return void ready(res);
+    if (path?.startsWith("/media/") && deps.mediaHandler?.(req, res)) return;
     if ((req.url ?? "").length > 10_000) return reject(res, 414, "The request URL is too long");
     if (req.method === "POST") {
       // Bodies must declare their size, and stay under the limit (AGENTS.md §6).

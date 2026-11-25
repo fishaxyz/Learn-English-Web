@@ -4,7 +4,8 @@ import { healthQuery } from "./health";
 import { identityResolvers } from "./identity";
 import { lexiconResolvers } from "./lexicon";
 import { resourceResolvers } from "./resources";
-import { DateTime, ExercisePayload, RichText } from "./scalars";
+import { audioResolvers } from "./audio";
+import { DateTime, ExercisePayload, JobPayload, RichText } from "./scalars";
 
 /** Merges each domain's resolvers (AGENTS.md §16: one module per domain). */
 function merge(...parts: Resolvers[]): Resolvers {
@@ -18,8 +19,16 @@ function merge(...parts: Resolvers[]): Resolvers {
 }
 
 export const resolvers: Resolvers = {
-  ...merge({ Query: { ...healthQuery } }, identityResolvers, resourceResolvers, lexiconResolvers, assessmentResolvers),
+  ...merge(
+    { Query: { ...healthQuery } },
+    identityResolvers,
+    resourceResolvers,
+    lexiconResolvers,
+    assessmentResolvers,
+    audioResolvers
+  ),
   DateTime,
   RichText,
   ExercisePayload,
+  JobPayload,
 };

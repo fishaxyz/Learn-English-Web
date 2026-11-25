@@ -15,6 +15,8 @@ import type {
   EditorialSenseModel,
   SenseRevisionModel,
   VocabularyItemModel,
+  AudioTrackModel,
+  ClaimedJobModel,
   ViewerModel,
   MembershipModel,
 } from "../models";
@@ -38,6 +40,8 @@ export type Scalars = {
    * apps/api/src/modules/assessment/schemas.ts for the exact shape of each question type. Editorial only.
    */
   ExercisePayload: { input: unknown; output: unknown };
+  /** Job data, validated per job type by the API. */
+  JobPayload: { input: unknown; output: unknown };
   /**
    * A rich-text document (Tiptap JSON, schema version 1). Validated by the API on every write; only known node
    * and mark types are accepted, and links must be http(s) or mailto.
@@ -62,12 +66,45 @@ export type ArticleResource = Resource & {
   topics: Array<Topic>;
 };
 
+/** One voice reading a revision's text. */
+export type AudioTrack = {
+  __typename?: "AudioTrack";
+  accent: VoiceAccent;
+  characters: Scalars["Int"]["output"];
+  createdAt: Scalars["DateTime"]["output"];
+  durationMs?: Maybe<Scalars["Int"]["output"]>;
+  error?: Maybe<Scalars["String"]["output"]>;
+  gender: VoiceGender;
+  id: Scalars["ID"]["output"];
+  /** For learners: "Woman · UK". */
+  label: Scalars["String"]["output"];
+  /** Editorial: the text changed after this voice-over was made. */
+  stale: Scalars["Boolean"]["output"];
+  status: AudioTrackStatus;
+  /** A time-limited address for the audio file, once it exists. */
+  url?: Maybe<Scalars["String"]["output"]>;
+  voiceName: Scalars["String"]["output"];
+  /** Empty when the provider gave no timings: they're never invented. */
+  wordTimings: Array<WordTiming>;
+};
+
+export type AudioTrackStatus = "APPROVED" | "FAILED" | "GENERATING" | "READY";
+
 /** CEFR levels. An editorial estimate of a lesson's difficulty, not a guarantee of a learner's level. */
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
 export type ChoiceAnswer = {
   __typename?: "ChoiceAnswer";
   optionId: Scalars["ID"]["output"];
+};
+
+export type ClaimedJob = {
+  __typename?: "ClaimedJob";
+  attempt: Scalars["Int"]["output"];
+  claimToken: Scalars["String"]["output"];
+  id: Scalars["ID"]["output"];
+  payload: Scalars["JobPayload"]["output"];
+  type: Scalars["String"]["output"];
 };
 
 export type CorrectAnswer = ChoiceAnswer | GapsAnswer | JudgementAnswer;
@@ -294,6 +331,12 @@ export type ManageLexicalSenseInput = {
   usageNote?: InputMaybe<Scalars["String"]["input"]>;
 };
 
+export type MediaUpload = {
+  __typename?: "MediaUpload";
+  objectKey: Scalars["String"]["output"];
+  uploadUrl: Scalars["String"]["output"];
+};
+
 export type Membership = {
   __typename?: "Membership";
   role: SiteRole;
@@ -302,10 +345,17 @@ export type Membership = {
 
 export type Mutation = {
   __typename?: "Mutation";
+  /** Editors: keep a finished voice-over; only approved ones go live. */
+  approveAudioTrack: AudioTrack;
   /** Admins: take the resource off the site. Its revisions are kept. */
   archiveResource: EditorialResource;
+  claimJob?: Maybe<ClaimedJob>;
+  completeJob: Scalars["Boolean"]["output"];
+  createJobUpload: MediaUpload;
   /** Editors: a new resource with its first draft. */
   createResource: EditorialResource;
+  deleteAudioTrack: Scalars["Boolean"]["output"];
+  failJob: Scalars["Boolean"]["output"];
   /** Grades answers on the server. Nothing is stored: practice is anonymous in the MVP. */
   gradePractice: PracticeResult;
   manageLexicalSense: EditorialSense;
@@ -314,6 +364,8 @@ export type Mutation = {
   publishNow: EditorialResource;
   /** Reviewers: publish the reviewed draft. The previous published revision is superseded, never changed. */
   publishResource: EditorialResource;
+  /** Editors: start a voice-over of the draft's text for each voice (at most 4 at a time). Runs in the background. */
+  requestVoiceovers: Array<AudioTrack>;
   /** Reviewers: send it back to the editor. */
   returnToDraft: EditorialResource;
   /** Editors: replace the draft's exercises. Validated as a whole. */
@@ -325,12 +377,43 @@ export type Mutation = {
   updateDraft: EditorialResource;
 };
 
+export type MutationApproveAudioTrackArgs = {
+  id: Scalars["ID"]["input"];
+};
+
 export type MutationArchiveResourceArgs = {
   resourceId: Scalars["ID"]["input"];
 };
 
+export type MutationClaimJobArgs = {
+  types: Array<Scalars["String"]["input"]>;
+};
+
+export type MutationCompleteJobArgs = {
+  claimToken: Scalars["String"]["input"];
+  jobId: Scalars["ID"]["input"];
+  result: Scalars["JobPayload"]["input"];
+};
+
+export type MutationCreateJobUploadArgs = {
+  claimToken: Scalars["String"]["input"];
+  contentType: Scalars["String"]["input"];
+  jobId: Scalars["ID"]["input"];
+};
+
 export type MutationCreateResourceArgs = {
   input: CreateResourceInput;
+};
+
+export type MutationDeleteAudioTrackArgs = {
+  id: Scalars["ID"]["input"];
+};
+
+export type MutationFailJobArgs = {
+  claimToken: Scalars["String"]["input"];
+  error: Scalars["String"]["input"];
+  jobId: Scalars["ID"]["input"];
+  retryable: Scalars["Boolean"]["input"];
 };
 
 export type MutationGradePracticeArgs = {
@@ -354,6 +437,11 @@ export type MutationPublishNowArgs = {
 export type MutationPublishResourceArgs = {
   localizationId: Scalars["ID"]["input"];
   lockVersion: Scalars["Int"]["input"];
+};
+
+export type MutationRequestVoiceoversArgs = {
+  localizationId: Scalars["ID"]["input"];
+  voiceIds: Array<Scalars["ID"]["input"]>;
 };
 
 export type MutationReturnToDraftArgs = {
@@ -438,6 +526,8 @@ export type Query = {
   topics: Array<Topic>;
   /** Who is signed in (from the request's session token), or null. */
   viewer?: Maybe<Viewer>;
+  /** Editorial: voices to choose from (US and UK, man or woman) and this month's character use. */
+  voiceCatalog: VoiceCatalog;
 };
 
 export type QueryEditorialResourceArgs = {
@@ -484,6 +574,10 @@ export type QueryResourceBySlugArgs = {
   slug: Scalars["String"]["input"];
 };
 
+export type QueryVoiceCatalogArgs = {
+  siteId: Scalars["ID"]["input"];
+};
+
 /** A question as the learner sees it. Answers are never part of it: they come back from gradePractice. */
 export type Question = {
   id: Scalars["ID"]["output"];
@@ -512,6 +606,8 @@ export type QuestionType = "GAP_FILL" | "SINGLE_CHOICE" | "TRUE_FALSE_NOT_GIVEN"
 
 export type ReadingResource = Resource & {
   __typename?: "ReadingResource";
+  /** Approved voice-overs, each with its voice tags and word timings. */
+  audioTracks: Array<AudioTrack>;
   body: Scalars["RichText"]["output"];
   cefrLevel?: Maybe<CefrLevel>;
   /** At about 200 words a minute. */
@@ -571,6 +667,8 @@ export type ResourceKind = "ARTICLE" | "LEXICAL_COLLECTION" | "LISTENING" | "REA
 
 export type Revision = {
   __typename?: "Revision";
+  /** Every voice-over of this revision, in any state. */
+  audioTracks: Array<AudioTrack>;
   body: Scalars["RichText"]["output"];
   cefrLevel?: Maybe<CefrLevel>;
   createdAt: Scalars["DateTime"]["output"];
@@ -707,6 +805,38 @@ export type VocabularyItem = {
   sense: LexicalSense;
 };
 
+export type Voice = {
+  __typename?: "Voice";
+  accent: VoiceAccent;
+  gender: VoiceGender;
+  id: Scalars["ID"]["output"];
+  name: Scalars["String"]["output"];
+  previewUrl?: Maybe<Scalars["String"]["output"]>;
+};
+
+export type VoiceAccent = "UK" | "US";
+
+export type VoiceCatalog = {
+  __typename?: "VoiceCatalog";
+  charactersLimit?: Maybe<Scalars["Int"]["output"]>;
+  charactersUsed?: Maybe<Scalars["Int"]["output"]>;
+  /** elevenlabs, or fake when no key is set. */
+  provider: Scalars["String"]["output"];
+  voices: Array<Voice>;
+};
+
+export type VoiceGender = "FEMALE" | "MALE";
+
+/** When a word is spoken in a track: its block, code-point offsets in that block's text, and milliseconds. */
+export type WordTiming = {
+  __typename?: "WordTiming";
+  blockId: Scalars["String"]["output"];
+  end: Scalars["Int"]["output"];
+  endMs: Scalars["Int"]["output"];
+  start: Scalars["Int"]["output"];
+  startMs: Scalars["Int"]["output"];
+};
+
 export type ResolverTypeWrapper<T> = Promise<T> | T;
 
 export type ResolverWithResolve<TResult, TParent, TContext, TArgs> = {
@@ -800,9 +930,12 @@ export type ResolversUnionTypes<_RefType extends Record<string, unknown>> = {
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = {
   ArticleResource: ResolverTypeWrapper<PublishedResourceModel>;
+  AudioTrack: ResolverTypeWrapper<AudioTrackModel>;
+  AudioTrackStatus: AudioTrackStatus;
   Boolean: ResolverTypeWrapper<Scalars["Boolean"]["output"]>;
   CefrLevel: CefrLevel;
   ChoiceAnswer: ResolverTypeWrapper<ChoiceAnswer>;
+  ClaimedJob: ResolverTypeWrapper<ClaimedJobModel>;
   CorrectAnswer: ResolverTypeWrapper<ResolversUnionTypes<ResolversTypes>["CorrectAnswer"]>;
   CreateResourceInput: CreateResourceInput;
   DateTime: ResolverTypeWrapper<Scalars["DateTime"]["output"]>;
@@ -823,6 +956,7 @@ export type ResolversTypes = {
   HealthStatus: HealthStatus;
   ID: ResolverTypeWrapper<Scalars["ID"]["output"]>;
   Int: ResolverTypeWrapper<Scalars["Int"]["output"]>;
+  JobPayload: ResolverTypeWrapper<Scalars["JobPayload"]["output"]>;
   Judgement: Judgement;
   JudgementAnswer: ResolverTypeWrapper<JudgementAnswer>;
   LexicalCollectionResource: ResolverTypeWrapper<PublishedResourceModel>;
@@ -833,6 +967,7 @@ export type ResolversTypes = {
   LexicalSense: ResolverTypeWrapper<LexicalSenseModel>;
   ListeningResource: ResolverTypeWrapper<PublishedResourceModel>;
   ManageLexicalSenseInput: ManageLexicalSenseInput;
+  MediaUpload: ResolverTypeWrapper<MediaUpload>;
   Membership: ResolverTypeWrapper<MembershipModel>;
   Mutation: ResolverTypeWrapper<Record<PropertyKey, never>>;
   PageInfo: ResolverTypeWrapper<PageInfo>;
@@ -873,13 +1008,20 @@ export type ResolversTypes = {
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ResolverTypeWrapper<ViewerModel>;
   VocabularyItem: ResolverTypeWrapper<VocabularyItemModel>;
+  Voice: ResolverTypeWrapper<Voice>;
+  VoiceAccent: VoiceAccent;
+  VoiceCatalog: ResolverTypeWrapper<VoiceCatalog>;
+  VoiceGender: VoiceGender;
+  WordTiming: ResolverTypeWrapper<WordTiming>;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
   ArticleResource: PublishedResourceModel;
+  AudioTrack: AudioTrackModel;
   Boolean: Scalars["Boolean"]["output"];
   ChoiceAnswer: ChoiceAnswer;
+  ClaimedJob: ClaimedJobModel;
   CorrectAnswer: ResolversUnionTypes<ResolversParentTypes>["CorrectAnswer"];
   CreateResourceInput: CreateResourceInput;
   DateTime: Scalars["DateTime"]["output"];
@@ -899,6 +1041,7 @@ export type ResolversParentTypes = {
   Health: Health;
   ID: Scalars["ID"]["output"];
   Int: Scalars["Int"]["output"];
+  JobPayload: Scalars["JobPayload"]["output"];
   JudgementAnswer: JudgementAnswer;
   LexicalCollectionResource: PublishedResourceModel;
   LexicalEntry: LexicalEntryModel;
@@ -907,6 +1050,7 @@ export type ResolversParentTypes = {
   LexicalSense: LexicalSenseModel;
   ListeningResource: PublishedResourceModel;
   ManageLexicalSenseInput: ManageLexicalSenseInput;
+  MediaUpload: MediaUpload;
   Membership: MembershipModel;
   Mutation: Record<PropertyKey, never>;
   PageInfo: PageInfo;
@@ -937,6 +1081,9 @@ export type ResolversParentTypes = {
   UpdateDraftInput: UpdateDraftInput;
   Viewer: ViewerModel;
   VocabularyItem: VocabularyItemModel;
+  Voice: Voice;
+  VoiceCatalog: VoiceCatalog;
+  WordTiming: WordTiming;
 };
 
 export type ArticleResourceResolvers<
@@ -959,12 +1106,42 @@ export type ArticleResourceResolvers<
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type AudioTrackResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["AudioTrack"] = ResolversParentTypes["AudioTrack"],
+> = {
+  accent?: Resolver<ResolversTypes["VoiceAccent"], ParentType, ContextType>;
+  characters?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes["DateTime"], ParentType, ContextType>;
+  durationMs?: Resolver<Maybe<ResolversTypes["Int"]>, ParentType, ContextType>;
+  error?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+  gender?: Resolver<ResolversTypes["VoiceGender"], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
+  label?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  stale?: Resolver<ResolversTypes["Boolean"], ParentType, ContextType>;
+  status?: Resolver<ResolversTypes["AudioTrackStatus"], ParentType, ContextType>;
+  url?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+  voiceName?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  wordTimings?: Resolver<Array<ResolversTypes["WordTiming"]>, ParentType, ContextType>;
+};
+
 export type ChoiceAnswerResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["ChoiceAnswer"] = ResolversParentTypes["ChoiceAnswer"],
 > = {
   optionId?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type ClaimedJobResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["ClaimedJob"] = ResolversParentTypes["ClaimedJob"],
+> = {
+  attempt?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  claimToken?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
+  payload?: Resolver<ResolversTypes["JobPayload"], ParentType, ContextType>;
+  type?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
 };
 
 export type CorrectAnswerResolvers<
@@ -1088,6 +1265,10 @@ export type HealthResolvers<
   status?: Resolver<ResolversTypes["HealthStatus"], ParentType, ContextType>;
 };
 
+export interface JobPayloadScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes["JobPayload"], any> {
+  name: "JobPayload";
+}
+
 export type JudgementAnswerResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["JudgementAnswer"] = ResolversParentTypes["JudgementAnswer"],
@@ -1175,6 +1356,14 @@ export type ListeningResourceResolvers<
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type MediaUploadResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["MediaUpload"] = ResolversParentTypes["MediaUpload"],
+> = {
+  objectKey?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  uploadUrl?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+};
+
 export type MembershipResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["Membership"] = ResolversParentTypes["Membership"],
@@ -1187,17 +1376,53 @@ export type MutationResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["Mutation"] = ResolversParentTypes["Mutation"],
 > = {
+  approveAudioTrack?: Resolver<
+    ResolversTypes["AudioTrack"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationApproveAudioTrackArgs, "id">
+  >;
   archiveResource?: Resolver<
     ResolversTypes["EditorialResource"],
     ParentType,
     ContextType,
     RequireFields<MutationArchiveResourceArgs, "resourceId">
   >;
+  claimJob?: Resolver<
+    Maybe<ResolversTypes["ClaimedJob"]>,
+    ParentType,
+    ContextType,
+    RequireFields<MutationClaimJobArgs, "types">
+  >;
+  completeJob?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationCompleteJobArgs, "claimToken" | "jobId" | "result">
+  >;
+  createJobUpload?: Resolver<
+    ResolversTypes["MediaUpload"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationCreateJobUploadArgs, "claimToken" | "contentType" | "jobId">
+  >;
   createResource?: Resolver<
     ResolversTypes["EditorialResource"],
     ParentType,
     ContextType,
     RequireFields<MutationCreateResourceArgs, "input">
+  >;
+  deleteAudioTrack?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationDeleteAudioTrackArgs, "id">
+  >;
+  failJob?: Resolver<
+    ResolversTypes["Boolean"],
+    ParentType,
+    ContextType,
+    RequireFields<MutationFailJobArgs, "claimToken" | "error" | "jobId" | "retryable">
   >;
   gradePractice?: Resolver<
     ResolversTypes["PracticeResult"],
@@ -1228,6 +1453,12 @@ export type MutationResolvers<
     ParentType,
     ContextType,
     RequireFields<MutationPublishResourceArgs, "localizationId" | "lockVersion">
+  >;
+  requestVoiceovers?: Resolver<
+    Array<ResolversTypes["AudioTrack"]>,
+    ParentType,
+    ContextType,
+    RequireFields<MutationRequestVoiceoversArgs, "localizationId" | "voiceIds">
   >;
   returnToDraft?: Resolver<
     ResolversTypes["EditorialResource"],
@@ -1348,6 +1579,12 @@ export type QueryResolvers<
   >;
   topics?: Resolver<Array<ResolversTypes["Topic"]>, ParentType, ContextType>;
   viewer?: Resolver<Maybe<ResolversTypes["Viewer"]>, ParentType, ContextType>;
+  voiceCatalog?: Resolver<
+    ResolversTypes["VoiceCatalog"],
+    ParentType,
+    ContextType,
+    RequireFields<QueryVoiceCatalogArgs, "siteId">
+  >;
 };
 
 export type QuestionResolvers<
@@ -1385,6 +1622,7 @@ export type ReadingResourceResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["ReadingResource"] = ResolversParentTypes["ReadingResource"],
 > = {
+  audioTracks?: Resolver<Array<ResolversTypes["AudioTrack"]>, ParentType, ContextType>;
   body?: Resolver<ResolversTypes["RichText"], ParentType, ContextType>;
   cefrLevel?: Resolver<Maybe<ResolversTypes["CefrLevel"]>, ParentType, ContextType>;
   estimatedReadingSeconds?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
@@ -1428,6 +1666,7 @@ export type RevisionResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes["Revision"] = ResolversParentTypes["Revision"],
 > = {
+  audioTracks?: Resolver<Array<ResolversTypes["AudioTrack"]>, ParentType, ContextType>;
   body?: Resolver<ResolversTypes["RichText"], ParentType, ContextType>;
   cefrLevel?: Resolver<Maybe<ResolversTypes["CefrLevel"]>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes["DateTime"], ParentType, ContextType>;
@@ -1560,9 +1799,43 @@ export type VocabularyItemResolvers<
   sense?: Resolver<ResolversTypes["LexicalSense"], ParentType, ContextType>;
 };
 
+export type VoiceResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["Voice"] = ResolversParentTypes["Voice"],
+> = {
+  accent?: Resolver<ResolversTypes["VoiceAccent"], ParentType, ContextType>;
+  gender?: Resolver<ResolversTypes["VoiceGender"], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes["ID"], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  previewUrl?: Resolver<Maybe<ResolversTypes["String"]>, ParentType, ContextType>;
+};
+
+export type VoiceCatalogResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["VoiceCatalog"] = ResolversParentTypes["VoiceCatalog"],
+> = {
+  charactersLimit?: Resolver<Maybe<ResolversTypes["Int"]>, ParentType, ContextType>;
+  charactersUsed?: Resolver<Maybe<ResolversTypes["Int"]>, ParentType, ContextType>;
+  provider?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  voices?: Resolver<Array<ResolversTypes["Voice"]>, ParentType, ContextType>;
+};
+
+export type WordTimingResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes["WordTiming"] = ResolversParentTypes["WordTiming"],
+> = {
+  blockId?: Resolver<ResolversTypes["String"], ParentType, ContextType>;
+  end?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  endMs?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  start?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+  startMs?: Resolver<ResolversTypes["Int"], ParentType, ContextType>;
+};
+
 export type Resolvers<ContextType = GraphQLContext> = {
   ArticleResource?: ArticleResourceResolvers<ContextType>;
+  AudioTrack?: AudioTrackResolvers<ContextType>;
   ChoiceAnswer?: ChoiceAnswerResolvers<ContextType>;
+  ClaimedJob?: ClaimedJobResolvers<ContextType>;
   CorrectAnswer?: CorrectAnswerResolvers<ContextType>;
   DateTime?: GraphQLScalarType;
   EditorialLocalization?: EditorialLocalizationResolvers<ContextType>;
@@ -1577,12 +1850,14 @@ export type Resolvers<ContextType = GraphQLContext> = {
   GapSegment?: GapSegmentResolvers<ContextType>;
   GapsAnswer?: GapsAnswerResolvers<ContextType>;
   Health?: HealthResolvers<ContextType>;
+  JobPayload?: GraphQLScalarType;
   JudgementAnswer?: JudgementAnswerResolvers<ContextType>;
   LexicalCollectionResource?: LexicalCollectionResourceResolvers<ContextType>;
   LexicalEntry?: LexicalEntryResolvers<ContextType>;
   LexicalExample?: LexicalExampleResolvers<ContextType>;
   LexicalSense?: LexicalSenseResolvers<ContextType>;
   ListeningResource?: ListeningResourceResolvers<ContextType>;
+  MediaUpload?: MediaUploadResolvers<ContextType>;
   Membership?: MembershipResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   PageInfo?: PageInfoResolvers<ContextType>;
@@ -1607,4 +1882,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   TrueFalseNotGivenQuestion?: TrueFalseNotGivenQuestionResolvers<ContextType>;
   Viewer?: ViewerResolvers<ContextType>;
   VocabularyItem?: VocabularyItemResolvers<ContextType>;
+  Voice?: VoiceResolvers<ContextType>;
+  VoiceCatalog?: VoiceCatalogResolvers<ContextType>;
+  WordTiming?: WordTimingResolvers<ContextType>;
 };

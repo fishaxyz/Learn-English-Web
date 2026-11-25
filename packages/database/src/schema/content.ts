@@ -14,6 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import {
+  audioTrackStatus,
   cefrLevel,
   createdAt,
   id,
@@ -276,5 +277,56 @@ export const revisionMedia = pgTable(
       foreignColumns: [mediaAssets.id, mediaAssets.siteId],
     }),
     index("revision_media_asset").on(t.assetId),
+  ]
+);
+
+/**
+ * One voice reading one revision's text (AGENTS.md §5.2: audio variants are separate, each with its own timing).
+ * The voice's gender and accent are shown to learners as tags. Word timings are milliseconds relative to this
+ * track, keyed by block id and code-point offsets like vocabulary annotations; they're never invented: a track
+ * without provider timings has none. `textHash` says which text it read, so a changed text marks it stale.
+ */
+export const audioTracks = pgTable(
+  "audio_tracks",
+  {
+    id: id(),
+    siteId: siteRef(),
+    revisionId: uuid().notNull(),
+    assetId: uuid(),
+    status: audioTrackStatus().notNull().default("GENERATING"),
+    provider: text().notNull(),
+    voiceId: text().notNull(),
+    voiceName: text().notNull(),
+    /** "male" or "female", as the provider labels the voice. */
+    gender: text().notNull(),
+    /** "us" or "uk". */
+    accent: text().notNull(),
+    modelId: text(),
+    characters: integer().notNull(),
+    textHash: text().notNull(),
+    wordTimings: jsonb(),
+    durationMs: integer(),
+    position: integer().notNull().default(0),
+    jobId: uuid(),
+    error: text(),
+    createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "audio_tracks_revision_fk",
+      columns: [t.revisionId, t.siteId],
+      foreignColumns: [resourceRevisions.id, resourceRevisions.siteId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "audio_tracks_asset_fk",
+      columns: [t.assetId, t.siteId],
+      foreignColumns: [mediaAssets.id, mediaAssets.siteId],
+    }),
+    index("audio_tracks_revision").on(t.revisionId),
+    check("audio_tracks_gender", sql`${t.gender} in ('male', 'female')`),
+    check("audio_tracks_accent", sql`${t.accent} in ('us', 'uk')`),
+    check("audio_tracks_characters", sql`${t.characters} > 0`),
   ]
 );

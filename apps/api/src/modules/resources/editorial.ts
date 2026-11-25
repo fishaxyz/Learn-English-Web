@@ -5,6 +5,7 @@ import type { RevisionModel } from "../../models";
 import { copyExerciseSets } from "../assessment/service";
 import { audit } from "../audit";
 import { one } from "../../rows";
+import { copyTracks, prepareTracksForPublish } from "../audio/service";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
 import {
@@ -204,6 +205,7 @@ export async function startDraft(db: Database, actorUserId: string | null, local
           select site_id, ${d.id}, block_id, start, "end", surface_text, sense_revision_id, is_key
           from lexical_annotations where revision_id = ${p.id}`);
       await copyExerciseSets(tx, p.siteId, p.id, d.id);
+      await copyTracks(tx, p.id, d.id);
       await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));
       await audit(tx, {
         siteId: l.siteId,
@@ -318,6 +320,7 @@ export async function publishResource(
           union select sense_revision_id from lexical_annotations where revision_id = ${draft.id})
         limit 1`);
       if (unpublished.length) throw conflict("Publish the linked word senses first");
+      await prepareTracksForPublish(tx, draft.id, draft.richText as RichTextDocument);
 
       if (l.publishedRevisionId) {
         await tx.update(rev).set({ status: "SUPERSEDED" }).where(eq(rev.id, l.publishedRevisionId));

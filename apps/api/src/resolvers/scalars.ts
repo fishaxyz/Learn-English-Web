@@ -35,3 +35,11 @@ export const ExercisePayload = new GraphQLScalarType<unknown, unknown>({
   parseValue: (value) => value,
   parseLiteral: (ast) => valueFromASTUntyped(ast),
 });
+
+/** Worker job data: validated per job type by the services. */
+export const JobPayload = new GraphQLScalarType<unknown, unknown>({
+  name: "JobPayload",
+  serialize: (value) => value,
+  parseValue: (value) => value,
+  parseLiteral: (ast) => valueFromASTUntyped(ast),
+});

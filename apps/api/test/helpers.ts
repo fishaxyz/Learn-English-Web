@@ -4,7 +4,7 @@ import { createTestDatabase, type TestDatabase } from "@english/database/testing
 import { createApp } from "../src/app";
 import type { SiteRoleValue } from "../src/models";
 import { seed } from "../src/seed/seed";
-import { testDeps } from "./deps";
+import { TEST_WORKER_TOKEN, testDeps } from "./deps";
 
 export type Harness = Awaited<ReturnType<typeof createHarness>>;
 
@@ -13,11 +13,9 @@ export async function createHarness(overrides: Partial<Parameters<typeof testDep
   const t: TestDatabase = await createTestDatabase();
   const a = await seed(t.db, "a.test", "Site A");
   const b = await seed(t.db, "b.test", "Site B");
-  const yoga = createApp(testDeps({ db: t.db, ping: () => t.ping(), ...overrides }), {
-    corsOrigins: [],
-    graphiql: false,
-    production: false,
-  }).yoga;
+  const deps = testDeps({ db: t.db, ping: () => t.ping(), ...overrides });
+  const app = createApp(deps, { corsOrigins: [], graphiql: false, production: false });
+  const yoga = app.yoga;
 
   /** A signed-in editor: a user, a membership and a live session token. */
   async function editor(siteId: string, role: SiteRoleValue) {
@@ -50,7 +48,7 @@ export async function createHarness(overrides: Partial<Parameters<typeof testDep
   async function gql(
     query: string,
     variables: Record<string, unknown> = {},
-    options: { site?: string; token?: string } = {}
+    options: { site?: string; token?: string; worker?: boolean } = {}
   ): Promise<Result & { status: number }> {
     const res = await yoga.fetch("http://test/graphql", {
       method: "POST",
@@ -58,13 +56,14 @@ export async function createHarness(overrides: Partial<Parameters<typeof testDep
         "content-type": "application/json",
         "x-site-domain": options.site ?? "a.test",
         ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+        ...(options.worker ? { "x-worker-token": TEST_WORKER_TOKEN } : {}),
       },
       body: JSON.stringify({ query, variables }),
     });
     return { status: res.status, ...((await res.json()) as Result) };
   }
 
-  return { t, a, b, yoga, gql, people, editor, drop: () => t.drop() };
+  return { t, a, b, yoga, handler: app.handler, deps, gql, people, editor, drop: () => t.drop() };
 }
 
 export const codeOf = (r: { errors?: { extensions?: { code?: string } }[] }) => r.errors?.[0]?.extensions?.code;
