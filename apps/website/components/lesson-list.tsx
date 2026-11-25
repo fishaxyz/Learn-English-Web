@@ -12,12 +12,22 @@ export function lessonHref(lesson: { kind: string; slug: string }) {
 function LessonCard({ lesson }: { lesson: LessonCardFragment }) {
   const href = lessonHref(lesson);
   const reading = lesson.__typename === "ReadingResource" ? lesson.estimatedReadingSeconds : null;
+  const voices = lesson.__typename === "ReadingResource" ? lesson.audioTracks : [];
   const body = (
     <>
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
         <LevelBadge level={lesson.cefrLevel} />
         {reading ? <span>{minutes(reading)}</span> : null}
       </div>
+      {voices.length ? (
+        <p className="flex flex-wrap gap-1.5 text-xs text-muted">
+          {voices.map((v) => (
+            <span key={v.id} className="rounded-full border border-line px-2 py-0.5">
+              🎧 {v.label}
+            </span>
+          ))}
+        </p>
+      ) : null}
       <h3 className="font-display text-xl font-semibold text-ink group-hover:text-accent">{lesson.title}</h3>
       {lesson.summary ? <p className="text-muted">{lesson.summary}</p> : null}
       {lesson.topics.length ? (

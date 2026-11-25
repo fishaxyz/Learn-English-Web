@@ -2,3 +2,10 @@
 @import "@english/ui/theme.css";
 /* Shared components live outside this app, so Tailwind must scan them too. */
 @source "../../../packages/ui/src";
+
+/* Read-along: the word the voice-over is saying (set by the audio player through CSS.highlights). */
+::highlight(read-along) {
+  background-color: var(--color-accent-soft);
+  color: var(--color-ink);
+  text-decoration: underline 2px var(--color-accent);
+}

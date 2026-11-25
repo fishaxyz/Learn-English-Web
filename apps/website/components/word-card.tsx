@@ -2,6 +2,7 @@
 
 import type { VocabularyItemViewFragment } from "@english/graphql";
 import { LevelBadge } from "@english/ui";
+import { useState } from "react";
 import { useSpeech } from "../lib/speech";
 
 const KIND_LABEL: Record<string, string> = {
@@ -45,11 +46,14 @@ export function WordCard({
   language,
   inList,
   onToggle,
+  playInText,
 }: {
   item: VocabularyItemViewFragment;
   language: string | null;
   inList: boolean;
   onToggle: () => void;
+  /** Plays the words as the lesson's voice-over says them; returns false if that voice has no timings for them. */
+  playInText?: () => boolean;
 }) {
   const { sense } = item;
   const { available, speak } = useSpeech();
@@ -58,6 +62,7 @@ export function WordCard({
   // Patterns ("like + verb-ing") are spoken as they appear in the text; everything else by its base form.
   const spoken = sense.entry.kind === "SENTENCE_PATTERN" && first ? first.text : sense.entry.displayForm;
   const translation = language ? sense.translations.find((t) => t.locale === language) : undefined;
+  const [noTiming, setNoTiming] = useState(false);
   const ipa = (accent: string) => sense.pronunciations.find((p) => p.accent === accent)?.ipa;
 
   return (
@@ -69,9 +74,18 @@ export function WordCard({
         {item.isKey ? <span className="text-xs font-semibold text-accent">★ Key word</span> : null}
       </div>
 
-      {available ? (
+      {available || playInText ? (
         <div className="flex flex-wrap gap-2">
-          {(["en-GB", "en-US"] as const).map((accent) => (
+          {playInText ? (
+            <button
+              type="button"
+              onClick={() => setNoTiming(!playInText())}
+              className="flex items-center gap-1.5 rounded-full border border-accent px-3 py-1 text-sm font-medium text-accent hover:bg-accent-soft"
+            >
+              <span aria-hidden="true">🎧</span> As said in the text
+            </button>
+          ) : null}
+          {(available ? (["en-GB", "en-US"] as const) : []).map((accent) => (
             <button
               key={accent}
               type="button"
@@ -87,6 +101,7 @@ export function WordCard({
         </div>
       ) : null}
 
+      {noTiming ? <p className="text-sm text-muted">This voice can&apos;t play single words, sorry.</p> : null}
       {translation ? (
         <p lang={translation.locale} className="rounded-lg bg-accent-soft px-3 py-2 font-medium text-ink">
           {translation.text}

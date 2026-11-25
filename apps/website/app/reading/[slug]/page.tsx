@@ -93,6 +93,7 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
           body={lesson.body}
           items={lesson.vocabularyItems}
           lesson={{ slug: lesson.slug, title: lesson.title }}
+          tracks={lesson.audioTracks.filter((t) => t.url)}
         />
       </LessonLayout>
     </>

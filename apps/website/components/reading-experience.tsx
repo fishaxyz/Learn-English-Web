@@ -5,6 +5,7 @@ import { RichTextRenderer } from "@english/ui";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { AudioPlayer, type PlayerHandle, type Track } from "./audio-player";
 import { SUGGESTED_PER_READING, useMyWords, type SavedItem } from "../lib/my-words";
 import { isStructure, languageName, WordCard } from "./word-card";
 
@@ -117,11 +118,15 @@ export function ReadingExperience({
   body,
   items,
   lesson,
+  tracks = [],
 }: {
   body: unknown;
   items: Item[];
   lesson: { slug: string; title: string };
+  tracks?: Track[];
 }) {
+  const text = useRef<HTMLDivElement>(null);
+  const player = useRef<PlayerHandle>(null);
   const words = useMyWords();
   const [mode, setMode] = useState<Mode>("choose");
   const [open, setOpen] = useState<{ item: Item; anchor: HTMLElement } | null>(null);
@@ -190,6 +195,8 @@ export function ReadingExperience({
         ) : null}
       </div>
 
+      {tracks.length ? <AudioPlayer ref={player} tracks={tracks} text={text} /> : null}
+
       <p className="font-sans text-sm text-muted">
         {mode === "choose"
           ? "Read the text. Tap a word or phrase you want to learn, then add it to your list."
@@ -198,7 +205,11 @@ export function ReadingExperience({
             : "You haven’t chosen any words yet. Switch to “Read & choose” and add some."}
       </p>
 
-      <div onClick={onTextClick} className="lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink">
+      <div
+        ref={text}
+        onClick={onTextClick}
+        className="lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink"
+      >
         <RichTextRenderer
           doc={body}
           renderTerm={(senseRevisionId, children, key) => {
@@ -246,6 +257,14 @@ export function ReadingExperience({
             language={words.language}
             inList={words.has(open.item.sense.revisionId)}
             onToggle={() => toggle(open.item)}
+            playInText={
+              tracks.length && open.item.occurrences[0]
+                ? () => {
+                    const o = open.item.occurrences[0];
+                    return !!o && !!player.current?.playSpan(o.blockId, o.start, o.end);
+                  }
+                : undefined
+            }
           />
         </Popover>
       ) : null}
