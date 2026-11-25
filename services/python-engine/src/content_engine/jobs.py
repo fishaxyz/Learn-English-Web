@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field, ValidationError
 from .graphql_client import GraphQLResponseError, GraphQLTransportError
 from .tts.alignment import Block, WordTiming, turn_timings, word_timings
 from .tts.providers import ProviderError, Speech, SpeechProvider, join_audio
+from .vocab.llm import LanguageModel
+from .vocab.suggest import suggest
 
 CLAIM = "mutation Claim($types: [String!]!) { claimJob(types: $types) { id type payload claimToken attempt } }"
 UPLOAD = """mutation Upload($job: ID!, $token: String!, $type: String!) {
@@ -21,7 +23,9 @@ COMPLETE = """mutation Complete($job: ID!, $token: String!, $result: JobPayload!
 FAIL = """mutation Fail($job: ID!, $token: String!, $error: String!, $retryable: Boolean!) {
   failJob(jobId: $job, claimToken: $token, error: $error, retryable: $retryable) }"""
 
-JOB_TYPES = ["tts.generate"]
+RENEW = """mutation Renew($job: ID!, $token: String!) { renewJobLease(jobId: $job, claimToken: $token) }"""
+
+JOB_TYPES = ["tts.generate", "vocab.suggest"]
 
 
 class Executor(Protocol):
@@ -70,6 +74,15 @@ def parts_of(turns: list[Turn], limit: int) -> list[list[Turn]]:
     return parts
 
 
+class VocabPayload(BaseModel):
+    """A script to find vocabulary in: its blocks' text, and the learners' level."""
+
+    revisionId: str
+    textHash: str
+    level: Literal["A1", "A2", "B1", "B2", "C1", "C2"] | None = None
+    blocks: list[dict[str, str]] = Field(max_length=500)
+
+
 class Claimed(BaseModel):
     id: str
     type: str
@@ -86,9 +99,11 @@ class JobRunner:
         log: logging.Logger,
         upload_origin: str | None = None,
         upload_transport: httpx.BaseTransport | None = None,
+        language_model: LanguageModel | None = None,
     ) -> None:
         self._client = client
         self._provider = provider
+        self._model = language_model
         self._log = log
         self._upload_origin = upload_origin
         self._http = httpx.Client(timeout=120.0, transport=upload_transport)
@@ -102,9 +117,12 @@ class JobRunner:
         log = {"job": job.id, "type": job.type, "attempt": job.attempt}
         self._log.info("job claimed", extra=log)
         try:
-            if job.type != "tts.generate":
+            if job.type == "vocab.suggest":
+                self._vocabulary(job)
+            elif job.type == "tts.generate":
+                self._tts(job)
+            else:
                 raise ProviderError(f"unknown job type {job.type}", retryable=False)
-            self._tts(job)
             self._log.info("job done", extra=log)
         except ProviderError as error:
             self._fail(job, str(error), error.retryable)
@@ -125,6 +143,16 @@ class JobRunner:
             return url
         u, o = urlsplit(url), urlsplit(self._upload_origin)
         return urlunsplit((o.scheme, o.netloc, u.path, u.query, ""))
+
+    def _vocabulary(self, job: Claimed) -> None:
+        payload = VocabPayload.model_validate(job.payload)
+
+        # The language model is slow on a CPU: keep the job claimed between paragraphs.
+        def renew() -> None:
+            self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
+
+        result = suggest(payload.blocks, payload.level, self._model, self._log, keep_alive=renew)
+        self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
 
     def _tts(self, job: Claimed) -> None:
         if job.payload.get("mode") == "conversation":

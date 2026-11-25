@@ -13,6 +13,7 @@ from .graphql_client import GraphQLClient, GraphQLResponseError, GraphQLTranspor
 from .jobs import JobRunner
 from .logs import setup_logging
 from .tts.providers import ElevenLabs, SilentFake, SpeechProvider
+from .vocab.llm import LanguageModel
 
 HEALTH_QUERY = "query WorkerHealth { health { status database } }"
 
@@ -98,7 +99,13 @@ def main() -> int:
                 provider = SilentFake()
             log.info("jobs enabled", extra={"tts_provider": provider.name})
             origin = str(settings.media_upload_origin) if settings.media_upload_origin else None
-            jobs = JobRunner(client, provider, log, upload_origin=origin)
+            model = (
+                LanguageModel(str(settings.llm_base_url), settings.llm_model, settings.llm_timeout_seconds)
+                if settings.llm_base_url
+                else None
+            )
+            log.info("vocabulary suggestions", extra={"language_model": settings.llm_model if model else None})
+            jobs = JobRunner(client, provider, log, upload_origin=origin, language_model=model)
         worker = Worker(client, settings, log, jobs)
 
         def on_signal(signum: int, _frame: FrameType | None) -> None:

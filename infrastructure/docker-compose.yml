@@ -125,6 +125,12 @@ services:
       ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID:-eleven_multilingual_v2}
       # Upload links name the browser-facing address; inside Docker the API is at api:4400.
       MEDIA_UPLOAD_ORIGIN: http://api:4400
+      # Vocabulary suggestions: the language model served by llama.cpp on this Mac (ADR 0007). Set it empty to
+      # suggest from word frequency only (the end-to-end tests do).
+      LLM_BASE_URL: ${LLM_BASE_URL-http://host.docker.internal:8400/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen3-14b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       api:
         condition: service_healthy

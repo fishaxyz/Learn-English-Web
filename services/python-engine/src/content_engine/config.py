@@ -18,12 +18,18 @@ class Settings(BaseSettings):
     elevenlabs_model_id: str = "eleven_multilingual_v2"
     tts_provider: Literal["elevenlabs", "fake"] | None = None
 
-    @field_validator("tts_provider", mode="before")
+    @field_validator("tts_provider", "llm_base_url", mode="before")
     @classmethod
     def _unset_when_empty(cls, value: object) -> object:
-        # Docker Compose passes TTS_PROVIDER="" when it isn't set: that means "choose by the key".
+        # Docker Compose passes "" for a setting that's turned off: TTS_PROVIDER="" means "choose by the key",
+        # LLM_BASE_URL="" means "no language model".
         return None if value == "" else value
 
+    # The local language model for vocabulary suggestions (llama.cpp's OpenAI-compatible server). Without it,
+    # suggestions come from word frequency only.
+    llm_base_url: HttpUrl | None = None
+    llm_model: str = "qwen3-14b"
+    llm_timeout_seconds: float = Field(default=240.0, gt=0, le=1800)
     # Where upload URLs' origin should point from inside Docker (the local storage driver lives in the API).
     media_upload_origin: HttpUrl | None = None
     log_level: Literal["debug", "info", "warn", "error"] = "info"
