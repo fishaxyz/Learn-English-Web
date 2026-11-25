@@ -16,6 +16,7 @@ const COMPLETE = `mutation($job: ID!, $token: String!, $result: JobPayload!) { c
 const STATE = `query($id: ID!) { editorialResource(id: $id) { localizations { draft { lockVersion body
   vocabularySuggestions { state usedLanguageModel items { id status kind displayForm surfaceText sentence definition inWordBank source } } } } } }`;
 const APPROVE = `mutation($loc: ID!, $v: Int!, $ids: [ID!]!) { approveVocabularySuggestions(localizationId: $loc, lockVersion: $v, ids: $ids) { id } }`;
+const SUGGEST = `mutation($loc: ID!) { suggestVocabulary(localizationId: $loc) }`;
 const REJECT = `mutation($loc: ID!, $ids: [ID!]!) { rejectVocabularySuggestions(localizationId: $loc, ids: $ids) }`;
 
 const doc = (text: string): RichTextDocument => ({
@@ -91,7 +92,7 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
       }
     ).localizations[0]!.draft;
 
-  it("queues a job when the script is saved, and keeps what the worker found that really is in the text", async () => {
+  it("starts from its button (not on save), and keeps what the worker found that really is in the text", async () => {
     const created = await h.gql(
       CREATE,
       { input: { siteId: h.a.siteId, kind: "READING", slug: "suggested", title: "Suggested", body: doc(TEXT) } },
@@ -99,7 +100,12 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
     );
     ({ id: resourceId } = created.data?.createResource as { id: string });
     localizationId = (created.data?.createResource as { localizations: { id: string }[] }).localizations[0]!.id;
+    // Saving doesn't start the (slow) language model; the "Suggest vocabulary" button does.
+    expect((await state()).vocabularySuggestions.state).toBe("IDLE");
+    expect((await h.gql(SUGGEST, { loc: localizationId }, owner())).data).toEqual({ suggestVocabulary: true });
     expect((await state()).vocabularySuggestions.state).toBe("WORKING");
+    // A second click while it's looking doesn't queue a duplicate.
+    expect(codeOf(await h.gql(SUGGEST, { loc: localizationId }, owner()))).toBe("CONFLICT");
 
     const job = (await h.gql(CLAIM, {}, { worker: true })).data?.claimJob as {
       id: string;
@@ -196,7 +202,7 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
     );
   });
 
-  it("a new text drops pending suggestions and queues a new job; the worker can renew a long job's lease", async () => {
+  it("a new text drops pending suggestions; asking again looks at it; the worker can renew a long job's lease", async () => {
     const before = await state();
     const update = await h.gql(
       `mutation($input: UpdateDraftInput!) { updateDraft(input: $input) { id } }`,
@@ -204,8 +210,9 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
       owner()
     );
     expect(update.errors).toBeUndefined();
-    const after = (await state()).vocabularySuggestions;
-    expect(after).toMatchObject({ state: "WORKING", items: [] });
+    expect((await state()).vocabularySuggestions).toMatchObject({ state: "IDLE", items: [] });
+    await h.gql(SUGGEST, { loc: localizationId }, owner());
+    expect((await state()).vocabularySuggestions).toMatchObject({ state: "WORKING", items: [] });
 
     const job = (await h.gql(CLAIM, {}, { worker: true })).data?.claimJob as { id: string; claimToken: string };
     const RENEW = `mutation($job: ID!, $token: String!) { renewJobLease(jobId: $job, claimToken: $token) }`;
@@ -214,5 +221,14 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
     });
     expect(codeOf(await h.gql(RENEW, { job: job.id, token: job.claimToken }, owner()))).toBe("FORBIDDEN");
     expect(codeOf(await h.gql(RENEW, { job: job.id, token: "stale" }, { worker: true }))).toBe("CONFLICT");
+
+    // An empty script can't be looked at.
+    const emptied = await state();
+    await h.gql(
+      `mutation($input: UpdateDraftInput!) { updateDraft(input: $input) { id } }`,
+      { input: { localizationId, lockVersion: emptied.lockVersion, body: { type: "doc", content: [] } } },
+      owner()
+    );
+    expect(codeOf(await h.gql(SUGGEST, { loc: localizationId }, owner()))).toBe("VALIDATION_ERROR");
   });
 });

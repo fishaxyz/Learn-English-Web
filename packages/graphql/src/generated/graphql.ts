@@ -220,7 +220,7 @@ export type VocabularySuggestionsState =
   | 'DONE'
   /** The worker couldn't finish; ask again. */
   | 'FAILED'
-  /** Nothing asked yet (no script). */
+  /** Nothing asked yet for this script (the Suggest button starts it). */
   | 'IDLE'
   /** The worker is looking (with the local language model this can take a few minutes). */
   | 'WORKING';

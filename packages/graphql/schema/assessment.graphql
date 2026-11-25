@@ -282,6 +282,6 @@ extend type Mutation {
   approveQuestionSuggestions(localizationId: ID!, lockVersion: Int!, ids: [ID!]!): EditorialResource!
   "Editors: take drafted questions off the list."
   rejectQuestionSuggestions(localizationId: ID!, ids: [ID!]!): Boolean!
-  "Editors: draft questions again for the current script."
+  "Editors: draft questions about the draft's saved script (it needs a few sentences). Runs in the background."
   suggestQuestions(localizationId: ID!): Boolean!
 }

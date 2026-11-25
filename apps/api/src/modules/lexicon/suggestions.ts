@@ -70,6 +70,35 @@ export async function queueSuggestions(
   });
 }
 
+/** Saving a new script: pending suggestions made for an older text go (decisions are kept). Nothing is queued. */
+export async function dropStaleSuggestions(tx: Tx, revisionId: string, doc: RichTextDocument) {
+  await tx
+    .delete(suggestions)
+    .where(
+      and(
+        eq(suggestions.revisionId, revisionId),
+        eq(suggestions.status, "PENDING"),
+        ne(suggestions.textHash, scriptHash(doc))
+      )
+    );
+}
+
+/** A suggestion job already queued or running for this text: asking again would only queue a duplicate. */
+export async function isLooking(tx: Tx | Database, siteId: string, key: string) {
+  const [busy] = await tx
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(
+      and(
+        eq(schema.jobs.siteId, siteId),
+        like(schema.jobs.idempotencyKey, `${key}%`),
+        inArray(schema.jobs.status, ["QUEUED", "RUNNING"])
+      )
+    )
+    .limit(1);
+  return Boolean(busy);
+}
+
 export type SuggestionsState = "IDLE" | "WORKING" | "DONE" | "FAILED";
 
 /** Where suggestions for the revision's current text stand, and the suggestions themselves. */
@@ -424,7 +453,7 @@ export async function rejectSuggestions(
   });
 }
 
-/** "Suggest again": a fresh job for the current text (the previous one failed, or the editor wants another try). */
+/** "Suggest vocabulary" (or again): a job for the draft's saved script. The script must have text. */
 export async function suggestAgain(db: Database, actorUserId: string | null, localizationId: string) {
   return db.transaction(async (tx) => {
     const l = await lockLocalization(tx, localizationId);
@@ -432,7 +461,11 @@ export async function suggestAgain(db: Database, actorUserId: string | null, loc
     const draft = one(
       await tx.select().from(schema.resourceRevisions).where(eq(schema.resourceRevisions.id, l.draftRevisionId))
     );
-    const job = await queueSuggestions(tx, draft, draft.richText as RichTextDocument, actorUserId, true);
+    const doc = draft.richText as RichTextDocument;
+    if (await isLooking(tx, draft.siteId, jobKey(draft.id, scriptHash(doc)))) {
+      throw conflict("Suggestions for this script are already being made");
+    }
+    const job = await queueSuggestions(tx, draft, doc, actorUserId, true);
     if (!job) throw invalid("Write the script first");
     return true;
   });

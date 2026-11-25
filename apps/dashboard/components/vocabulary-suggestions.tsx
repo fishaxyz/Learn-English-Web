@@ -40,6 +40,8 @@ export function VocabularySuggestions({
   lockVersion,
   editable,
   saved,
+  hasScript,
+  ensureSaved,
   data,
   onData: setData,
   paragraphs,
@@ -51,6 +53,10 @@ export function VocabularySuggestions({
   editable: boolean;
   /** Approving changes the text: everything must be saved first. */
   saved: boolean;
+  /** The script has text: suggestions need something to read. */
+  hasScript: boolean;
+  /** Saves the script first if it has unsaved changes; false when saving failed. */
+  ensureSaved: () => Promise<boolean>;
   /** The suggestions, kept by the page (its Vocabulary header sums them up). */
   data: SuggestionsFieldsFragment;
   onData: (data: SuggestionsFieldsFragment) => void;
@@ -111,6 +117,7 @@ export function VocabularySuggestions({
   }
   function again() {
     start(async () => {
+      if (!(await ensureSaved())) return;
       const r = await actions.suggestAgain(localizationId);
       setMessage(r.ok ? null : { tone: "bad", text: r.message ?? "Something went wrong." });
       await refresh();
@@ -124,21 +131,28 @@ export function VocabularySuggestions({
         <h3 id="suggestions-heading" className="font-semibold">
           Suggested for this script
         </h3>
-        {editable && data.state !== "WORKING" && data.state !== "IDLE" ? (
+        {editable && data.state !== "WORKING" ? (
           <button
             type="button"
             onClick={again}
-            disabled={pending}
-            className={`${button} border border-line bg-surface`}
+            disabled={pending || !hasScript}
+            title={hasScript ? undefined : "Write the script first"}
+            className={
+              data.state === "IDLE"
+                ? `${button} bg-accent text-on-accent hover:bg-accent-strong`
+                : `${button} border border-line bg-surface`
+            }
           >
-            Suggest again
+            {pending ? "Starting…" : data.state === "IDLE" ? "Suggest vocabulary" : "Suggest again"}
           </button>
         ) : null}
       </div>
 
       <p className="text-sm text-muted" aria-live="polite">
         {data.state === "IDLE"
-          ? "Save the script: words, phrases and idioms worth learning are suggested here."
+          ? hasScript
+            ? "Click “Suggest vocabulary” to find words, phrases and idioms worth learning in the script."
+            : "Write the script first: suggestions are made from it."
           : data.state === "WORKING"
             ? ""
             : data.state === "FAILED"

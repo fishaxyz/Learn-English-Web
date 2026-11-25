@@ -165,7 +165,7 @@ enum VocabularySuggestionStatus {
 }
 
 enum VocabularySuggestionsState {
-  "Nothing asked yet (no script)."
+  "Nothing asked yet for this script (the Suggest button starts it)."
   IDLE
   "The worker is looking (with the local language model this can take a few minutes)."
   WORKING
@@ -210,7 +210,7 @@ extend type Mutation {
   approveVocabularySuggestions(localizationId: ID!, lockVersion: Int!, ids: [ID!]!): EditorialResource!
   "Editors: take suggestions off the list (they aren't suggested again for this lesson)."
   rejectVocabularySuggestions(localizationId: ID!, ids: [ID!]!): Boolean!
-  "Editors: look for suggestions again for the current text."
+  "Editors: look for vocabulary in the draft's saved script (its text must not be empty). Runs in the background."
   suggestVocabulary(localizationId: ID!): Boolean!
   "The worker: keep a long job claimed."
   renewJobLease(jobId: ID!, claimToken: String!): Boolean!

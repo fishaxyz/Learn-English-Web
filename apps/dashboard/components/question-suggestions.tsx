@@ -117,6 +117,8 @@ export function QuestionSuggestions({
   lockVersion,
   editable,
   saved,
+  hasScript,
+  ensureSaved,
   paragraphs,
   data,
   onData: setData,
@@ -127,6 +129,10 @@ export function QuestionSuggestions({
   lockVersion: number;
   editable: boolean;
   saved: boolean;
+  /** The script has text: suggestions need something to read. */
+  hasScript: boolean;
+  /** Saves the script first if it has unsaved changes; false when saving failed. */
+  ensureSaved: () => Promise<boolean>;
   paragraphs: number;
   data: QuestionSuggestionsFieldsFragment;
   onData: (data: QuestionSuggestionsFieldsFragment) => void;
@@ -182,6 +188,7 @@ export function QuestionSuggestions({
   }
   function again() {
     start(async () => {
+      if (!(await ensureSaved())) return;
       const r = await actions.suggestQuestionsAgain(localizationId);
       setMessage(r.ok ? null : { tone: "bad", text: r.message ?? "Something went wrong." });
       await refresh();
@@ -198,14 +205,19 @@ export function QuestionSuggestions({
         <h3 id="question-suggestions-heading" className="font-semibold">
           Suggested questions
         </h3>
-        {editable && data.state !== "WORKING" && data.state !== "IDLE" ? (
+        {editable && data.state !== "WORKING" ? (
           <button
             type="button"
             onClick={again}
-            disabled={pending}
-            className={`${button} border border-line bg-surface`}
+            disabled={pending || !hasScript}
+            title={hasScript ? undefined : "Write the script first"}
+            className={
+              data.state === "IDLE"
+                ? `${button} bg-accent text-on-accent hover:bg-accent-strong`
+                : `${button} border border-line bg-surface`
+            }
           >
-            Suggest again
+            {pending ? "Starting…" : data.state === "IDLE" ? "Suggest questions" : "Suggest again"}
           </button>
         ) : null}
       </div>
@@ -218,7 +230,9 @@ export function QuestionSuggestions({
       ) : (
         <p className="text-sm text-muted" aria-live="polite">
           {data.state === "IDLE"
-            ? "Save the script: IELTS-style questions about it are drafted here for you to check."
+            ? hasScript
+              ? "Click “Suggest questions” to draft IELTS-style questions about the script, for you to check."
+              : "Write the script first: suggestions are made from it."
             : data.state === "FAILED"
               ? "The questions couldn't be drafted. Try “Suggest again”."
               : data.usedLanguageModel === false

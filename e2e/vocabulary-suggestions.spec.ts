@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { DASHBOARD, EDITOR, saveAndEdit, signIn } from "./helpers";
 
-// Saving a script brings vocabulary suggestions; approving one links it in the script as a bold key word (a new
+// "Suggest vocabulary" brings suggestions for the saved script; approving one links it in the script as a bold key word (a new
 // item goes into the word bank as a draft); removing one takes it off the list. This stack runs without the local
 // language model (LLM_BASE_URL is empty), so suggestions come from spaCy and word frequency only.
 test("an editor approves and removes suggested vocabulary from the saved script", async ({ page }) => {
@@ -18,7 +18,10 @@ test("an editor approves and removes suggested vocabulary from the saved script"
   await saveAndEdit(page, title);
 
   const suggestions = page.getByRole("region", { name: "Suggested for this script" });
-  await expect(suggestions.getByText(/to check/)).toBeVisible({ timeout: 90_000 });
+  // Saving doesn't start it: the section's button does.
+  await expect(suggestions.getByText(/Click “Suggest vocabulary”/)).toBeVisible();
+  await suggestions.getByRole("button", { name: "Suggest vocabulary" }).click();
+  await expect(suggestions.getByText(/^\d+ to check ·/)).toBeVisible({ timeout: 90_000 });
   await expect(suggestions.getByText(/local AI wasn't running/)).toBeVisible();
   await expect(suggestions.getByText("give up", { exact: true })).toBeVisible();
   await expect(suggestions.getByText("New: added as a draft").first()).toBeVisible();

@@ -36,6 +36,34 @@ export const slugify = (title: string) =>
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+function SuggestCard({
+  what,
+  label,
+  disabled,
+  reason,
+  onClick,
+}: {
+  what: string;
+  label: string;
+  disabled: boolean;
+  reason: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-sun/25 p-4 text-sm">
+      <p className="min-w-60 flex-1 text-muted">{reason ?? what}</p>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="rounded-full bg-accent px-4 py-1.5 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+      >
+        {label}
+      </button>
+    </div>
+  );
+}
+
 /**
  * A new reading, in the same four sections as the lesson page (the same components): script, voice-over,
  * vocabulary and questions. Creating saves the draft with everything filled in here, then starts the voice-overs.
@@ -100,7 +128,8 @@ export function NewLessonForm({
         ? exercises
         : voiceProblem;
 
-  function create() {
+  /** Saves the lesson; `suggest` also starts vocabulary or question suggestions and opens the lesson page. */
+  function create(suggest: ("vocabulary" | "questions")[] = []) {
     if (problem || typeof exercises === "string") return;
     if (
       wantsVoice &&
@@ -118,6 +147,7 @@ export function NewLessonForm({
         body: body ? (JSON.parse(JSON.stringify(body)) as unknown) : null,
         exercises,
         voice: { ...sent, make },
+        suggest,
       });
       setError(r.message); // only returned when creating failed; success opens the lesson
     });
@@ -139,7 +169,7 @@ export function NewLessonForm({
         <div className="flex max-w-xs flex-col items-end gap-1.5">
           <button
             type="button"
-            onClick={create}
+            onClick={() => create()}
             disabled={pending || !!problem}
             title={problem ?? undefined}
             className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
@@ -225,10 +255,13 @@ export function NewLessonForm({
               tint="bg-sun"
             >
               <div className="flex flex-col gap-4">
-                <p className="rounded-2xl bg-sun/25 p-4 text-sm text-muted">
-                  After <strong className="text-ink">Save and Preview</strong>, words, phrases and idioms worth learning
-                  are suggested here from the script, to approve or remove.
-                </p>
+                <SuggestCard
+                  label={pending ? "Saving…" : "Suggest vocabulary"}
+                  what="Saves the lesson, then the local AI finds words, phrases and idioms worth learning in the script, for you to approve or remove."
+                  reason={!text.single ? "Write the script first: suggestions are made from it." : problem}
+                  disabled={pending || !text.single || !!problem}
+                  onClick={() => create(["vocabulary"])}
+                />
                 <VocabularyList vocabulary={vocabulary} keys={keys} />
               </div>
             </EditorSection>
@@ -241,7 +274,16 @@ export function NewLessonForm({
               state={parts.questions.state}
               tint="bg-good-soft"
             >
-              <ExercisesEditor sets={sets} disabled={false} onChange={setSets} />
+              <div className="flex flex-col gap-4">
+                <SuggestCard
+                  label={pending ? "Saving…" : "Suggest questions"}
+                  what="Saves the lesson, then the local AI drafts IELTS-style questions about the script, for you to check and approve."
+                  reason={!text.single ? "Write the script first: questions are drafted from it." : problem}
+                  disabled={pending || !text.single || !!problem}
+                  onClick={() => create(["questions"])}
+                />
+                <ExercisesEditor sets={sets} disabled={false} onChange={setSets} />
+              </div>
             </EditorSection>
           </>
         }

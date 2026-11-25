@@ -5,7 +5,7 @@
 
 ## What editors see
 
-1. **Save script** (or **Save and Preview** on a new lesson) starts a background search. The Vocabulary section shows "Looking for words, phrases and idioms…" while it runs.
+1. **Suggest vocabulary** in the Lexical vocabulary section starts a background search of the saved script. The script must not be empty, and unsaved changes are saved first. On the New reading page, the button saves the lesson, then opens its page. The Vocabulary section shows "Looking for words, phrases and idioms…" while it runs.
 2. Suggestions appear in **Suggested for this script**. Each shows:
    - its base form (such as "give up" or "a piece of cake") and its kind (word, phrasal verb, idiom, collocation, pattern);
    - a CEFR level;
@@ -16,7 +16,7 @@
    - **Approve** links the item in the script as a **key word**, so it shows in bold in the editor and first for learners. An item new to the word bank is added there as a **draft**, with the suggested meaning and the sentence as its example.
    - The lesson can't be published until those draft meanings are checked and published in Lexical Studio, because publishing refuses unpublished word senses.
    - **Remove** takes an item off the list. The same item isn't suggested again for that lesson.
-4. Changing and saving the script replaces the pending suggestions with new ones. Decisions already made are kept. **Suggest again** runs a new search on the current text.
+4. Saving a changed script drops the pending suggestions made for the old text, but starts nothing: the button does. Decisions already made are kept. **Suggest again** runs a new search on the current text.
 
 ## How suggestions are made (the worker's `vocab.suggest` job)
 

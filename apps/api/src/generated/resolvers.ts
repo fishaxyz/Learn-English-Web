@@ -495,9 +495,9 @@ export type Mutation = {
   startDraft: EditorialResource;
   /** Editors: hand the draft to a reviewer. */
   submitForReview: EditorialResource;
-  /** Editors: draft questions again for the current script. */
+  /** Editors: draft questions about the draft's saved script (it needs a few sentences). Runs in the background. */
   suggestQuestions: Scalars["Boolean"]["output"];
-  /** Editors: look for suggestions again for the current text. */
+  /** Editors: look for vocabulary in the draft's saved script (its text must not be empty). Runs in the background. */
   suggestVocabulary: Scalars["Boolean"]["output"];
   updateDraft: EditorialResource;
 };
@@ -1085,7 +1085,7 @@ export type VocabularySuggestionsState =
   | "DONE"
   /** The worker couldn't finish; ask again. */
   | "FAILED"
-  /** Nothing asked yet (no script). */
+  /** Nothing asked yet for this script (the Suggest button starts it). */
   | "IDLE"
   /** The worker is looking (with the local language model this can take a few minutes). */
   | "WORKING";

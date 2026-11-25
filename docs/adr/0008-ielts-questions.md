@@ -25,7 +25,7 @@ The Questions section follows the IELTS Reading task types. Each one is a branch
 
 ## Suggested questions (admin review)
 
-1. **Save script** queues a `questions.suggest` job next to the vocabulary job.
+1. **Suggest questions** in the Questions section queues a `questions.suggest` job for the saved script. It needs a few sentences, and unsaved changes are saved first. Saving alone starts nothing, so the slow model only runs when asked.
 2. The worker sends the whole text to the local language model (Qwen on llama.cpp), with paragraph letters A, B, C… It asks for these, in a fixed JSON shape:
    - 3 to 5 True/False/Not Given;
    - up to 3 Yes/No/Not Given, only for the writer's views;

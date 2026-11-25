@@ -227,6 +227,13 @@ describe.skipIf(!testDatabaseUrl)("drafted questions, approved by editors", () =
     );
     ({ id: resourceId } = created.data?.createResource as { id: string });
     localizationId = (created.data?.createResource as { localizations: { id: string }[] }).localizations[0]!.id;
+    expect((await state()).questionSuggestions.state).toBe("IDLE"); // only the "Suggest questions" button starts it
+    const suggest = await h.gql(
+      `mutation($loc: ID!) { suggestQuestions(localizationId: $loc) }`,
+      { loc: localizationId },
+      owner()
+    );
+    expect(suggest.data).toEqual({ suggestQuestions: true });
     expect((await state()).questionSuggestions.state).toBe("WORKING");
 
     const job = (await h.gql(CLAIM, {}, { worker: true })).data?.claimJob as {

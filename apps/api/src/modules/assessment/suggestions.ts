@@ -6,7 +6,7 @@ import type { RevisionModel } from "../../models";
 import { one } from "../../rows";
 import { audit } from "../audit";
 import { enqueue, markSucceeded, type JobRow } from "../jobs/service";
-import { scriptHash } from "../lexicon/suggestions";
+import { isLooking, scriptHash } from "../lexicon/suggestions";
 import { draftOf, lockLocalization } from "../resources/editorial";
 import { blockTexts, type RichTextDocument } from "../rich-text";
 import { exerciseSetsForEditing, replaceExerciseSets } from "./service";
@@ -59,6 +59,13 @@ export async function queueQuestionSuggestions(
     maxAttempts: 2,
     payload: { revisionId: revision.id, textHash: hash, level: revision.cefrLevel ?? null, blocks },
   });
+}
+
+/** Saving a new script: pending drafts for an older text go (decisions are kept). Nothing is queued. */
+export async function dropStaleQuestionSuggestions(tx: Tx, revisionId: string, doc: RichTextDocument) {
+  await tx
+    .delete(drafts)
+    .where(and(eq(drafts.revisionId, revisionId), eq(drafts.status, "PENDING"), ne(drafts.textHash, scriptHash(doc))));
 }
 
 export async function questionSuggestionsFor(db: Database, revision: RevisionModel) {
@@ -280,6 +287,7 @@ export async function rejectQuestionSuggestions(
   });
 }
 
+/** "Suggest questions" (or again): a job for the draft's saved script. The script must have some text. */
 export async function suggestQuestionsAgain(db: Database, actorUserId: string | null, localizationId: string) {
   return db.transaction(async (tx) => {
     const l = await lockLocalization(tx, localizationId);
@@ -287,8 +295,12 @@ export async function suggestQuestionsAgain(db: Database, actorUserId: string | 
     const draft = one(
       await tx.select().from(schema.resourceRevisions).where(eq(schema.resourceRevisions.id, l.draftRevisionId))
     );
-    const job = await queueQuestionSuggestions(tx, draft, draft.richText as RichTextDocument, actorUserId, true);
-    if (!job) throw invalid("The script is too short to ask questions about");
+    const doc = draft.richText as RichTextDocument;
+    if (await isLooking(tx, draft.siteId, jobKey(draft.id, scriptHash(doc)))) {
+      throw conflict("Questions for this script are already being drafted");
+    }
+    const job = await queueQuestionSuggestions(tx, draft, doc, actorUserId, true);
+    if (!job) throw invalid("Write the script first: questions need at least a few sentences");
     return true;
   });
 }

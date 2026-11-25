@@ -105,24 +105,28 @@ export function LessonEditor({
     return true;
   }
 
-  const saveText = () =>
-    startTransition(async () => {
-      // Plain JSON: Tiptap's attribute objects aren't plain, and React can't send them to a server action as-is.
-      const saved = JSON.parse(JSON.stringify(body.current ?? { type: "doc", content: [] })) as unknown;
-      const result = await actions.saveDraft(localization.id, lockVersion, {
-        title: script.title,
-        summary: script.summary.trim() || null,
-        cefrLevel: script.level || null,
-        body: saved,
-        topicSlugs: script.topicSlugs,
-      });
-      if (!after(result, "Saved.", false)) return;
-      setTextDirty(false);
-      // Voice-overs read the saved text: count it, and see which voice-overs it made out of date.
-      setSavedBody(saved);
-      const fresh = await actions.draftTracks(lesson.id);
-      if (fresh.ok) setTracks(fresh.tracks);
+  /** Saves the script (title, summary, level, topics, text); false when it couldn't be saved. */
+  async function saveScript(): Promise<boolean> {
+    // Plain JSON: Tiptap's attribute objects aren't plain, and React can't send them to a server action as-is.
+    const saved = JSON.parse(JSON.stringify(body.current ?? { type: "doc", content: [] })) as unknown;
+    const result = await actions.saveDraft(localization.id, lockVersion, {
+      title: script.title,
+      summary: script.summary.trim() || null,
+      cefrLevel: script.level || null,
+      body: saved,
+      topicSlugs: script.topicSlugs,
     });
+    if (!after(result, "Saved.", false)) return false;
+    setTextDirty(false);
+    // Voice-overs read the saved text: count it, and see which voice-overs it made out of date.
+    setSavedBody(saved);
+    const fresh = await actions.draftTracks(lesson.id);
+    if (fresh.ok) setTracks(fresh.tracks);
+    return true;
+  }
+  const saveText = () => startTransition(async () => void (await saveScript()));
+  /** "Suggest vocabulary / questions" read the saved script: save unsaved changes first. */
+  const ensureSaved = async () => (textDirty ? saveScript() : true);
 
   const saveSets = () =>
     startTransition(async () => {
@@ -264,6 +268,8 @@ export function LessonEditor({
                 lockVersion={lockVersion}
                 editable={editable}
                 saved={!dirty}
+                hasScript={words > 0}
+                ensureSaved={ensureSaved}
                 data={suggestions}
                 onData={setSuggestions}
                 paragraphs={paragraphs(savedBody)}
@@ -291,6 +297,8 @@ export function LessonEditor({
                 lockVersion={lockVersion}
                 editable={editable}
                 saved={!dirty}
+                hasScript={words > 0}
+                ensureSaved={ensureSaved}
                 paragraphs={paragraphs(savedBody)}
                 data={questionDrafts}
                 onData={setQuestionDrafts}
