@@ -8,7 +8,7 @@ test("an editor sets a password and signs in with it", async ({ page }) => {
   const password = "Tea at seven, rain later";
 
   await signIn(page, email);
-  await page.getByRole("link", { name: email }).click();
+  await page.getByRole("link", { name: "Account" }).click();
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
 
   // A weak password is refused, with the reason (too-short ones are already stopped by the browser).
@@ -22,7 +22,7 @@ test("an editor sets a password and signs in with it", async ({ page }) => {
   await page.getByRole("button", { name: "Set password" }).click();
   await expect(page.getByText("Password saved.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
   // A wrong password says only that it doesn't match.
