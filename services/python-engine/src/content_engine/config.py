@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, HttpUrl, SecretStr, ValidationError
+from pydantic import Field, HttpUrl, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     elevenlabs_api_key: SecretStr | None = None
     elevenlabs_model_id: str = "eleven_multilingual_v2"
     tts_provider: Literal["elevenlabs", "fake"] | None = None
+
+    @field_validator("tts_provider", mode="before")
+    @classmethod
+    def _unset_when_empty(cls, value: object) -> object:
+        # Docker Compose passes TTS_PROVIDER="" when it isn't set: that means "choose by the key".
+        return None if value == "" else value
+
     # Where upload URLs' origin should point from inside Docker (the local storage driver lives in the API).
     media_upload_origin: HttpUrl | None = None
     log_level: Literal["debug", "info", "warn", "error"] = "info"

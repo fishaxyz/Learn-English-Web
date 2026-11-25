@@ -104,3 +104,11 @@ def test_word_offsets_include_a_skipped_host_label() -> None:
     alignment = Alignment(list(text), [i * 0.1 for i in range(9)], [(i + 1) * 0.1 for i in range(9)])
     words = word_timings(text, [{"blockId": "para-1", "start": 0, "length": 9, "offset": 7}], alignment)
     assert [(w["start"], w["end"]) for w in words] == [(7, 9), (10, 15)]
+
+
+def test_an_empty_tts_provider_means_choose_by_the_key() -> None:
+    from content_engine.config import Settings, tts_provider_name
+
+    settings = Settings.model_validate({"graphql_api_url": "http://api:4400/graphql", "tts_provider": ""})
+    assert settings.tts_provider is None
+    assert tts_provider_name(settings) == "fake"  # no key in tests
