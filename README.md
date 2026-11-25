@@ -57,6 +57,8 @@ After that first sign-in, open **Account** (your email at the top right) and set
 
 To also offer **Continue with Google**, follow [docs/google-sign-in.md](docs/google-sign-in.md).
 
+Disk space: `pnpm docker:up` keeps Docker's build cache under 8 GB. If the Docker VM's disk file on your Mac grows anyway, `pnpm docker:trim` gives its unused space back to macOS; nothing is deleted.
+
 Then check:
 
 - the website at <http://localhost:3400>;

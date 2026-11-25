@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
-    "docker:up": "docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait",
+    "docker:up": "pnpm -s docker:prune-cache && docker compose -f infrastructure/docker-compose.yml --env-file .env up --build --wait",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml --env-file .env down",
     "docker:logs": "docker compose -f infrastructure/docker-compose.yml --env-file .env logs -f",
     "docker:ps": "docker compose -f infrastructure/docker-compose.yml --env-file .env ps",
@@ -24,7 +24,9 @@
     "db:seed": "pnpm --filter @english/api seed",
     "docker:invite": "docker compose -f infrastructure/docker-compose.yml --env-file .env run --rm api node dist/invite.js",
     "invite": "pnpm --filter @english/api invite",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "docker:prune-cache": "docker builder prune -f --max-used-space 8gb >/dev/null",
+    "docker:trim": "colima ssh -- sudo fstrim -av"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
