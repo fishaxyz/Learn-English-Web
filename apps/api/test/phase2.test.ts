@@ -94,7 +94,7 @@ describe.skipIf(!testDatabaseUrl)("Phase 2 API", () => {
     expect(notified).toContainEqual(["resources", "resource:READING:short-commute"]);
   });
 
-  it("won't publish a text that links to an unpublished sense", async () => {
+  it("publishing a text also publishes the draft sense it links to (for now: ADR 0007)", async () => {
     const draftSense = await h.gql(
       `mutation($input: ManageLexicalSenseInput!) { manageLexicalSense(input: $input) { draft { id } } }`,
       {
@@ -134,7 +134,18 @@ describe.skipIf(!testDatabaseUrl)("Phase 2 API", () => {
       { id: loc.id },
       { token: h.people.reviewerA.token }
     );
-    expect(codeOf(pub)).toBe("CONFLICT");
+    expect(pub.errors).toBeUndefined();
+    const sense = await h.gql(
+      `query($q: String!) { lexicalSearch(query: $q, first: 5) { displayForm senses { revisionId } } }`,
+      { q: "platform" },
+      { token: h.people.editorA.token }
+    );
+    // The linked revision is now the published one, so the word can be found in the word bank.
+    expect(
+      (sense.data?.lexicalSearch as { senses: { revisionId: string }[] }[]).flatMap((e) =>
+        e.senses.map((x) => x.revisionId)
+      )
+    ).toContain(revisionId);
   });
 
   it("saves exercises on a draft, gives them back to editors, and validates them whole", async () => {

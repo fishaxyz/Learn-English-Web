@@ -187,15 +187,6 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
       definitionEn: "to stop doing something",
     });
 
-    // The lesson can't go out with an unchecked word: its meaning must be published first.
-    const publish = await h.gql(
-      `mutation($id: ID!, $v: Int!) { publishNow(localizationId: $id, lockVersion: $v) { id } }`,
-      { id: localizationId, v: after.lockVersion },
-      owner()
-    );
-    expect(codeOf(publish)).toBe("CONFLICT");
-    expect(publish.errors?.[0]?.message).toMatch(/linked word senses/);
-
     // An approval with an old lock version is refused.
     expect(codeOf(await h.gql(APPROVE, { loc: localizationId, v: before.lockVersion, ids: [cake!.id] }, owner()))).toBe(
       "CONFLICT"
@@ -230,5 +221,44 @@ describe.skipIf(!testDatabaseUrl)("vocabulary suggestions", () => {
       owner()
     );
     expect(codeOf(await h.gql(SUGGEST, { loc: localizationId }, owner()))).toBe("VALIDATION_ERROR");
+  });
+
+  it("publishing the lesson publishes the draft meanings it links to (approved as suggestions)", async () => {
+    const { lockVersion } = await state();
+    // Link a draft meaning again: the text was emptied by the previous test, so approve a fresh suggestion.
+    await h.gql(
+      `mutation($input: UpdateDraftInput!) { updateDraft(input: $input) { id } }`,
+      { input: { localizationId, lockVersion, body: doc(TEXT) } },
+      owner()
+    );
+    const [giveUp] = await h.t.db
+      .select({ id: schema.lexicalSenseRevisions.id, status: schema.lexicalSenseRevisions.status })
+      .from(schema.lexicalSenseRevisions)
+      .innerJoin(schema.lexicalSenses, eq(schema.lexicalSenses.id, schema.lexicalSenseRevisions.senseId))
+      .innerJoin(schema.lexicalEntries, eq(schema.lexicalEntries.id, schema.lexicalSenses.entryId))
+      .where(
+        and(eq(schema.lexicalEntries.siteId, h.a.siteId), eq(schema.lexicalEntries.normalizedHeadword, "give up"))
+      );
+    expect(giveUp!.status).toBe("DRAFT");
+    const current = await state();
+    const linked = addLexicalMark(current.body, at("gave up"), { senseRevisionId: giveUp!.id, key: true });
+    const saved = await h.gql(
+      `mutation($input: UpdateDraftInput!) { updateDraft(input: $input) { id } }`,
+      { input: { localizationId, lockVersion: current.lockVersion, body: linked } },
+      owner()
+    );
+    expect(saved.errors).toBeUndefined();
+
+    const publish = await h.gql(
+      `mutation($id: ID!, $v: Int!) { publishNow(localizationId: $id, lockVersion: $v) { id } }`,
+      { id: localizationId, v: current.lockVersion + 1 },
+      owner()
+    );
+    expect(publish.errors).toBeUndefined();
+    const [after] = await h.t.db
+      .select({ status: schema.lexicalSenseRevisions.status })
+      .from(schema.lexicalSenseRevisions)
+      .where(eq(schema.lexicalSenseRevisions.id, giveUp!.id));
+    expect(after!.status).toBe("PUBLISHED");
   });
 });

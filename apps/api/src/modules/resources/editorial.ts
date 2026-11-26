@@ -7,6 +7,7 @@ import { audit } from "../audit";
 import { one } from "../../rows";
 import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio/service";
 import { dropStaleQuestionSuggestions } from "../assessment/suggestions";
+import { publishLinkedDrafts } from "../lexicon/service";
 import { dropStaleSuggestions } from "../lexicon/suggestions";
 import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
@@ -350,7 +351,18 @@ export async function publishResource(
       if (draft.status !== "IN_REVIEW" && !(options.skipReview && draft.status === "DRAFT")) {
         throw conflict("Only a reviewed draft can be published: submit it for review");
       }
-      // Collections and vocabulary links may only pin published (frozen) sense revisions.
+      // Collections and vocabulary links may only pin published (frozen) sense revisions. For now, the draft
+      // meanings a lesson links to are published with it: they were approved as suggestions (ADR 0007).
+      const linked = await tx.execute(sql`
+        select r.id from lexical_sense_revisions r
+        where r.status in ('DRAFT', 'IN_REVIEW') and r.id in (
+          select sense_revision_id from collection_items where revision_id = ${draft.id}
+          union select sense_revision_id from lexical_annotations where revision_id = ${draft.id})`);
+      await publishLinkedDrafts(
+        tx,
+        actorUserId,
+        (linked as unknown as { id: string }[]).map((r) => r.id)
+      );
       const unpublished = await tx.execute(sql`
         select 1 from lexical_sense_revisions r
         where r.status in ('DRAFT', 'IN_REVIEW') and r.id in (

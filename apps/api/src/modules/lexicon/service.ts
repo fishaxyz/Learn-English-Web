@@ -288,26 +288,49 @@ export async function publishLexicalSense(
     if (!sense.draftRevisionId) throw conflict("There's no draft to publish");
     const draft = one(await tx.select().from(senseRevs).where(eq(senseRevs.id, sense.draftRevisionId)));
     if (draft.lockVersion !== lockVersion) throw conflict("Someone else changed this sense; reload it");
-    if (sense.publishedRevisionId) {
-      await tx.update(senseRevs).set({ status: "SUPERSEDED" }).where(eq(senseRevs.id, sense.publishedRevisionId));
-    }
-    await tx
-      .update(senseRevs)
-      .set({ status: "PUBLISHED", publishedAt: new Date(), lockVersion: draft.lockVersion + 1 })
-      .where(eq(senseRevs.id, draft.id));
-    await tx
-      .update(senses)
-      .set({ publishedRevisionId: draft.id, draftRevisionId: null })
-      .where(eq(senses.id, sense.id));
-    await audit(tx, {
-      siteId: sense.siteId,
-      actorUserId,
-      action: "sense.published",
-      entityType: "lexical_sense",
-      entityId: sense.id,
-    });
+    await publishDraft(tx, actorUserId, sense, draft);
     return sense.id;
   });
+}
+
+type SenseRow = typeof senses.$inferSelect;
+type SenseRevisionRow = typeof senseRevs.$inferSelect;
+
+/** Makes a sense's draft its published revision (the previous one is superseded, not changed). */
+async function publishDraft(tx: Tx, actorUserId: string | null, sense: SenseRow, draft: SenseRevisionRow) {
+  if (sense.publishedRevisionId) {
+    await tx.update(senseRevs).set({ status: "SUPERSEDED" }).where(eq(senseRevs.id, sense.publishedRevisionId));
+  }
+  await tx
+    .update(senseRevs)
+    .set({ status: "PUBLISHED", publishedAt: new Date(), lockVersion: draft.lockVersion + 1 })
+    .where(eq(senseRevs.id, draft.id));
+  await tx.update(senses).set({ publishedRevisionId: draft.id, draftRevisionId: null }).where(eq(senses.id, sense.id));
+  await audit(tx, {
+    siteId: sense.siteId,
+    actorUserId,
+    action: "sense.published",
+    entityType: "lexical_sense",
+    entityId: sense.id,
+  });
+}
+
+/**
+ * Publishing a lesson publishes the draft word meanings it links to (for now: an editor approved them as
+ * suggestions, ADR 0007). Returns how many were published; a linked revision that isn't its sense's current
+ * draft is left alone, and the caller still refuses to publish with it.
+ */
+export async function publishLinkedDrafts(tx: Tx, actorUserId: string | null, senseRevisionIds: string[]) {
+  let published = 0;
+  for (const revisionId of [...new Set(senseRevisionIds)]) {
+    const [draft] = await tx.select().from(senseRevs).where(eq(senseRevs.id, revisionId));
+    if (!draft || (draft.status !== "DRAFT" && draft.status !== "IN_REVIEW")) continue;
+    const [sense] = await tx.select().from(senses).where(eq(senses.id, draft.senseId)).for("update");
+    if (!sense || sense.draftRevisionId !== draft.id) continue;
+    await publishDraft(tx, actorUserId, sense, draft);
+    published += 1;
+  }
+  return published;
 }
 
 export async function siteOfSense(db: Database, senseId: string): Promise<string | null> {

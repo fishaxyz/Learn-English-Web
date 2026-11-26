@@ -14,7 +14,7 @@
    - whether it's already in the word bank or new.
 3. Tick items and **Approve selected** or **Remove selected**, or use the ✓ and ✕ buttons on each item.
    - **Approve** links the item in the script as a **key word**, so it shows in bold in the editor and first for learners. An item new to the word bank is added there as a **draft**, with the suggested meaning and the sentence as its example.
-   - The lesson can't be published until those draft meanings are checked and published in Lexical Studio, because publishing refuses unpublished word senses.
+   - **For this phase,** publishing the lesson also publishes the draft meanings it links to: approving the suggestion counts as checking it. A meaning can still be edited in Lexical Studio and published again; lessons keep the revision they were published with. (Before, publishing was refused until each meaning had been published in Lexical Studio. That stricter rule can return with an in-lesson "check meaning" step.)
    - **Remove** takes an item off the list. The same item isn't suggested again for that lesson.
 4. Saving a changed script drops the pending suggestions made for the old text, but starts nothing: the button does. Decisions already made are kept. **Suggest again** runs a new search on the current text.
 
