@@ -69,4 +69,18 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   const second = await pointAt("Others");
   await page.mouse.click(second.x, second.y);
   await expect.poll(time).toBeGreaterThan(2.5);
+
+  // Read-along follows word by word by default; Reading settings switches it to the whole sentence.
+  /** The text the read-along highlight is on right now. */
+  const lit = (name: string) =>
+    page.evaluate((n) => {
+      const h = (CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights.get(n);
+      return h ? [...h].map((r) => r.toString()).join(" ") : "";
+    }, name);
+  await expect.poll(() => lit("read-along")).toMatch(/^\w+[.,]?$/);
+  await page.getByRole("radio", { name: "Sentence by sentence" }).click();
+  await expect(page.getByRole("radio", { name: "Sentence by sentence" })).toHaveAttribute("aria-checked", "true");
+  await page.mouse.click(second.x, second.y);
+  await expect.poll(() => lit("read-along-sentence")).toBe("Others go for a run.");
+  expect(await lit("read-along")).toBe("");
 });

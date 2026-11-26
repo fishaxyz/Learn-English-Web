@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReadingLessonQuery } from "@english/graphql";
-import { rangeForSpan } from "../lib/text-spans";
+import { useFollowAlong } from "../lib/reading-prefs";
+import { blockById, blockText, rangeForSpan, sentenceAt } from "../lib/text-spans";
 import { VoiceTags } from "./voice-tags";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type RefObject } from "react";
 
@@ -16,6 +17,7 @@ export type PlayerHandle = {
 const SPEEDS = [0.75, 1] as const;
 const SPEED_LABEL: Record<(typeof SPEEDS)[number], string> = { 0.75: "Slower Speed", 1: "Natural Speed" };
 const HIGHLIGHT = "read-along";
+const SENTENCE_HIGHLIGHT = "read-along-sentence";
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -30,7 +32,8 @@ const highlights = (): HighlightRegistry | null =>
 
 /**
  * The lesson's voice-overs: play, seek, speed, and a choice of voice ("Woman · UK"). While it plays, the
- * word being spoken is highlighted in the text (read-along), using the browser's highlight API so the text itself
+ * word being spoken, or its whole sentence (the learner's choice in Reading settings), is highlighted in the text
+ * (read-along), using the browser's highlight API so the text itself
  * isn't re-rendered. No autoplay; nothing loads until the learner presses play (AGENTS.md §9).
  */
 export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: RefObject<HTMLElement | null> }>(
@@ -43,6 +46,7 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
     const stopAt = useRef<number | null>(null);
     const track = tracks[index] ?? tracks[0];
     const duration = track?.durationMs ?? 0;
+    const [follow] = useFollowAlong();
 
     const highlight = useCallback(
       (ms: number) => {
@@ -62,16 +66,40 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
           } else hi = mid - 1;
         }
         const word = found >= 0 ? timings[found] : undefined;
-        const range =
-          word && ms <= word.endMs + 400 ? rangeForSpan(container, word.blockId, word.start, word.end) : null;
         const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
-        if (range && Highlight) registry.set(HIGHLIGHT, new Highlight(range));
-        else registry.delete(HIGHLIGHT);
+        const [name, other] = follow === "sentence" ? [SENTENCE_HIGHLIGHT, HIGHLIGHT] : [HIGHLIGHT, SENTENCE_HIGHLIGHT];
+        registry.delete(other);
+        let range: Range | null = null;
+        if (word && follow === "sentence") {
+          // The sentence holding the word, kept lit through the pauses between its words.
+          const block = blockById(container, word.blockId);
+          const sentence = block ? sentenceAt(blockText(block), word.start) : null;
+          const next = timings[found + 1];
+          const continues = !!sentence && next?.blockId === word.blockId && next.start < sentence.end;
+          if (sentence && (ms <= word.endMs + 400 || continues))
+            range = rangeForSpan(container, word.blockId, sentence.start, sentence.end);
+        } else if (word && ms <= word.endMs + 400) {
+          range = rangeForSpan(container, word.blockId, word.start, word.end);
+        }
+        if (range && Highlight) registry.set(name, new Highlight(range));
+        else registry.delete(name);
       },
-      [text, track]
+      [text, track, follow]
     );
 
-    useEffect(() => () => highlights()?.delete(HIGHLIGHT), []);
+    // Changing the setting re-lights the text at once, also while paused.
+    useEffect(() => {
+      const el = audio.current;
+      if (el && el.currentTime > 0) highlight(el.currentTime * 1000);
+    }, [highlight]);
+
+    useEffect(
+      () => () => {
+        highlights()?.delete(HIGHLIGHT);
+        highlights()?.delete(SENTENCE_HIGHLIGHT);
+      },
+      []
+    );
 
     useImperativeHandle(ref, () => ({
       playSpan(blockId, start, end) {

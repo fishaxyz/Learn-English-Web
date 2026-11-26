@@ -14,3 +14,9 @@
   color: var(--color-ink);
   text-decoration: underline 2px var(--color-accent);
 }
+
+/* Sentence by sentence: the whole sentence being spoken, a calm background without the word underline. */
+::highlight(read-along-sentence) {
+  background-color: var(--color-accent-soft);
+  color: var(--color-ink);
+}
