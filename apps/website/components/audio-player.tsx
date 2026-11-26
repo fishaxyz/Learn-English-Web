@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReadingLessonQuery } from "@english/graphql";
-import { FOLLOW_LABEL, useReadingPrefs, type FollowAlong } from "../lib/reading-prefs";
+import { FOLLOW_LABEL, REPEAT_LABEL, useReadingPrefs, type FollowAlong } from "../lib/reading-prefs";
 import { blockById, blockText, rangeForSpan, sentenceAt } from "../lib/text-spans";
 import { VoiceTags } from "./voice-tags";
 import {
@@ -77,9 +77,36 @@ export const AudioPlayer = forwardRef<
   const [prefs, update] = useReadingPrefs();
   const stopAt = useRef<number | null>(null);
   const lastSentence = useRef<string | null>(null);
+  /** "Current sentence" repeat: the stretch of the recording being looped. */
+  const loopSpan = useRef<{ startMs: number; endMs: number } | null>(null);
   const track = tracks[index] ?? tracks[0];
   const duration = track?.durationMs ?? 0;
   const { follow, autoScroll } = prefs;
+  const repeatSentence = repeat && prefs.repeat === "sentence";
+
+  /** Where in the recording the sentence being said at `ms` starts and ends. */
+  const sentenceTimesAt = useCallback(
+    (ms: number) => {
+      const container = text.current;
+      const timings = track?.wordTimings ?? [];
+      const word = [...timings].reverse().find((t) => t.startMs <= ms) ?? timings[0];
+      const block = word && container ? blockById(container, word.blockId) : null;
+      const sentence = word && block ? sentenceAt(blockText(block), word.start) : null;
+      if (!word || !sentence) return null;
+      const words = timings.filter(
+        (t) => t.blockId === word.blockId && t.start >= sentence.start && t.end <= sentence.end
+      );
+      const first = words[0];
+      const last = words[words.length - 1];
+      return first && last ? { startMs: first.startMs, endMs: last.endMs } : null;
+    },
+    [text, track]
+  );
+
+  // A new repeat choice (or turning it off) lets go of the sentence being looped.
+  useEffect(() => {
+    loopSpan.current = null;
+  }, [repeatSentence, track]);
 
   const highlight = useCallback(
     (ms: number, following: boolean) => {
@@ -154,7 +181,10 @@ export const AudioPlayer = forwardRef<
       const el = audio.current;
       const words = track?.wordTimings.filter((t) => t.blockId === blockId && t.start < end && t.end > start) ?? [];
       if (!el || !words.length) return false;
-      stopAt.current = words[words.length - 1]?.endMs ?? null;
+      const endMs = words[words.length - 1]?.endMs ?? null;
+      // With "Current sentence" repeat on, a tapped sentence loops; otherwise it plays once.
+      loopSpan.current = repeatSentence && endMs != null ? { startMs: words[0]?.startMs ?? 0, endMs } : null;
+      stopAt.current = repeatSentence ? null : endMs;
       const from = (words[0]?.startMs ?? 0) / 1000;
       const go = () => {
         el.currentTime = from;
@@ -184,13 +214,21 @@ export const AudioPlayer = forwardRef<
         ref={audio}
         src={track.url ?? undefined}
         preload="none"
-        loop={repeat}
+        loop={repeat && !repeatSentence}
         onPlay={() => setPlaying(true)}
         onPause={() => {
           setPlaying(false);
           clearHighlights();
         }}
-        onEnded={() => setPlaying(false)}
+        onEnded={(e) => {
+          const span = loopSpan.current;
+          if (repeatSentence && span) {
+            e.currentTarget.currentTime = span.startMs / 1000;
+            void e.currentTarget.play();
+            return;
+          }
+          setPlaying(false);
+        }}
         onTimeUpdate={(e) => {
           const ms = e.currentTarget.currentTime * 1000;
           setNow(ms);
@@ -198,6 +236,14 @@ export const AudioPlayer = forwardRef<
             stopAt.current = null;
             e.currentTarget.pause();
             return;
+          }
+          if (repeatSentence) {
+            loopSpan.current ??= sentenceTimesAt(ms);
+            const span = loopSpan.current;
+            if (span && ms >= span.endMs) {
+              e.currentTarget.currentTime = span.startMs / 1000;
+              return;
+            }
           }
           highlight(ms, true);
         }}
@@ -230,6 +276,7 @@ export const AudioPlayer = forwardRef<
             onChange={(e) => {
               const ms = Number(e.target.value);
               setNow(ms);
+              loopSpan.current = null; // moving on: repeat the sentence found there
               if (audio.current) audio.current.currentTime = ms / 1000;
             }}
             className="flex-1 accent-[var(--color-accent)]"
@@ -259,8 +306,14 @@ export const AudioPlayer = forwardRef<
           >
             {FOLLOW_BUTTON[follow]}
           </button>
-          <button type="button" aria-pressed={repeat} onClick={() => setRepeat(!repeat)} className={button}>
-            Repeat
+          <button
+            type="button"
+            aria-pressed={repeat}
+            title={`Repeat: ${REPEAT_LABEL[prefs.repeat]} (change it in Reading settings)`}
+            onClick={() => setRepeat(!repeat)}
+            className={button}
+          >
+            {repeat && repeatSentence ? "Repeat sentence" : "Repeat"}
           </button>
           {settings ? (
             <button

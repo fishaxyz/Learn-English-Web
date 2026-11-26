@@ -4,10 +4,12 @@ import { useId } from "react";
 import {
   DISPLAY_LABEL,
   FOLLOW_LABEL,
+  REPEAT_LABEL,
   TRANSLATION_LANGUAGES,
   useReadingPrefs,
   type DisplayMode,
   type FollowAlong,
+  type RepeatMode,
 } from "../lib/reading-prefs";
 import { languageName } from "./word-card";
 
@@ -101,6 +103,13 @@ export function ReadingSettingsControls() {
         options={FOLLOW_LABEL}
         value={prefs.follow}
         onChange={(follow) => update({ follow })}
+      />
+      <hr className="border-line" />
+      <Choices<RepeatMode>
+        label="Repeat"
+        options={REPEAT_LABEL}
+        value={prefs.repeat}
+        onChange={(repeat) => update({ repeat })}
       />
       <hr className="border-line" />
       <Switch

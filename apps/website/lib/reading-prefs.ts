@@ -7,8 +7,12 @@ export type FollowAlong = "word" | "sentence" | "combined";
 /** Where translations show: under a sentence the learner taps, under every sentence or paragraph, or beside it. */
 export type DisplayMode = "on-demand" | "sentence" | "paragraph" | "side-by-side";
 
+/** What Repeat loops: the whole recording, or the sentence being spoken. */
+export type RepeatMode = "recording" | "sentence";
+
 export type ReadingPrefs = {
   follow: FollowAlong;
+  repeat: RepeatMode;
   translate: boolean;
   language: string;
   display: DisplayMode;
@@ -16,12 +20,16 @@ export type ReadingPrefs = {
 };
 
 /** Translation languages offered (BCP 47 codes). */
-export const TRANSLATION_LANGUAGES = ["vi", "zh-Hans", "ja", "ko", "th", "es"] as const;
+export const TRANSLATION_LANGUAGES = ["vi", "fr", "de"] as const;
 
 export const FOLLOW_LABEL: Record<FollowAlong, string> = {
   word: "Word by word",
   sentence: "Sentence by sentence",
   combined: "Combined",
+};
+export const REPEAT_LABEL: Record<RepeatMode, string> = {
+  recording: "Whole recording",
+  sentence: "Current sentence",
 };
 export const DISPLAY_LABEL: Record<DisplayMode, string> = {
   "on-demand": "On demand",
@@ -34,6 +42,7 @@ const KEY = "learn-english-web:reading-prefs";
 const OLD_KEY = "learn-english-web:follow-along";
 const DEFAULTS: ReadingPrefs = {
   follow: "word",
+  repeat: "recording",
   translate: false,
   language: "vi",
   display: "sentence",
@@ -52,6 +61,7 @@ function read(): ReadingPrefs {
     const oldFollow = localStorage.getItem(OLD_KEY); // the first version kept only this
     cache = {
       follow: oneOf(stored?.follow ?? oldFollow, FOLLOW_LABEL, DEFAULTS.follow),
+      repeat: oneOf(stored?.repeat, REPEAT_LABEL, DEFAULTS.repeat),
       translate: typeof stored?.translate === "boolean" ? stored.translate : DEFAULTS.translate,
       language: (TRANSLATION_LANGUAGES as readonly string[]).includes(stored?.language ?? "")
         ? (stored?.language as string)

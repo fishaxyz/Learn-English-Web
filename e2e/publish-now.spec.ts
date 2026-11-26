@@ -113,4 +113,27 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   const tapAgain = await pointAt("Others");
   await page.mouse.click(tapAgain.x, tapAgain.y);
   await expect(standIn).toBeVisible();
+
+  // The languages: Vietnamese, French and German.
+  await page.getByRole("combobox", { name: "Translation language" }).first().selectOption("fr");
+  await expect(page.getByText("[French translation of “Others go for a run.”]")).toBeVisible();
+
+  // Repeat loops the whole recording by default; Reading settings can make it loop the current sentence.
+  await expect(page.locator("audio")).not.toHaveAttribute("loop");
+  await page.getByRole("button", { name: "Repeat", exact: true }).click();
+  await expect(page.locator("audio")).toHaveAttribute("loop");
+  await page.getByRole("radiogroup", { name: "Repeat" }).getByRole("radio", { name: "Current sentence" }).click();
+  await expect(page.locator("audio")).not.toHaveAttribute("loop");
+  await expect(page.getByRole("button", { name: "Repeat sentence" })).toBeVisible();
+  const last = await pointAt("Others");
+  await page.mouse.click(last.x, last.y);
+  // The sentence ends near the end of the recording; it starts again instead of stopping.
+  let jumpedBack = false;
+  for (let i = 0; i < 40 && !jumpedBack; i++) {
+    const before = await time();
+    await page.waitForTimeout(150);
+    jumpedBack = (await time()) < before - 0.3;
+  }
+  expect(jumpedBack).toBe(true);
+  expect(await paused()).toBe(false);
 });

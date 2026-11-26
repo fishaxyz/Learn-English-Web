@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { EXAMPLE_TRANSLATIONS } from "../lib/example-translations";
 import { DISPLAY_LABEL, TRANSLATION_LANGUAGES, useReadingPrefs, type DisplayMode } from "../lib/reading-prefs";
 import { blockById, blockText, pointInText, rangeForSpan, sentenceAt, sentencesOf } from "../lib/text-spans";
 import { ReadingSettingsControls, Switch } from "./reading-settings";
@@ -35,7 +36,12 @@ export type Translations = Record<string, Record<string, string>>;
 
 const shortLanguage = (locale: string) => (locale.split("-")[0] ?? locale).toUpperCase();
 
-/** For reviewing the layout before lessons have translations: a marked stand-in for each sentence. */
+/** For reviewing the layout before lessons have translations: an example translation, or a marked stand-in. */
+function example(language: string, text: string, span: { start: number; end: number }) {
+  const sentence = [...text].slice(span.start, span.end).join("").replace(/\s+/g, " ");
+  return EXAMPLE_TRANSLATIONS[sentence]?.[language] ?? placeholder(language, sentence);
+}
+
 function placeholder(language: string, sentence: string) {
   const words = sentence.split(/\s+/);
   const start = words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
@@ -78,7 +84,9 @@ function TranslationToolbar({ available, preview }: { available: boolean; previe
         </span>
       </div>
       {prefs.translate && preview ? (
-        <p className="text-sm text-muted">Preview: the lines in brackets stand in for translations still to come.</p>
+        <p className="text-sm text-muted">
+          Preview: example translations. Sentences without an example show a stand-in in brackets.
+        </p>
       ) : prefs.translate && !available ? (
         <p className="text-sm text-muted">There’s no {languageName(prefs.language)} translation for this lesson yet.</p>
       ) : prefs.translate && prefs.display === "on-demand" ? (
@@ -306,8 +314,7 @@ export function ReadingExperience({
   const byLanguage = translations[prefs.language] ?? {};
   const hasTranslations = Object.keys(byLanguage).length > 0;
   const translationOf = (blockId: string, text: string, span: { start: number; end: number }) =>
-    byLanguage[`${blockId}:${span.start}`] ??
-    (previewTranslations ? placeholder(prefs.language, [...text].slice(span.start, span.end).join("")) : null);
+    byLanguage[`${blockId}:${span.start}`] ?? (previewTranslations ? example(prefs.language, text, span) : null);
   const paragraphOf = (blockId: string, text: string) =>
     sentencesOf(text)
       .map((span) => translationOf(blockId, text, span))
