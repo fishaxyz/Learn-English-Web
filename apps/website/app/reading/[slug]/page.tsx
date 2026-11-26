@@ -2,7 +2,6 @@ import { ReadingLessonDocument } from "@english/graphql";
 import { ExerciseRenderer, LessonLayout, minutes } from "@english/ui";
 import { ReadingExperience } from "../../../components/reading-experience";
 import { ReadingSettings } from "../../../components/reading-settings";
-import { VoiceTags } from "../../../components/voice-tags";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -81,11 +80,6 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
                 {l.name}
               </span>
             ))}
-            {tracks.length === 1 && tracks[0] ? (
-              <span className="ml-auto">
-                <VoiceTags label={tracks[0].label} />
-              </span>
-            ) : null}
           </>
         }
         aside={<ReadingSettings />}

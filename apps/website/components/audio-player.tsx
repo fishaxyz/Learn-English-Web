@@ -155,27 +155,29 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
               </button>
             ))}
           </div>
-          {
-            tracks.length > 1 ? (
-              <div role="group" aria-label="Voice" className="flex flex-wrap gap-1">
-                {tracks.map((t, i) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-pressed={i === index}
-                    onClick={() => {
-                      audio.current?.pause();
-                      setIndex(i);
-                      setNow(0);
-                    }}
-                    className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
-                  >
-                    <VoiceTags label={t.label} />
-                  </button>
-                ))}
-              </div>
-            ) : null /* one voice: its tags are shown under the title */
-          }
+          {tracks.length > 1 ? (
+            <div role="group" aria-label="Voice" className="ml-auto flex flex-wrap gap-1">
+              {tracks.map((t, i) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={i === index}
+                  onClick={() => {
+                    audio.current?.pause();
+                    setIndex(i);
+                    setNow(0);
+                  }}
+                  className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
+                >
+                  <VoiceTags label={t.label} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="ml-auto">
+              <VoiceTags label={track.label} />
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <span className="w-10 text-right text-sm tabular-nums text-muted">{clock(now)}</span>
