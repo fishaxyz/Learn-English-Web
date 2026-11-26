@@ -22,11 +22,10 @@ const highlightRegistry = (): HighlightRegistry | null =>
   typeof CSS !== "undefined" && "highlights" in CSS
     ? (CSS as unknown as { highlights: HighlightRegistry }).highlights
     : null;
-import { SUGGESTED_PER_READING, useMyWords, type SavedItem } from "../lib/my-words";
+import { useMyWords, type SavedItem } from "../lib/my-words";
 import { isStructure, languageName, WordCard } from "./word-card";
 
 type Item = VocabularyItemViewFragment;
-type Mode = "choose" | "study";
 type Tab = "article" | "questions" | "vocabulary";
 
 /** The word under a click, for words that aren't prepared (to say so kindly). */
@@ -130,9 +129,8 @@ function Popover({
  * the voice-over keeps playing and answers are kept while the learner switches.
  *
  * The reading, the learner's way (AGENTS.md §7: an interactive island in a server-rendered page):
- * 1. read the clean text and tap prepared words or structures; a structure is always added whole;
- * 2. the counter shows the list for this reading, with a gentle suggestion, never a limit;
- * 3. "Study my words" highlights only what they chose; every item opens its card.
+ * read the clean text and tap prepared words or structures (a structure is always added whole); words already in
+ * their list are underlined, and every item opens its card.
  */
 export function ReadingExperience({
   body,
@@ -158,11 +156,9 @@ export function ReadingExperience({
   const text = useRef<HTMLDivElement>(null);
   const player = useRef<PlayerHandle>(null);
   const words = useMyWords();
-  const [mode, setMode] = useState<Mode>("choose");
   const [open, setOpen] = useState<{ item: Item; anchor: HTMLElement } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const byRevision = new Map(items.map((i) => [i.sense.revisionId, i]));
-  const chosenHere = items.filter((i) => words.has(i.sense.revisionId));
   const languages = [...new Set(items.flatMap((i) => i.sense.translations.map((t) => t.locale)))].sort();
 
   function toggle(item: Item) {
@@ -289,41 +285,12 @@ export function ReadingExperience({
         hidden={tab !== "article"}
         className="flex flex-col gap-6"
       >
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-sans">
-          <p className="text-sm font-medium" aria-live="polite">
-            My list for this reading: <span className="font-semibold text-accent">{chosenHere.length}</span>
-          </p>
-          <div role="group" aria-label="Reading mode" className="flex rounded-full border border-line p-0.5 text-sm">
-            {(["choose", "study"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={mode === m}
-                onClick={() => setMode(m)}
-                className="rounded-full px-3 py-1 font-medium aria-pressed:bg-accent aria-pressed:text-on-accent"
-              >
-                {m === "choose" ? "Read & choose" : "Study my words"}
-              </button>
-            ))}
-          </div>
-          {chosenHere.length > SUGGESTED_PER_READING ? (
-            <p className="w-full text-sm text-muted">
-              {SUGGESTED_PER_READING} is a good number to start with. You can keep adding; smaller lists are easier to
-              remember.
-            </p>
-          ) : null}
-        </div>
-
         {tracks.length ? <AudioPlayer ref={player} tracks={tracks} text={text} /> : null}
 
         <p className="font-sans text-sm text-muted">
-          {mode === "choose"
-            ? `Read the text. Tap a word or phrase you want to learn, then add it to your list.${
-                canHearSentences ? " Tap any sentence to hear it." : ""
-              }`
-            : chosenHere.length
-              ? "Your words are highlighted. Tap one to see it again."
-              : "You haven’t chosen any words yet. Switch to “Read & choose” and add some."}
+          {`Read the text. Tap a word or phrase you want to learn, then add it to your list.${
+            canHearSentences ? " Tap any sentence to hear it." : ""
+          }`}
         </p>
 
         <div
@@ -342,12 +309,7 @@ export function ReadingExperience({
               const item = byRevision.get(senseRevisionId);
               if (!item) return children;
               const chosen = words.has(senseRevisionId);
-              const style =
-                mode === "study" && chosen
-                  ? "rounded-sm bg-accent-soft px-0.5 font-medium underline decoration-accent decoration-2 underline-offset-4"
-                  : chosen
-                    ? "underline decoration-accent/60 decoration-1 underline-offset-4"
-                    : "";
+              const style = chosen ? "underline decoration-accent/60 decoration-1 underline-offset-4" : "";
               return (
                 <button
                   key={key}
