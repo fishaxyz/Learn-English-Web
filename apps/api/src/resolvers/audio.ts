@@ -7,6 +7,7 @@ import * as audio from "../modules/audio/service";
 import { claimJob, heldJob, jobTypeOf, renewLease } from "../modules/jobs/service";
 import { completeQuestionJob, QUESTIONS_JOB } from "../modules/assessment/suggestions";
 import { completeSuggestJob, VOCAB_JOB } from "../modules/lexicon/suggestions";
+import { completeTranslateJob, TRANSLATE_JOB } from "../modules/translations/service";
 import { siteOfLocalization } from "../modules/resources/editorial";
 import type { RichTextDocument } from "../modules/rich-text";
 import { trackLabel } from "../modules/tts/voices";
@@ -76,6 +77,9 @@ export const audioResolvers: Resolvers = {
       const type = await jobTypeOf(ctx.db, jobId);
       if (type === QUESTIONS_JOB) {
         return ctx.db.transaction(async (tx) => completeQuestionJob(tx, await heldJob(tx, jobId, claimToken), result));
+      }
+      if (type === TRANSLATE_JOB) {
+        return ctx.db.transaction(async (tx) => completeTranslateJob(tx, await heldJob(tx, jobId, claimToken), result));
       }
       if (type === VOCAB_JOB) {
         return ctx.db.transaction(async (tx) => completeSuggestJob(tx, await heldJob(tx, jobId, claimToken), result));

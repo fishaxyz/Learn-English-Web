@@ -7,3 +7,4 @@ export * from "./lexicon";
 export * from "./assessment";
 export * from "./audit";
 export * from "./jobs";
+export * from "./translations";

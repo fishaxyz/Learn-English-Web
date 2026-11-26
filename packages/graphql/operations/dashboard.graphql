@@ -457,3 +457,45 @@ query SlugAvailability($siteId: ID!, $slug: String!) {
     suggestion
   }
 }
+
+# --- Translations
+
+fragment DraftTranslationsFields on DraftTranslations {
+  locale
+  state
+  usedLanguageModel
+  sentences {
+    blockId
+    start
+    end
+    source
+    translation {
+      id
+      text
+      status
+    }
+  }
+}
+
+query DraftTranslations($id: ID!, $locale: String!) {
+  editorialResource(id: $id) {
+    id
+    localizations {
+      id
+      draft {
+        id
+        translations(locale: $locale) {
+          ...DraftTranslationsFields
+        }
+      }
+    }
+  }
+}
+
+mutation TranslateDraft($localizationId: ID!, $locale: String!, $redoDrafts: Boolean) {
+  translateDraft(localizationId: $localizationId, locale: $locale, redoDrafts: $redoDrafts)
+}
+
+mutation ApproveTranslations($localizationId: ID!, $items: [TranslationApproval!]!) {
+  approveTranslations(localizationId: $localizationId, items: $items)
+}

@@ -1,0 +1,65 @@
+# --- Sentence translations for bilingual reading (ADR 0009). Text only: no voice-over.
+
+enum TranslationStatus {
+  "Made by the local language model, waiting for an editor."
+  DRAFT
+  "Checked by an editor: learners see it once the lesson is published."
+  APPROVED
+}
+
+type SentenceTranslation {
+  id: ID!
+  text: String!
+  status: TranslationStatus!
+}
+
+"One sentence of a draft's script (code-point offsets into its block), with its translation if it has one."
+type TranslationSentence {
+  blockId: String!
+  start: Int!
+  end: Int!
+  source: String!
+  translation: SentenceTranslation
+}
+
+type DraftTranslations {
+  "vi, fr or de."
+  locale: String!
+  "The latest translation job for this language: same states as vocabulary suggestions."
+  state: VocabularySuggestionsState!
+  "False when the language model wasn't reachable (nothing can be translated without it)."
+  usedLanguageModel: Boolean
+  sentences: [TranslationSentence!]!
+}
+
+extend type Revision {
+  "Editorial: the draft's sentences in one language (vi, fr or de), with their translations."
+  translations(locale: String!): DraftTranslations!
+}
+
+input TranslationApproval {
+  id: ID!
+  "The text to keep: the drafted one, or the editor's edit."
+  text: String!
+}
+
+"An approved translation of one sentence of a published lesson."
+type PublicTranslation {
+  locale: String!
+  blockId: String!
+  start: Int!
+  end: Int!
+  text: String!
+}
+
+extend type ReadingResource {
+  "Approved sentence translations, every language."
+  translations: [PublicTranslation!]!
+}
+
+extend type Mutation {
+  "Editors: translate the draft's sentences that have none yet (redoDrafts: unapproved ones too). In the background."
+  translateDraft(localizationId: ID!, locale: String!, redoDrafts: Boolean = false): Boolean!
+  "Editors: approve translations, with their edits. Returns how many were approved."
+  approveTranslations(localizationId: ID!, items: [TranslationApproval!]!): Int!
+}

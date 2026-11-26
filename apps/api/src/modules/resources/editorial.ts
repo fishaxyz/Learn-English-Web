@@ -9,6 +9,7 @@ import { copyTracks, parseSpeakerNames, prepareTracksForPublish } from "../audio
 import { dropStaleQuestionSuggestions } from "../assessment/suggestions";
 import { publishLinkedDrafts } from "../lexicon/service";
 import { dropStaleSuggestions } from "../lexicon/suggestions";
+import { copyTranslations, syncTranslations } from "../translations/service";
 import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
@@ -235,6 +236,7 @@ export async function startDraft(db: Database, actorUserId: string | null, local
           from lexical_annotations where revision_id = ${p.id}`);
       await copyExerciseSets(tx, p.siteId, p.id, d.id);
       await copyTracks(tx, p.id, d.id);
+      await copyTranslations(tx, p.id, d.id);
       await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));
       await audit(tx, {
         siteId: l.siteId,
@@ -285,6 +287,8 @@ export async function updateDraft(db: Database, actorUserId: string | null, inpu
         // pending ones made for the old text.
         await dropStaleSuggestions(tx, draft.id, body);
         await dropStaleQuestionSuggestions(tx, draft.id, body);
+        // Translations follow the script: changed sentences are translated again, as drafts to check.
+        await syncTranslations(tx, draft, body, actorUserId);
       }
       await audit(tx, {
         siteId: l.siteId,

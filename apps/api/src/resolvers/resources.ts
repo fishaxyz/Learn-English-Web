@@ -1,5 +1,6 @@
 import * as questionDrafts from "../modules/assessment/suggestions";
 import * as suggestions from "../modules/lexicon/suggestions";
+import * as translations from "../modules/translations/service";
 import { checklistFrom, missingParts } from "../modules/resources/checklist";
 import { schema } from "@english/database";
 import { asc, eq } from "drizzle-orm";
@@ -196,6 +197,14 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return questionDrafts.suggestQuestionsAgain(ctx.db, userId, localizationId);
     },
+    translateDraft: async (_, { localizationId, locale, redoDrafts }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return translations.translateDraft(ctx.db, userId, localizationId, locale, redoDrafts ?? false);
+    },
+    approveTranslations: async (_, { localizationId, items }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return translations.approveTranslations(ctx.db, userId, localizationId, items);
+    },
     suggestVocabulary: async (_, { localizationId }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return suggestions.suggestAgain(ctx.db, userId, localizationId);
@@ -214,6 +223,7 @@ export const resourceResolvers: Resolvers = {
     vocabulary: (p, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(p.revision.id),
     vocabularyItems: (p, _, ctx) => vocabularyItems(ctx, p.revision),
     speakerNames: (p) => speakerNames(p.revision.speakerNames),
+    translations: (p, _, ctx) => translations.approvedTranslations(ctx.db, p.revision.id),
     audioTracks: (p, _, ctx) => publicTracks(ctx, p.revision),
     wordCount: (p) => wordCount(p.revision.plainText),
     estimatedReadingSeconds: (p) => readingSeconds(wordCount(p.revision.plainText)),
@@ -235,6 +245,18 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    translations: async (r, { locale }, ctx) => {
+      const found = await translations.translationsFor(ctx.db, r, locale);
+      return {
+        ...found,
+        sentences: found.sentences.map((s) => ({
+          ...s,
+          translation: s.translation
+            ? { ...s.translation, status: s.translation.status as "DRAFT" | "APPROVED" }
+            : null,
+        })),
+      };
+    },
     questionSuggestions: async (r, _, ctx) => {
       if (r.status === "PUBLISHED" || r.status === "SUPERSEDED") {
         return { state: "IDLE", usedLanguageModel: null, items: [] };

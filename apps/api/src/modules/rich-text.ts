@@ -227,3 +227,31 @@ export function sentenceAround(text: string, start: number, end: number): string
   }
   return chars.slice(from, to).join("").trim();
 }
+
+/**
+ * A text's sentences, as code-point spans: each runs from after the previous ".", "!", "?" or "…" (and any closing
+ * quote or bracket) to its own end mark, without surrounding spaces. The website splits sentences with the same
+ * rule (apps/website/lib/text-spans.ts), so translations line up with the sentences learners tap and hear.
+ */
+export function sentencesOf(text: string): { start: number; end: number }[] {
+  const chars = [...text];
+  const sentences: { start: number; end: number }[] = [];
+  let start = 0;
+  for (let i = 0; i <= chars.length; i++) {
+    const c = chars[i];
+    const atEnd = i === chars.length;
+    if (atEnd || /[.!?…]/.test(c ?? "")) {
+      let end = atEnd ? i : i + 1;
+      while (!atEnd && end < chars.length && /[.!?…"'”’)\]]/.test(chars[end] ?? "")) end += 1;
+      let s = start;
+      while (s < end && /\s/.test(chars[s] ?? "")) s += 1;
+      let e = end;
+      while (e > s && /\s/.test(chars[e - 1] ?? "")) e -= 1;
+      if (e > s) sentences.push({ start: s, end: e });
+      if (atEnd) break;
+      start = end;
+      i = end - 1;
+    }
+  }
+  return sentences;
+}

@@ -52,6 +52,13 @@ query ReadingLesson($slug: String!) {
       vocabularyItems {
         ...VocabularyItemView
       }
+      translations {
+        locale
+        blockId
+        start
+        end
+        text
+      }
       speakerNames {
         host1
         host2
