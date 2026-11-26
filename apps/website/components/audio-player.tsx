@@ -1,10 +1,19 @@
 "use client";
 
 import type { ReadingLessonQuery } from "@english/graphql";
-import { useFollowAlong } from "../lib/reading-prefs";
+import { FOLLOW_LABEL, useReadingPrefs, type FollowAlong } from "../lib/reading-prefs";
 import { blockById, blockText, rangeForSpan, sentenceAt } from "../lib/text-spans";
 import { VoiceTags } from "./voice-tags";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type RefObject } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 type Lesson = Extract<NonNullable<ReadingLessonQuery["resourceBySlug"]>, { __typename: "ReadingResource" }>;
 export type Track = Lesson["audioTracks"][number];
@@ -14,10 +23,18 @@ export type PlayerHandle = {
   playSpan(blockId: string, start: number, end: number): boolean;
 };
 
-const SPEEDS = [0.75, 1] as const;
-const SPEED_LABEL: Record<(typeof SPEEDS)[number], string> = { 0.75: "Slower Speed", 1: "Natural Speed" };
-const HIGHLIGHT = "read-along";
-const SENTENCE_HIGHLIGHT = "read-along-sentence";
+type Speed = 1 | 0.75;
+const SPEED_LABEL: Record<Speed, string> = { 0.75: "Slower Speed", 1: "Natural Speed" };
+const FOLLOW_ORDER: FollowAlong[] = ["word", "sentence", "combined"];
+const FOLLOW_BUTTON: Record<FollowAlong, string> = {
+  word: "Word highlight",
+  sentence: "Sentence highlight",
+  combined: "Combined highlight",
+};
+const WORD = "read-along";
+const SENTENCE = "read-along-sentence";
+/** The bar's height, so auto-scroll keeps the spoken sentence above it. */
+const BAR_SPACE = 120;
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -29,185 +46,179 @@ const highlights = (): HighlightRegistry | null =>
   typeof CSS !== "undefined" && "highlights" in CSS
     ? (CSS as unknown as { highlights: HighlightRegistry }).highlights
     : null;
+const clearHighlights = () => {
+  highlights()?.delete(WORD);
+  highlights()?.delete(SENTENCE);
+};
 
 /**
- * The lesson's voice-overs: play, seek, speed, and a choice of voice ("Woman · UK"). While it plays, the
- * word being spoken, or its whole sentence (the learner's choice in Reading settings), is highlighted in the text
- * (read-along), using the browser's highlight API so the text itself
- * isn't re-rendered. No autoplay; nothing loads until the learner presses play (AGENTS.md §9).
+ * The lesson's voice-overs, in a bar fixed to the bottom of the screen: play, seek, speed, highlight style,
+ * repeat, and a choice of voice ("Woman · UK"). While it plays, the word being spoken, its sentence, or both (the
+ * learner's choice) are highlighted in the text with the browser's highlight API, so the text isn't re-rendered;
+ * with auto-scroll on, the page follows the voice. No autoplay; nothing loads until the learner presses play
+ * (AGENTS.md §9).
  */
-export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: RefObject<HTMLElement | null> }>(
-  function AudioPlayer({ tracks, text }, ref) {
-    const audio = useRef<HTMLAudioElement>(null);
-    const [index, setIndex] = useState(0);
-    const [playing, setPlaying] = useState(false);
-    const [now, setNow] = useState(0);
-    const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
-    const stopAt = useRef<number | null>(null);
-    const track = tracks[index] ?? tracks[0];
-    const duration = track?.durationMs ?? 0;
-    const [follow] = useFollowAlong();
+export const AudioPlayer = forwardRef<
+  PlayerHandle,
+  {
+    tracks: Track[];
+    text: RefObject<HTMLElement | null>;
+    /** The reading settings, for phones (the side panel is hidden there). */
+    settings?: ReactNode;
+  }
+>(function AudioPlayer({ tracks, text, settings }, ref) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [now, setNow] = useState(0);
+  const [speed, setSpeed] = useState<Speed>(1);
+  const [repeat, setRepeat] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [prefs, update] = useReadingPrefs();
+  const stopAt = useRef<number | null>(null);
+  const lastSentence = useRef<string | null>(null);
+  const track = tracks[index] ?? tracks[0];
+  const duration = track?.durationMs ?? 0;
+  const { follow, autoScroll } = prefs;
 
-    const highlight = useCallback(
-      (ms: number) => {
-        const registry = highlights();
-        const container = text.current;
-        if (!registry || !container || !track) return;
-        const timings = track.wordTimings;
-        // The word being spoken: the last one that started at or before now.
-        let lo = 0;
-        let hi = timings.length - 1;
-        let found = -1;
-        while (lo <= hi) {
-          const mid = (lo + hi) >> 1;
-          if ((timings[mid]?.startMs ?? 0) <= ms) {
-            found = mid;
-            lo = mid + 1;
-          } else hi = mid - 1;
-        }
-        const word = found >= 0 ? timings[found] : undefined;
-        const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
-        const [name, other] = follow === "sentence" ? [SENTENCE_HIGHLIGHT, HIGHLIGHT] : [HIGHLIGHT, SENTENCE_HIGHLIGHT];
-        registry.delete(other);
-        let range: Range | null = null;
-        if (word && follow === "sentence") {
-          // The sentence holding the word, kept lit through the pauses between its words.
-          const block = blockById(container, word.blockId);
-          const sentence = block ? sentenceAt(blockText(block), word.start) : null;
-          const next = timings[found + 1];
-          const continues = !!sentence && next?.blockId === word.blockId && next.start < sentence.end;
-          if (sentence && (ms <= word.endMs + 400 || continues))
-            range = rangeForSpan(container, word.blockId, sentence.start, sentence.end);
-        } else if (word && ms <= word.endMs + 400) {
-          range = rangeForSpan(container, word.blockId, word.start, word.end);
-        }
-        if (range && Highlight) registry.set(name, new Highlight(range));
+  const highlight = useCallback(
+    (ms: number, following: boolean) => {
+      const registry = highlights();
+      const container = text.current;
+      if (!registry || !container || !track) return;
+      const timings = track.wordTimings;
+      // The word being spoken: the last one that started at or before now.
+      let lo = 0;
+      let hi = timings.length - 1;
+      let found = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if ((timings[mid]?.startMs ?? 0) <= ms) {
+          found = mid;
+          lo = mid + 1;
+        } else hi = mid - 1;
+      }
+      const word = found >= 0 ? timings[found] : undefined;
+      const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+      const block = word ? blockById(container, word.blockId) : null;
+      const sentence = word && block ? sentenceAt(blockText(block), word.start) : null;
+      // A sentence stays lit through the pauses between its words; a word only while it's said.
+      const next = timings[found + 1];
+      const inSentence =
+        !!word &&
+        !!sentence &&
+        (ms <= word.endMs + 400 || (next?.blockId === word.blockId && next.start < sentence.end));
+      const wordRange =
+        word && ms <= word.endMs + 400 ? rangeForSpan(container, word.blockId, word.start, word.end) : null;
+      const sentenceRange =
+        word && sentence && inSentence ? rangeForSpan(container, word.blockId, sentence.start, sentence.end) : null;
+
+      const show = (name: string, range: Range | null, on: boolean) => {
+        if (on && range && Highlight) registry.set(name, new Highlight(range));
         else registry.delete(name);
-      },
-      [text, track, follow]
-    );
+      };
+      show(WORD, wordRange, follow !== "sentence");
+      show(SENTENCE, sentenceRange, follow !== "word");
 
-    // Changing the setting re-lights the text at once, also while paused.
-    useEffect(() => {
-      const el = audio.current;
-      if (el && el.currentTime > 0) highlight(el.currentTime * 1000);
-    }, [highlight]);
-
-    useEffect(
-      () => () => {
-        highlights()?.delete(HIGHLIGHT);
-        highlights()?.delete(SENTENCE_HIGHLIGHT);
-      },
-      []
-    );
-
-    useImperativeHandle(ref, () => ({
-      playSpan(blockId, start, end) {
-        const el = audio.current;
-        const words = track?.wordTimings.filter((t) => t.blockId === blockId && t.start < end && t.end > start) ?? [];
-        if (!el || !words.length) return false;
-        stopAt.current = words[words.length - 1]?.endMs ?? null;
-        const from = (words[0]?.startMs ?? 0) / 1000;
-        const go = () => {
-          el.currentTime = from;
-          el.playbackRate = speed;
-          void el.play();
-        };
-        // Nothing is loaded until it's needed (preload="none"): seeking waits for the file's details.
-        if (el.readyState >= HTMLMediaElement.HAVE_METADATA) go();
-        else {
-          el.addEventListener("loadedmetadata", go, { once: true });
-          el.load();
+      // Auto-scroll: when the voice reaches a new sentence that's out of comfortable view, bring it to the middle.
+      const key = word && sentence ? `${word.blockId}:${sentence.start}` : null;
+      if (following && autoScroll && sentenceRange && key !== lastSentence.current) {
+        const r = sentenceRange.getBoundingClientRect();
+        if (r.top < 80 || r.bottom > window.innerHeight - BAR_SPACE) {
+          window.scrollBy({ top: r.top - window.innerHeight / 3, behavior: "smooth" });
         }
-        return true;
-      },
-    }));
+      }
+      lastSentence.current = key;
+    },
+    [text, track, follow, autoScroll]
+  );
 
-    if (!track) return null;
-    const button = "rounded-full border border-line px-3 py-1.5 text-sm font-medium hover:border-accent";
+  // Changing the setting re-lights the text at once, also while paused.
+  useEffect(() => {
+    const el = audio.current;
+    if (el && el.currentTime > 0) highlight(el.currentTime * 1000, false);
+  }, [highlight]);
 
-    return (
-      <section
-        aria-label="Listen to the text"
-        className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 font-sans"
-      >
-        <audio
-          ref={audio}
-          src={track.url ?? undefined}
-          preload="none"
-          onPlay={() => setPlaying(true)}
-          onPause={() => {
-            setPlaying(false);
-            highlights()?.delete(HIGHLIGHT);
+  useEffect(() => clearHighlights, []);
+
+  // The bar covers the bottom of the page: leave room for it.
+  useEffect(() => {
+    document.body.style.paddingBottom = `${BAR_SPACE}px`;
+    return () => {
+      document.body.style.paddingBottom = "";
+    };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    playSpan(blockId, start, end) {
+      const el = audio.current;
+      const words = track?.wordTimings.filter((t) => t.blockId === blockId && t.start < end && t.end > start) ?? [];
+      if (!el || !words.length) return false;
+      stopAt.current = words[words.length - 1]?.endMs ?? null;
+      const from = (words[0]?.startMs ?? 0) / 1000;
+      const go = () => {
+        el.currentTime = from;
+        el.playbackRate = speed;
+        void el.play();
+      };
+      // Nothing is loaded until it's needed (preload="none"): seeking waits for the file's details.
+      if (el.readyState >= HTMLMediaElement.HAVE_METADATA) go();
+      else {
+        el.addEventListener("loadedmetadata", go, { once: true });
+        el.load();
+      }
+      return true;
+    },
+  }));
+
+  if (!track) return null;
+  const button =
+    "shrink-0 rounded-xl px-3 py-2 text-sm font-medium text-ink hover:bg-paper aria-pressed:bg-accent-soft aria-pressed:text-accent";
+
+  return (
+    <section
+      aria-label="Listen to the text"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 font-sans shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur"
+    >
+      <audio
+        ref={audio}
+        src={track.url ?? undefined}
+        preload="none"
+        loop={repeat}
+        onPlay={() => setPlaying(true)}
+        onPause={() => {
+          setPlaying(false);
+          clearHighlights();
+        }}
+        onEnded={() => setPlaying(false)}
+        onTimeUpdate={(e) => {
+          const ms = e.currentTarget.currentTime * 1000;
+          setNow(ms);
+          if (stopAt.current != null && ms >= stopAt.current) {
+            stopAt.current = null;
+            e.currentTarget.pause();
+            return;
+          }
+          highlight(ms, true);
+        }}
+      />
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+        <button
+          type="button"
+          aria-label={playing ? "Pause" : "Listen"}
+          onClick={() => {
+            stopAt.current = null;
+            const el = audio.current;
+            if (!el) return;
+            el.playbackRate = speed;
+            if (el.paused) void el.play();
+            else el.pause();
           }}
-          onEnded={() => setPlaying(false)}
-          onTimeUpdate={(e) => {
-            const ms = e.currentTarget.currentTime * 1000;
-            setNow(ms);
-            if (stopAt.current != null && ms >= stopAt.current) {
-              stopAt.current = null;
-              e.currentTarget.pause();
-              return;
-            }
-            highlight(ms);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              stopAt.current = null;
-              const el = audio.current;
-              if (!el) return;
-              el.playbackRate = speed;
-              if (el.paused) void el.play();
-              else el.pause();
-            }}
-            className="rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-strong"
-          >
-            {playing ? "❚❚ Pause" : "▶ Listen"}
-          </button>
-          <div role="group" aria-label="Speed" className="flex gap-1">
-            {SPEEDS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={speed === s}
-                onClick={() => {
-                  setSpeed(s);
-                  if (audio.current) audio.current.playbackRate = s;
-                }}
-                className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
-              >
-                {SPEED_LABEL[s]}
-              </button>
-            ))}
-          </div>
-          {tracks.length > 1 ? (
-            <div role="group" aria-label="Voice" className="ml-auto flex flex-wrap gap-1">
-              {tracks.map((t, i) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  aria-pressed={i === index}
-                  onClick={() => {
-                    audio.current?.pause();
-                    setIndex(i);
-                    setNow(0);
-                  }}
-                  className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
-                >
-                  <VoiceTags label={t.label} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="ml-auto">
-              <VoiceTags label={track.label} />
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
+          className="grid size-12 shrink-0 place-items-center rounded-full bg-accent text-lg text-on-accent hover:bg-accent-strong"
+        >
+          <span aria-hidden="true">{playing ? "❚❚" : "▶"}</span>
+        </button>
+        <div className="flex min-w-48 flex-1 items-center gap-3">
           <span className="w-10 text-right text-sm tabular-nums text-muted">{clock(now)}</span>
           <input
             type="range"
@@ -225,10 +236,81 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
           />
           <span className="w-10 text-sm tabular-nums text-muted">{clock(duration)}</span>
         </div>
-        {track.wordTimings.length ? null : (
-          <p className="text-sm text-muted">This voice has no word timings, so the text isn&apos;t highlighted.</p>
-        )}
-      </section>
-    );
-  }
-);
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            title="Change the speed"
+            onClick={() => {
+              const next: Speed = speed === 1 ? 0.75 : 1;
+              setSpeed(next);
+              if (audio.current) audio.current.playbackRate = next;
+            }}
+            className={`${button} bg-paper`}
+          >
+            {SPEED_LABEL[speed]}
+          </button>
+          <button
+            type="button"
+            title={`Highlight while listening: ${FOLLOW_LABEL[follow]}`}
+            onClick={() =>
+              update({ follow: FOLLOW_ORDER[(FOLLOW_ORDER.indexOf(follow) + 1) % FOLLOW_ORDER.length] ?? "word" })
+            }
+            className={`${button} bg-accent-soft text-accent`}
+          >
+            {FOLLOW_BUTTON[follow]}
+          </button>
+          <button type="button" aria-pressed={repeat} onClick={() => setRepeat(!repeat)} className={button}>
+            Repeat
+          </button>
+          {settings ? (
+            <button
+              type="button"
+              aria-expanded={sheet}
+              aria-controls="player-settings"
+              onClick={() => setSheet(!sheet)}
+              className={`${button} lg:hidden`}
+            >
+              Settings
+            </button>
+          ) : null}
+          {tracks.length > 1 ? (
+            <div role="group" aria-label="Voice" className="flex flex-wrap gap-1">
+              {tracks.map((t, i) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={i === index}
+                  onClick={() => {
+                    audio.current?.pause();
+                    setIndex(i);
+                    setNow(0);
+                  }}
+                  className={`${button} border border-line`}
+                >
+                  <VoiceTags label={t.label} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="pl-2">
+              <VoiceTags label={track.label} />
+            </span>
+          )}
+        </div>
+      </div>
+      {track.wordTimings.length ? null : (
+        <p className="mx-auto max-w-6xl px-4 pb-2 text-sm text-muted">
+          This voice has no word timings, so the text isn&apos;t highlighted.
+        </p>
+      )}
+      {settings && sheet ? (
+        <div
+          id="player-settings"
+          className="mx-auto max-h-[60vh] max-w-6xl overflow-y-auto border-t border-line px-4 py-4 lg:hidden"
+        >
+          {settings}
+        </div>
+      ) : null}
+    </section>
+  );
+});

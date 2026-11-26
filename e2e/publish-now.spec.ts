@@ -30,7 +30,7 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   await page.goto(`${WEBSITE}/reading/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
   await expect(page.getByText("Many people drink coffee before their commute.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "▶ Listen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Listen", exact: true })).toBeVisible();
 
   // Tapping a sentence plays just that sentence, from where it starts in the voice-over.
   await expect(page.getByText("Tap any sentence to hear it.")).toBeVisible();
@@ -78,9 +78,39 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
       return h ? [...h].map((r) => r.toString()).join(" ") : "";
     }, name);
   await expect.poll(() => lit("read-along")).toMatch(/^\w+[.,]?$/);
-  await page.getByRole("radio", { name: "Sentence by sentence" }).click();
-  await expect(page.getByRole("radio", { name: "Sentence by sentence" })).toHaveAttribute("aria-checked", "true");
+  const highlightChoice = page.getByRole("radiogroup", { name: "Highlight while listening" });
+  await highlightChoice.getByRole("radio", { name: "Sentence by sentence" }).click();
+  await expect(highlightChoice.getByRole("radio", { name: "Sentence by sentence" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
   await page.mouse.click(second.x, second.y);
   await expect.poll(() => lit("read-along-sentence")).toBe("Others go for a run.");
   expect(await lit("read-along")).toBe("");
+
+  // Combined: the sentence and the word in it. The player's button goes through the three styles.
+  await page.getByRole("button", { name: "Sentence highlight" }).click();
+  await expect(page.getByRole("button", { name: "Combined highlight" })).toBeVisible();
+  await page.mouse.click(second.x, second.y);
+  await expect.poll(() => lit("read-along-sentence")).toBe("Others go for a run.");
+  await expect.poll(() => lit("read-along")).toMatch(/^\w+[.,]?$/);
+
+  // Bilingual layout (stand-ins until lessons have translations): the lines sit outside the lesson text, so
+  // read-along still lights exactly the English sentence.
+  await page.goto(`${WEBSITE}/reading/${slug}?preview-translations`);
+  await page.getByRole("switch", { name: "Translation" }).click();
+  const standIn = page.getByText("[Vietnamese translation of “Others go for a run.”]");
+  await expect(standIn).toBeVisible();
+  const again = await pointAt("Others");
+  await page.mouse.click(again.x, again.y);
+  await expect.poll(() => lit("read-along-sentence")).toBe("Others go for a run.");
+
+  const display = page.getByRole("radiogroup", { name: "Display mode" });
+  await display.getByRole("radio", { name: "Paragraph by paragraph" }).click();
+  await expect(page.locator("p[data-extra]")).toContainText("[Vietnamese translation of “Many people");
+  await display.getByRole("radio", { name: "On demand" }).click();
+  await expect(standIn).toBeHidden();
+  const tapAgain = await pointAt("Others");
+  await page.mouse.click(tapAgain.x, tapAgain.y);
+  await expect(standIn).toBeVisible();
 });

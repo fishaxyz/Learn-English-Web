@@ -79,10 +79,10 @@ export function pointInText(container: HTMLElement, x: number, y: number): { blo
 }
 
 /**
- * The sentence around a code-point offset of a text: from after the previous ".", "!", "?" or "…" (and any closing
- * quote or bracket) to its own end mark, without surrounding spaces. Null for blank space between sentences.
+ * A text's sentences, as code-point spans: each runs from after the previous ".", "!", "?" or "…" (and any closing
+ * quote or bracket) to its own end mark, without surrounding spaces.
  */
-export function sentenceAt(text: string, offset: number): { start: number; end: number } | null {
+export function sentencesOf(text: string): { start: number; end: number }[] {
   const chars = [...text];
   const sentences: { start: number; end: number }[] = [];
   let start = 0;
@@ -102,5 +102,9 @@ export function sentenceAt(text: string, offset: number): { start: number; end: 
       i = end - 1;
     }
   }
-  return sentences.find((s) => offset >= s.start && offset < s.end) ?? null;
+  return sentences;
 }
+
+/** The sentence around a code-point offset of a text; null for blank space between sentences. */
+export const sentenceAt = (text: string, offset: number) =>
+  sentencesOf(text).find((s) => offset >= s.start && offset < s.end) ?? null;

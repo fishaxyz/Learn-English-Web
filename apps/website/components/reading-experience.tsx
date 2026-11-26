@@ -1,7 +1,7 @@
 "use client";
 
 import type { VocabularyItemViewFragment } from "@english/graphql";
-import { RichTextRenderer, type SpeakerNames } from "@english/ui";
+import { RichTextRenderer, type BlockExtras, type SpeakerNames } from "@english/ui";
 import Link from "next/link";
 import {
   useEffect,
@@ -13,7 +13,9 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { blockById, blockText, pointInText, rangeForSpan, sentenceAt } from "../lib/text-spans";
+import { DISPLAY_LABEL, TRANSLATION_LANGUAGES, useReadingPrefs, type DisplayMode } from "../lib/reading-prefs";
+import { blockById, blockText, pointInText, rangeForSpan, sentenceAt, sentencesOf } from "../lib/text-spans";
+import { ReadingSettingsControls, Switch } from "./reading-settings";
 import { AudioPlayer, type PlayerHandle, type Track } from "./audio-player";
 
 const SENTENCE_HIGHLIGHT = "sentence-hover";
@@ -27,6 +29,64 @@ import { isStructure, languageName, WordCard } from "./word-card";
 
 type Item = VocabularyItemViewFragment;
 type Tab = "article" | "questions" | "vocabulary";
+
+/** Sentence translations by language, then by `${blockId}:${start}` of the sentence. */
+export type Translations = Record<string, Record<string, string>>;
+
+const shortLanguage = (locale: string) => (locale.split("-")[0] ?? locale).toUpperCase();
+
+/** For reviewing the layout before lessons have translations: a marked stand-in for each sentence. */
+function placeholder(language: string, sentence: string) {
+  const words = sentence.split(/\s+/);
+  const start = words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
+  return `[${languageName(language)} translation of “${start}”]`;
+}
+
+function TranslationToolbar({ available, preview }: { available: boolean; preview: boolean }) {
+  const [prefs, update] = useReadingPrefs();
+  const select = "cursor-pointer rounded-lg bg-transparent py-1 pl-1 font-medium text-accent hover:bg-accent-soft";
+  return (
+    <div className="flex flex-col gap-2 font-sans">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-surface px-4 py-2 text-sm">
+        <span className="font-semibold text-accent">EN ↔ {shortLanguage(prefs.language)}</span>
+        <label className="flex items-center">
+          <span className="sr-only">Translation language</span>
+          <select value={prefs.language} onChange={(e) => update({ language: e.target.value })} className={select}>
+            {TRANSLATION_LANGUAGES.map((l) => (
+              <option key={l} value={l}>
+                {languageName(l)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center">
+          <span className="sr-only">Display mode</span>
+          <select
+            value={prefs.display}
+            onChange={(e) => update({ display: e.target.value as DisplayMode, translate: true })}
+            className={select}
+          >
+            {(Object.keys(DISPLAY_LABEL) as DisplayMode[]).map((d) => (
+              <option key={d} value={d}>
+                {DISPLAY_LABEL[d]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="ml-auto">
+          <Switch label="Translation" on={prefs.translate} onChange={(translate) => update({ translate })} />
+        </span>
+      </div>
+      {prefs.translate && preview ? (
+        <p className="text-sm text-muted">Preview: the lines in brackets stand in for translations still to come.</p>
+      ) : prefs.translate && !available ? (
+        <p className="text-sm text-muted">There’s no {languageName(prefs.language)} translation for this lesson yet.</p>
+      ) : prefs.translate && prefs.display === "on-demand" ? (
+        <p className="text-sm text-muted">Tap a sentence to see its translation.</p>
+      ) : null}
+    </div>
+  );
+}
 
 /** The word under a click, for words that aren't prepared (to say so kindly). */
 function wordAt(x: number, y: number): string | null {
@@ -140,6 +200,8 @@ export function ReadingExperience({
   speakers,
   questions,
   questionCount = 0,
+  translations = {},
+  previewTranslations = false,
 }: {
   body: unknown;
   items: Item[];
@@ -150,7 +212,13 @@ export function ReadingExperience({
   /** The exercises, rendered by the page (they grade on the server). */
   questions?: ReactNode;
   questionCount?: number;
+  /** Approved sentence translations (none yet: their source is still to be decided). */
+  translations?: Translations;
+  /** Shows marked stand-ins where translations will go, to review the layout. */
+  previewTranslations?: boolean;
 }) {
+  const [prefs] = useReadingPrefs();
+  const [shown, setShown] = useState<Set<string>>(() => new Set());
   const top = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("article");
   const text = useRef<HTMLDivElement>(null);
@@ -211,8 +279,18 @@ export function ReadingExperience({
   function onTextClick(e: MouseEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest("button")) return; // a prepared word: its card opens
     if (window.getSelection()?.toString()) return; // they're selecting text, not tapping
+    if ((e.target as HTMLElement).closest("[data-extra]")) return; // a translation, not the lesson text
+    const tapped = sentenceUnder(e.clientX, e.clientY);
+    if (tapped && prefs.translate && prefs.display === "on-demand") {
+      const key = `${tapped.blockId}:${tapped.start}`;
+      setShown((now) => {
+        const next = new Set(now);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    }
     if (canHearSentences) {
-      const sentence = sentenceUnder(e.clientX, e.clientY);
+      const sentence = tapped;
       if (sentence) {
         const played = player.current?.playSpan(sentence.blockId, sentence.start, sentence.end);
         setNotice(played ? null : "This voice can’t play single sentences. Choose another voice above.");
@@ -223,6 +301,61 @@ export function ReadingExperience({
     const word = wordAt(e.clientX, e.clientY);
     setNotice(word ? `“${word}” isn’t in our word list yet. Highlighted words and phrases can be added.` : null);
   }
+
+  // Translations, placed by the display mode: after a tapped sentence, after every sentence or paragraph, or beside.
+  const byLanguage = translations[prefs.language] ?? {};
+  const hasTranslations = Object.keys(byLanguage).length > 0;
+  const translationOf = (blockId: string, text: string, span: { start: number; end: number }) =>
+    byLanguage[`${blockId}:${span.start}`] ??
+    (previewTranslations ? placeholder(prefs.language, [...text].slice(span.start, span.end).join("")) : null);
+  const paragraphOf = (blockId: string, text: string) =>
+    sentencesOf(text)
+      .map((span) => translationOf(blockId, text, span))
+      .filter(Boolean)
+      .join(" ");
+  const line = "block border-l-2 border-accent/40 pl-3 font-sans text-base leading-relaxed text-muted";
+  const lang = prefs.language;
+  const extras: BlockExtras | undefined = !prefs.translate
+    ? undefined
+    : prefs.display === "sentence" || prefs.display === "on-demand"
+      ? {
+          insertAfter: (blockId, text) => {
+            const out = new Map<number, ReactNode>();
+            for (const span of sentencesOf(text)) {
+              if (prefs.display === "on-demand" && !shown.has(`${blockId}:${span.start}`)) continue;
+              const t = translationOf(blockId, text, span);
+              if (t)
+                out.set(
+                  span.end,
+                  <span data-extra="" lang={lang} className={`${line} my-2`}>
+                    {t}
+                  </span>
+                );
+            }
+            return out;
+          },
+        }
+      : {
+          wrap: (blockId, text, block) => {
+            const t = paragraphOf(blockId, text);
+            if (!t) return block;
+            return prefs.display === "side-by-side" ? (
+              <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
+                {block}
+                <p data-extra="" lang={lang} className="font-sans text-base leading-relaxed text-muted">
+                  {t}
+                </p>
+              </div>
+            ) : (
+              <>
+                {block}
+                <p data-extra="" lang={lang} className={`${line} mt-2`}>
+                  {t}
+                </p>
+              </>
+            );
+          },
+        };
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "article", label: "Article" },
@@ -278,6 +411,10 @@ export function ReadingExperience({
         </Link>
       </div>
 
+      {tracks.length ? (
+        <AudioPlayer ref={player} tracks={tracks} text={text} settings={<ReadingSettingsControls />} />
+      ) : null}
+
       <div
         id="panel-article"
         role="tabpanel"
@@ -285,7 +422,7 @@ export function ReadingExperience({
         hidden={tab !== "article"}
         className="flex flex-col gap-6"
       >
-        {tracks.length ? <AudioPlayer ref={player} tracks={tracks} text={text} /> : null}
+        <TranslationToolbar available={hasTranslations} preview={previewTranslations} />
 
         <p className="font-sans text-sm text-muted">
           {`Read the text. Tap a word or phrase you want to learn, then add it to your list.${
@@ -305,6 +442,7 @@ export function ReadingExperience({
           <RichTextRenderer
             doc={body}
             speakers={speakers}
+            extras={extras}
             renderTerm={(senseRevisionId, children, key) => {
               const item = byRevision.get(senseRevisionId);
               if (!item) return children;

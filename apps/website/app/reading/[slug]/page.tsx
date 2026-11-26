@@ -36,8 +36,16 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-export default async function ReadingLessonPage({ params }: { params: Params }) {
+export default async function ReadingLessonPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const lesson = await getLesson((await params).slug);
+  // "?preview-translations": marked stand-ins where translations will go, to review the bilingual layout.
+  const previewTranslations = "preview-translations" in (await searchParams);
   if (!lesson) notFound();
   const tracks = lesson.audioTracks.filter((t) => t.url);
 
@@ -90,6 +98,7 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
           lesson={{ slug: lesson.slug, title: lesson.title }}
           tracks={tracks}
           speakers={lesson.speakerNames}
+          previewTranslations={previewTranslations}
           questionCount={lesson.exerciseSets.reduce((n, set) => n + set.questions.length, 0)}
           questions={lesson.exerciseSets.map((set) => (
             <ExerciseRenderer key={set.id} set={set} grade={gradeExercises} />

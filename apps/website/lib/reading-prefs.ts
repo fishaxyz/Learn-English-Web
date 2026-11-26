@@ -2,29 +2,73 @@
 
 import { useSyncExternalStore } from "react";
 
-/** How the text follows the voice-over: the word being spoken, or the whole sentence. */
-export type FollowAlong = "word" | "sentence";
+/** How the text follows the voice-over: the word being spoken, its sentence, or both. */
+export type FollowAlong = "word" | "sentence" | "combined";
+/** Where translations show: under a sentence the learner taps, under every sentence or paragraph, or beside it. */
+export type DisplayMode = "on-demand" | "sentence" | "paragraph" | "side-by-side";
 
-const KEY = "learn-english-web:follow-along";
-const DEFAULT: FollowAlong = "word";
+export type ReadingPrefs = {
+  follow: FollowAlong;
+  translate: boolean;
+  language: string;
+  display: DisplayMode;
+  autoScroll: boolean;
+};
+
+/** Translation languages offered (BCP 47 codes). */
+export const TRANSLATION_LANGUAGES = ["vi", "zh-Hans", "ja", "ko", "th", "es"] as const;
+
+export const FOLLOW_LABEL: Record<FollowAlong, string> = {
+  word: "Word by word",
+  sentence: "Sentence by sentence",
+  combined: "Combined",
+};
+export const DISPLAY_LABEL: Record<DisplayMode, string> = {
+  "on-demand": "On demand",
+  sentence: "Sentence by sentence",
+  paragraph: "Paragraph by paragraph",
+  "side-by-side": "Side by side",
+};
+
+const KEY = "learn-english-web:reading-prefs";
+const OLD_KEY = "learn-english-web:follow-along";
+const DEFAULTS: ReadingPrefs = {
+  follow: "word",
+  translate: false,
+  language: "vi",
+  display: "sentence",
+  autoScroll: true,
+};
 const listeners = new Set<() => void>();
-let cache: FollowAlong | null = null;
+let cache: ReadingPrefs | null = null;
 
-function read(): FollowAlong {
+const oneOf = <T extends string>(value: unknown, options: Record<T, string>, fallback: T): T =>
+  typeof value === "string" && value in options ? (value as T) : fallback;
+
+function read(): ReadingPrefs {
   if (cache) return cache;
   try {
-    const stored = localStorage.getItem(KEY);
-    cache = stored === "sentence" || stored === "word" ? stored : DEFAULT;
+    const stored = JSON.parse(localStorage.getItem(KEY) ?? "null") as Partial<ReadingPrefs> | null;
+    const oldFollow = localStorage.getItem(OLD_KEY); // the first version kept only this
+    cache = {
+      follow: oneOf(stored?.follow ?? oldFollow, FOLLOW_LABEL, DEFAULTS.follow),
+      translate: typeof stored?.translate === "boolean" ? stored.translate : DEFAULTS.translate,
+      language: (TRANSLATION_LANGUAGES as readonly string[]).includes(stored?.language ?? "")
+        ? (stored?.language as string)
+        : DEFAULTS.language,
+      display: oneOf(stored?.display, DISPLAY_LABEL, DEFAULTS.display),
+      autoScroll: typeof stored?.autoScroll === "boolean" ? stored.autoScroll : DEFAULTS.autoScroll,
+    };
   } catch {
-    cache = DEFAULT; // storage blocked (private mode): the default, never a crash
+    cache = DEFAULTS; // storage blocked (private mode) or corrupt: the defaults, never a crash
   }
   return cache;
 }
 
-function write(next: FollowAlong) {
-  cache = next;
+function update(change: Partial<ReadingPrefs>) {
+  cache = { ...read(), ...change };
   try {
-    localStorage.setItem(KEY, next);
+    localStorage.setItem(KEY, JSON.stringify(cache));
   } catch {
     // Blocked: the choice still holds for this visit.
   }
@@ -46,7 +90,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** The learner's follow-along choice, remembered in this browser; the default on the server and first render. */
-export function useFollowAlong(): [FollowAlong, (next: FollowAlong) => void] {
-  return [useSyncExternalStore(subscribe, read, () => DEFAULT), write];
+/** The learner's reading settings, remembered in this browser; the defaults on the server and first render. */
+export function useReadingPrefs(): [ReadingPrefs, (change: Partial<ReadingPrefs>) => void] {
+  return [useSyncExternalStore(subscribe, read, () => DEFAULTS), update];
 }

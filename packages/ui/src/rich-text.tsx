@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 type Mark = { type: string; attrs?: Record<string, unknown> };
 type Node = { type: string; attrs?: Record<string, unknown>; content?: Node[]; text?: string; marks?: Mark[] };
@@ -17,6 +17,21 @@ export type RenderTerm = (senseRevisionId: string, children: ReactNode, key: str
 
 /** Names shown instead of a conversation's "HOST1:" / "HOST2:" labels. */
 export type SpeakerNames = { host1?: string | null; host2?: string | null } | null;
+
+/**
+ * Extra content around the lesson text, e.g. translations. Inserted nodes and wrappers must mark their own text
+ * `data-extra`, so code-point offsets into the block (read-along, vocabulary links) still line up.
+ */
+export type BlockExtras = {
+  /** Nodes to place inside the block right after these code-point offsets of its text (e.g. sentence ends). */
+  insertAfter?: (blockId: string, text: string) => Map<number, ReactNode> | null;
+  /** Wraps the whole block, e.g. to put a translation after it or beside it. */
+  wrap?: (blockId: string, text: string, block: ReactNode) => ReactNode;
+};
+
+/** A block's text the way the API counts it: text as written, a line break as "\n". */
+const inlineText = (node: Node) =>
+  (node.content ?? []).map((c) => (c.type === "text" ? (c.text ?? "") : c.type === "hardBreak" ? "\n" : "")).join("");
 
 const HOST_PREFIX = /^\s*HOST\s?([12])\s*:\s*/i;
 
@@ -66,38 +81,91 @@ function renderText(node: Node, key: string, renderTerm?: RenderTerm): ReactNode
   return out;
 }
 
-function renderNode(node: Node, key: string, renderTerm?: RenderTerm, speakers?: SpeakerNames): ReactNode {
+/**
+ * A block's inline content, starting at code point `from` of its text, with `inserts` placed after the offsets they
+ * name (a text run is split there, keeping its marks).
+ */
+function renderInline(
+  content: Node[],
+  key: string,
+  from: number,
+  inserts: Map<number, ReactNode> | null,
+  renderTerm?: RenderTerm
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  let offset = from;
+  content.forEach((child, i) => {
+    const k = `${key}-${i}`;
+    if (child.type !== "text") {
+      out.push(renderNode(child, k, renderTerm));
+      if (child.type === "hardBreak") offset += 1;
+      return;
+    }
+    const chars = [...(child.text ?? "")];
+    const cuts = inserts
+      ? [...inserts.keys()].filter((at) => at > offset && at <= offset + chars.length).sort((a, b) => a - b)
+      : [];
+    let start = 0;
+    for (const at of cuts) {
+      const piece = chars.slice(start, at - offset).join("");
+      if (piece) out.push(renderText({ ...child, text: piece }, `${k}-${at}`, renderTerm));
+      out.push(<Fragment key={`${k}-x${at}`}>{inserts?.get(at)}</Fragment>);
+      start = at - offset;
+    }
+    const rest = chars.slice(start).join("");
+    if (rest) out.push(renderText({ ...child, text: rest }, `${k}-end`, renderTerm));
+    offset += chars.length;
+  });
+  return out;
+}
+
+function renderNode(
+  node: Node,
+  key: string,
+  renderTerm?: RenderTerm,
+  speakers?: SpeakerNames,
+  extras?: BlockExtras
+): ReactNode {
   const id = typeof node.attrs?.["id"] === "string" ? (node.attrs["id"] as string) : undefined;
+  const text = id && (node.type === "paragraph" || node.type === "heading") ? inlineText(node) : null;
+  const inserts = id && text !== null ? (extras?.insertAfter?.(id, text) ?? null) : null;
+  const wrapped = (block: ReactNode) => (id && text !== null && extras?.wrap ? extras.wrap(id, text, block) : block);
   const turn = speakerTurn(node, speakers);
   if (turn) {
     return (
-      <p key={key} data-block-id={id} className={`turn turn-host-${turn.host}`}>
-        <span hidden>{turn.label}</span>
-        <span data-extra="" className="speaker-name">
-          {turn.name}
-          <span className="sr-only">:</span>
-        </span>{" "}
-        {(turn.rest.content ?? []).map((child, i) => renderNode(child, `${key}-${i}`, renderTerm, speakers))}
-      </p>
+      <Fragment key={key}>
+        {wrapped(
+          <p data-block-id={id} className={`turn turn-host-${turn.host}`}>
+            <span hidden>{turn.label}</span>
+            <span data-extra="" className="speaker-name">
+              {turn.name}
+              <span className="sr-only">:</span>
+            </span>{" "}
+            {renderInline(turn.rest.content ?? [], key, [...turn.label].length, inserts, renderTerm)}
+          </p>
+        )}
+      </Fragment>
     );
   }
-  const children = (node.content ?? []).map((child, i) => renderNode(child, `${key}-${i}`, renderTerm, speakers));
+  const children = (node.content ?? []).map((child, i) =>
+    renderNode(child, `${key}-${i}`, renderTerm, speakers, extras)
+  );
   switch (node.type) {
     case "text":
       return renderText(node, key, renderTerm);
     case "paragraph":
       return (
-        <p key={key} data-block-id={id}>
-          {children}
-        </p>
+        <Fragment key={key}>
+          {wrapped(<p data-block-id={id}>{renderInline(node.content ?? [], key, 0, inserts, renderTerm)}</p>)}
+        </Fragment>
       );
     case "heading": {
       const level = node.attrs?.["level"];
       const Tag = level === 3 ? "h3" : level === 4 ? "h4" : "h2";
       return (
-        <Tag key={key} data-block-id={id}>
-          {children}
-        </Tag>
+        <Fragment key={key}>
+          {wrapped(<Tag data-block-id={id}>{renderInline(node.content ?? [], key, 0, inserts, renderTerm)}</Tag>)}
+        </Fragment>
       );
     }
     case "blockquote":
@@ -142,13 +210,18 @@ export function RichTextRenderer({
   doc,
   renderTerm,
   speakers,
+  extras,
 }: {
   doc: unknown;
   renderTerm?: RenderTerm;
   /** For conversations: who HOST1 and HOST2 are. */
   speakers?: SpeakerNames;
+  /** Content around blocks and sentences (translations). */
+  extras?: BlockExtras;
 }) {
   const root = doc as Node | null;
   if (!root || root.type !== "doc" || !Array.isArray(root.content)) return null;
-  return <div className="rich-text">{root.content.map((n, i) => renderNode(n, `b${i}`, renderTerm, speakers))}</div>;
+  return (
+    <div className="rich-text">{root.content.map((n, i) => renderNode(n, `b${i}`, renderTerm, speakers, extras))}</div>
+  );
 }
