@@ -20,7 +20,7 @@ export const minutes = (seconds: number) => `${Math.max(1, Math.round(seconds / 
 
 /**
  * A lesson page's frame, shared by the website and the dashboard's preview: the title block, the text, then
- * whatever follows (vocabulary, exercises).
+ * whatever follows (vocabulary, exercises). With an `aside`, a side panel sits on the left on wide screens.
  */
 export function LessonLayout({
   kind,
@@ -30,6 +30,7 @@ export function LessonLayout({
   meta,
   children,
   after,
+  aside,
 }: {
   kind: string;
   level?: string | null;
@@ -38,8 +39,10 @@ export function LessonLayout({
   meta?: ReactNode;
   children: ReactNode;
   after?: ReactNode;
+  /** A panel on the left (wide screens only), e.g. the reading settings. */
+  aside?: ReactNode;
 }) {
-  return (
+  const article = (
     <article className="mx-auto flex w-full max-w-3xl flex-col gap-10">
       <header className="flex flex-col gap-3">
         <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-accent">
@@ -53,5 +56,14 @@ export function LessonLayout({
       <div className="lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink">{children}</div>
       {after}
     </article>
+  );
+  if (!aside) return article;
+  return (
+    <div className="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[15rem_minmax(0,1fr)]">
+      <aside className="hidden lg:block">
+        <div className="sticky top-6">{aside}</div>
+      </aside>
+      {article}
+    </div>
   );
 }

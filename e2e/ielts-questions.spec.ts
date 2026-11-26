@@ -42,6 +42,9 @@ test("IELTS question types are edited, published and marked", async ({ page }) =
   await expect(page.getByText(/Published as revision 1\./)).toBeVisible();
 
   await page.goto(`${WEBSITE}/reading/${slug}`);
+  // The questions have their own tab, next to the article and its vocabulary.
+  await expect(page.getByText("(Choose 2 letters.)")).toBeHidden();
+  await page.getByRole("tab", { name: /^Questions/ }).click();
   await expect(page.getByText("(Choose 2 letters.)")).toBeVisible();
   await page.getByRole("checkbox", { name: "B She reads a book." }).check();
   await page.getByRole("checkbox", { name: "C She works." }).check();

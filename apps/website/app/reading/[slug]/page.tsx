@@ -1,6 +1,7 @@
 import { ReadingLessonDocument } from "@english/graphql";
 import { ExerciseRenderer, LessonLayout, minutes } from "@english/ui";
 import { ReadingExperience } from "../../../components/reading-experience";
+import { ReadingSettings } from "../../../components/reading-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -81,13 +82,7 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
             ))}
           </>
         }
-        after={
-          <>
-            {lesson.exerciseSets.map((set) => (
-              <ExerciseRenderer key={set.id} set={set} grade={gradeExercises} />
-            ))}
-          </>
-        }
+        aside={<ReadingSettings />}
       >
         <ReadingExperience
           body={lesson.body}
@@ -95,6 +90,10 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
           lesson={{ slug: lesson.slug, title: lesson.title }}
           tracks={lesson.audioTracks.filter((t) => t.url)}
           speakers={lesson.speakerNames}
+          questionCount={lesson.exerciseSets.reduce((n, set) => n + set.questions.length, 0)}
+          questions={lesson.exerciseSets.map((set) => (
+            <ExerciseRenderer key={set.id} set={set} grade={gradeExercises} />
+          ))}
         />
       </LessonLayout>
     </>

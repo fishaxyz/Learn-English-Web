@@ -60,6 +60,10 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   await expect(page.getByText("My list for this reading: 1")).toBeVisible();
   await page.getByRole("button", { name: "Study my words" }).click();
   await expect(page.getByRole("button", { name: "commute (in your list)" })).toBeVisible();
+  await page.getByRole("tab", { name: /^Vocabulary/ }).click();
+  await expect(page.getByRole("heading", { name: "Words in this text" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove “commute” from my list" })).toBeVisible();
+  await page.getByRole("tab", { name: /^Questions/ }).click();
   await page.getByRole("radio", { name: "False" }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(page.getByText("You scored 1 out of 1.")).toBeVisible();

@@ -3,7 +3,15 @@
 import type { VocabularyItemViewFragment } from "@english/graphql";
 import { RichTextRenderer, type SpeakerNames } from "@english/ui";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { blockById, blockText, pointInText, rangeForSpan, sentenceAt } from "../lib/text-spans";
 import { AudioPlayer, type PlayerHandle, type Track } from "./audio-player";
@@ -19,6 +27,7 @@ import { isStructure, languageName, WordCard } from "./word-card";
 
 type Item = VocabularyItemViewFragment;
 type Mode = "choose" | "study";
+type Tab = "article" | "questions" | "vocabulary";
 
 /** The word under a click, for words that aren't prepared (to say so kindly). */
 function wordAt(x: number, y: number): string | null {
@@ -117,6 +126,9 @@ function Popover({
 }
 
 /**
+ * The reading page's tabs: the article itself, its questions, and its vocabulary. Every panel stays mounted, so
+ * the voice-over keeps playing and answers are kept while the learner switches.
+ *
  * The reading, the learner's way (AGENTS.md §7: an interactive island in a server-rendered page):
  * 1. read the clean text and tap prepared words or structures; a structure is always added whole;
  * 2. the counter shows the list for this reading, with a gentle suggestion, never a limit;
@@ -128,6 +140,8 @@ export function ReadingExperience({
   lesson,
   tracks = [],
   speakers,
+  questions,
+  questionCount = 0,
 }: {
   body: unknown;
   items: Item[];
@@ -135,7 +149,12 @@ export function ReadingExperience({
   tracks?: Track[];
   /** For conversations: the names shown instead of HOST1/HOST2. */
   speakers?: SpeakerNames;
+  /** The exercises, rendered by the page (they grade on the server). */
+  questions?: ReactNode;
+  questionCount?: number;
 }) {
+  const top = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>("article");
   const text = useRef<HTMLDivElement>(null);
   const player = useRef<PlayerHandle>(null);
   const words = useMyWords();
@@ -209,93 +228,181 @@ export function ReadingExperience({
     setNotice(word ? `“${word}” isn’t in our word list yet. Highlighted words and phrases can be added.` : null);
   }
 
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: "article", label: "Article" },
+    { id: "questions", label: "Questions", count: questionCount },
+    { id: "vocabulary", label: "Vocabulary", count: items.length },
+  ];
+
+  function choose(next: Tab) {
+    setTab(next);
+    setOpen(null);
+    setNotice(null);
+    // When the learner has scrolled down the article, the new tab starts at its top.
+    const at = top.current?.getBoundingClientRect().top ?? 0;
+    if (at < 0) top.current?.scrollIntoView({ block: "start" });
+  }
+
+  function onTabKey(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = tabs.findIndex((t) => t.id === tab);
+    const next = tabs[(at + step + tabs.length) % tabs.length];
+    if (!next) return;
+    choose(next.id);
+    document.getElementById(`tab-${next.id}`)?.focus();
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="sticky top-0 z-30 -mx-4 flex font-sans flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur">
-        <p className="text-sm font-medium" aria-live="polite">
-          My list for this reading: <span className="font-semibold text-accent">{chosenHere.length}</span>
-        </p>
-        <div role="group" aria-label="Reading mode" className="flex rounded-full border border-line p-0.5 text-sm">
-          {(["choose", "study"] as const).map((m) => (
+    <div ref={top} className="flex scroll-mt-4 flex-col gap-6">
+      <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-3 border-b border-line bg-paper/95 px-4 py-3 font-sans backdrop-blur">
+        <div role="tablist" aria-label="Lesson parts" onKeyDown={onTabKey} className="flex flex-wrap gap-1">
+          {tabs.map((t) => (
             <button
-              key={m}
+              key={t.id}
+              id={`tab-${t.id}`}
               type="button"
-              aria-pressed={mode === m}
-              onClick={() => setMode(m)}
-              className="rounded-full px-3 py-1 font-medium aria-pressed:bg-accent aria-pressed:text-on-accent"
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-controls={`panel-${t.id}`}
+              tabIndex={tab === t.id ? 0 : -1}
+              onClick={() => choose(t.id)}
+              className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink hover:border-accent aria-selected:border-ink aria-selected:bg-ink aria-selected:text-paper"
             >
-              {m === "choose" ? "Read & choose" : "Study my words"}
+              {t.label}
+              {t.count !== undefined ? (
+                <span className="rounded-full bg-paper px-1.5 text-xs font-bold text-muted">{t.count}</span>
+              ) : null}
             </button>
           ))}
         </div>
         <Link href="/my-words" className="ml-auto text-sm font-medium text-accent hover:underline">
           My words ({words.items.length})
         </Link>
-        {chosenHere.length > SUGGESTED_PER_READING ? (
-          <p className="w-full text-sm text-muted">
-            {SUGGESTED_PER_READING} is a good number to start with. You can keep adding; smaller lists are easier to
-            remember.
+      </div>
+
+      <div
+        id="panel-article"
+        role="tabpanel"
+        aria-labelledby="tab-article"
+        hidden={tab !== "article"}
+        className="flex flex-col gap-6"
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-sans">
+          <p className="text-sm font-medium" aria-live="polite">
+            My list for this reading: <span className="font-semibold text-accent">{chosenHere.length}</span>
+          </p>
+          <div role="group" aria-label="Reading mode" className="flex rounded-full border border-line p-0.5 text-sm">
+            {(["choose", "study"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => setMode(m)}
+                className="rounded-full px-3 py-1 font-medium aria-pressed:bg-accent aria-pressed:text-on-accent"
+              >
+                {m === "choose" ? "Read & choose" : "Study my words"}
+              </button>
+            ))}
+          </div>
+          {chosenHere.length > SUGGESTED_PER_READING ? (
+            <p className="w-full text-sm text-muted">
+              {SUGGESTED_PER_READING} is a good number to start with. You can keep adding; smaller lists are easier to
+              remember.
+            </p>
+          ) : null}
+        </div>
+
+        {tracks.length ? <AudioPlayer ref={player} tracks={tracks} text={text} /> : null}
+
+        <p className="font-sans text-sm text-muted">
+          {mode === "choose"
+            ? `Read the text. Tap a word or phrase you want to learn, then add it to your list.${
+                canHearSentences ? " Tap any sentence to hear it." : ""
+              }`
+            : chosenHere.length
+              ? "Your words are highlighted. Tap one to see it again."
+              : "You haven’t chosen any words yet. Switch to “Read & choose” and add some."}
+        </p>
+
+        <div
+          ref={text}
+          onClick={onTextClick}
+          onPointerMove={(e) => {
+            if (canHearSentences && e.pointerType === "mouse") showHover(sentenceUnder(e.clientX, e.clientY));
+          }}
+          onPointerLeave={() => showHover(null)}
+          className={`lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink ${canHearSentences ? "cursor-pointer" : ""}`}
+        >
+          <RichTextRenderer
+            doc={body}
+            speakers={speakers}
+            renderTerm={(senseRevisionId, children, key) => {
+              const item = byRevision.get(senseRevisionId);
+              if (!item) return children;
+              const chosen = words.has(senseRevisionId);
+              const style =
+                mode === "study" && chosen
+                  ? "rounded-sm bg-accent-soft px-0.5 font-medium underline decoration-accent decoration-2 underline-offset-4"
+                  : chosen
+                    ? "underline decoration-accent/60 decoration-1 underline-offset-4"
+                    : "";
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={(e) => {
+                    setNotice(null);
+                    setOpen({ item, anchor: e.currentTarget });
+                  }}
+                  className={`cursor-pointer text-inherit hover:bg-accent-soft/60 focus-visible:outline-2 focus-visible:outline-accent ${style}`}
+                >
+                  {children}
+                  {chosen ? <span className="sr-only"> (in your list)</span> : null}
+                </button>
+              );
+            }}
+          />
+        </div>
+        {notice ? (
+          <p role="status" className="rounded-lg bg-surface px-4 py-2 font-sans text-sm text-muted shadow-sm">
+            {notice}
           </p>
         ) : null}
       </div>
 
-      {tracks.length ? <AudioPlayer ref={player} tracks={tracks} text={text} /> : null}
-
-      <p className="font-sans text-sm text-muted">
-        {mode === "choose"
-          ? `Read the text. Tap a word or phrase you want to learn, then add it to your list.${
-              canHearSentences ? " Tap any sentence to hear it." : ""
-            }`
-          : chosenHere.length
-            ? "Your words are highlighted. Tap one to see it again."
-            : "You haven’t chosen any words yet. Switch to “Read & choose” and add some."}
-      </p>
+      <div
+        id="panel-questions"
+        role="tabpanel"
+        aria-labelledby="tab-questions"
+        hidden={tab !== "questions"}
+        className="flex flex-col gap-6 font-sans"
+      >
+        {questionCount ? questions : <p className="text-muted">There are no questions for this lesson yet.</p>}
+      </div>
 
       <div
-        ref={text}
-        onClick={onTextClick}
-        onPointerMove={(e) => {
-          if (canHearSentences && e.pointerType === "mouse") showHover(sentenceUnder(e.clientX, e.clientY));
-        }}
-        onPointerLeave={() => showHover(null)}
-        className={`lesson-text font-reading text-[1.1875rem] leading-[1.75] text-ink ${canHearSentences ? "cursor-pointer" : ""}`}
+        id="panel-vocabulary"
+        role="tabpanel"
+        aria-labelledby="tab-vocabulary"
+        hidden={tab !== "vocabulary"}
+        className="font-sans"
       >
-        <RichTextRenderer
-          doc={body}
-          speakers={speakers}
-          renderTerm={(senseRevisionId, children, key) => {
-            const item = byRevision.get(senseRevisionId);
-            if (!item) return children;
-            const chosen = words.has(senseRevisionId);
-            const style =
-              mode === "study" && chosen
-                ? "rounded-sm bg-accent-soft px-0.5 font-medium underline decoration-accent decoration-2 underline-offset-4"
-                : chosen
-                  ? "underline decoration-accent/60 decoration-1 underline-offset-4"
-                  : "";
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-haspopup="dialog"
-                onClick={(e) => {
-                  setNotice(null);
-                  setOpen({ item, anchor: e.currentTarget });
-                }}
-                className={`cursor-pointer text-inherit hover:bg-accent-soft/60 focus-visible:outline-2 focus-visible:outline-accent ${style}`}
-              >
-                {children}
-                {chosen ? <span className="sr-only"> (in your list)</span> : null}
-              </button>
-            );
-          }}
-        />
+        {items.length ? (
+          <WordPanel
+            items={items}
+            language={words.language}
+            languages={languages}
+            setLanguage={words.setLanguage}
+            has={words.has}
+            toggle={toggle}
+          />
+        ) : (
+          <p className="text-muted">There is no vocabulary for this lesson yet.</p>
+        )}
       </div>
-      {notice ? (
-        <p role="status" className="rounded-lg bg-surface px-4 py-2 font-sans text-sm text-muted shadow-sm">
-          {notice}
-        </p>
-      ) : null}
 
       {open ? (
         <Popover
@@ -319,15 +426,6 @@ export function ReadingExperience({
           />
         </Popover>
       ) : null}
-
-      <WordPanel
-        items={items}
-        language={words.language}
-        languages={languages}
-        setLanguage={words.setLanguage}
-        has={words.has}
-        toggle={toggle}
-      />
     </div>
   );
 }
