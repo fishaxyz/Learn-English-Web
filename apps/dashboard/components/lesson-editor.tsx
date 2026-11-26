@@ -25,6 +25,7 @@ import {
   type ScriptValues,
 } from "./lesson-parts";
 import { QuestionSuggestions } from "./question-suggestions";
+import { emptyTranslations, translationSummary, TranslationsPanel } from "./translations-panel";
 import { VocabularySuggestions } from "./vocabulary-suggestions";
 import { VoiceoverPanel } from "./voiceover-panel";
 
@@ -149,6 +150,8 @@ export function LessonEditor({
     draft?.vocabularySuggestions ?? { state: "IDLE", usedLanguageModel: null, items: [] }
   );
   const [words, setWords] = useState(() => countWords(draft?.body as JSONContent | undefined));
+  const [translations, setTranslations] = useState(() => emptyTranslations("vi"));
+  const translationPart = translationSummary(translations);
   const sections = useCollapsed();
   const parts = sectionStates({
     words,
@@ -326,6 +329,28 @@ export function LessonEditor({
                 </button>
               ) : null}
             </div>
+          </EditorSection>
+
+          <EditorSection
+            id="translation"
+            step={4}
+            title="Translation"
+            summary={translationPart.summary}
+            state={translationPart.state}
+            tint="bg-sky"
+          >
+            <TranslationsPanel
+              resourceId={lesson.id}
+              localizationId={localization.id}
+              lockVersion={lockVersion}
+              editable={editable}
+              saved={!dirty}
+              hasScript={words > 0}
+              ensureSaved={ensureSaved}
+              paragraphs={paragraphs(savedBody)}
+              data={translations}
+              onData={setTranslations}
+            />
           </EditorSection>
         </>
       }

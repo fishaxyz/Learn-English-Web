@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from .graphql_client import GraphQLResponseError, GraphQLTransportError
 from .questions.draft import draft_questions
+from .translations.translate import fake_translate, translate
 from .tts.alignment import Block, WordTiming, turn_timings, word_timings
 from .tts.providers import ProviderError, Speech, SpeechProvider, join_audio
 from .vocab.llm import LanguageModel
@@ -26,7 +27,7 @@ FAIL = """mutation Fail($job: ID!, $token: String!, $error: String!, $retryable:
 
 RENEW = """mutation Renew($job: ID!, $token: String!) { renewJobLease(jobId: $job, claimToken: $token) }"""
 
-JOB_TYPES = ["tts.generate", "vocab.suggest", "questions.suggest"]
+JOB_TYPES = ["tts.generate", "vocab.suggest", "questions.suggest", "translations.translate"]
 
 
 class Executor(Protocol):
@@ -84,6 +85,26 @@ class VocabPayload(BaseModel):
     blocks: list[dict[str, str]] = Field(max_length=500)
 
 
+class Sentence(BaseModel):
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    text: str = Field(min_length=1, max_length=5_000)
+
+
+class Paragraph(BaseModel):
+    blockId: str = Field(min_length=1, max_length=200)
+    sentences: list[Sentence] = Field(max_length=500)
+
+
+class TranslatePayload(BaseModel):
+    """Sentences to translate (with their paragraphs, for context) and the language."""
+
+    revisionId: str
+    locale: Literal["vi", "fr", "de"]
+    textHash: str
+    paragraphs: list[Paragraph] = Field(max_length=500)
+
+
 class Claimed(BaseModel):
     id: str
     type: str
@@ -101,7 +122,9 @@ class JobRunner:
         upload_origin: str | None = None,
         upload_transport: httpx.BaseTransport | None = None,
         language_model: LanguageModel | None = None,
+        fake_translations: bool = False,
     ) -> None:
+        self._fake_translations = fake_translations
         self._client = client
         self._provider = provider
         self._model = language_model
@@ -122,6 +145,8 @@ class JobRunner:
                 self._vocabulary(job)
             elif job.type == "questions.suggest":
                 self._questions(job)
+            elif job.type == "translations.translate":
+                self._translate(job)
             elif job.type == "tts.generate":
                 self._tts(job)
             else:
@@ -164,6 +189,20 @@ class JobRunner:
             self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
 
         result = draft_questions(payload.blocks, payload.level, self._model, self._log, keep_alive=renew)
+        self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
+
+    def _translate(self, job: Claimed) -> None:
+        payload = TranslatePayload.model_validate(job.payload)
+
+        def renew() -> None:
+            self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
+
+        paragraphs = [p.model_dump() for p in payload.paragraphs]
+        if self._fake_translations:
+            result = fake_translate(paragraphs, payload.locale)
+            self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
+            return
+        result = translate(paragraphs, payload.locale, self._model, self._log, keep_alive=renew)
         self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
 
     def _tts(self, job: Claimed) -> None:

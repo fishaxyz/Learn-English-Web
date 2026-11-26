@@ -15,6 +15,13 @@ export const dynamic = "force-dynamic";
 
 type Params = Promise<{ slug: string }>;
 
+/** Approved sentence translations, by language, then by the sentence's place (`blockId:start`). */
+function translationsByLanguage(list: { locale: string; blockId: string; start: number; text: string }[]) {
+  const out: Record<string, Record<string, string>> = {};
+  for (const t of list) (out[t.locale] ??= {})[`${t.blockId}:${t.start}`] = t.text;
+  return out;
+}
+
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** One API call per request, shared by the page and its metadata. */
@@ -99,6 +106,7 @@ export default async function ReadingLessonPage({
           tracks={tracks}
           speakers={lesson.speakerNames}
           previewTranslations={previewTranslations}
+          translations={translationsByLanguage(lesson.translations)}
           questionCount={lesson.exerciseSets.reduce((n, set) => n + set.questions.length, 0)}
           questions={lesson.exerciseSets.map((set) => (
             <ExerciseRenderer key={set.id} set={set} grade={gradeExercises} />

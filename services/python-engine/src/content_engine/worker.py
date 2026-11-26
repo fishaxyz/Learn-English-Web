@@ -105,7 +105,14 @@ def main() -> int:
                 else None
             )
             log.info("vocabulary suggestions", extra={"language_model": settings.llm_model if model else None})
-            jobs = JobRunner(client, provider, log, upload_origin=origin, language_model=model)
+            jobs = JobRunner(
+                client,
+                provider,
+                log,
+                upload_origin=origin,
+                language_model=model,
+                fake_translations=settings.translation_provider == "fake",
+            )
         worker = Worker(client, settings, log, jobs)
 
         def on_signal(signum: int, _frame: FrameType | None) -> None:

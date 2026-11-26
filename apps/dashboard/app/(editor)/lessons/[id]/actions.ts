@@ -4,6 +4,10 @@ import {
   ApproveAudioTrackDocument,
   ApproveVocabularySuggestionsDocument,
   ApproveQuestionSuggestionsDocument,
+  ApproveTranslationsDocument,
+  DraftTranslationsDocument,
+  TranslateDraftDocument,
+  type DraftTranslationsFieldsFragment,
   DraftQuestionSuggestionsDocument,
   RejectQuestionSuggestionsDocument,
   SuggestQuestionsDocument,
@@ -255,6 +259,47 @@ export async function suggestQuestionsAgain(localizationId: string): Promise<{ o
   try {
     await editorMutation(SuggestQuestionsDocument, { localizationId });
     return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+// --- Translations (bilingual reading; text only)
+
+export async function draftTranslations(
+  resourceId: string,
+  locale: string
+): Promise<{ ok: true; translations: DraftTranslationsFieldsFragment } | { ok: false; message: string }> {
+  try {
+    const r = await editorQuery(DraftTranslationsDocument, { id: resourceId, locale });
+    const draft = r.editorialResource?.localizations[0]?.draft;
+    if (!draft) return { ok: false, message: "There's no draft." };
+    return { ok: true, translations: draft.translations };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function translateDraft(
+  localizationId: string,
+  locale: string,
+  redoDrafts: boolean
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(TranslateDraftDocument, { localizationId, locale, redoDrafts });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function approveTranslations(
+  localizationId: string,
+  items: { id: string; text: string }[]
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  try {
+    const r = await editorMutation(ApproveTranslationsDocument, { localizationId, items });
+    return { ok: true, count: r.approveTranslations };
   } catch (error) {
     return { ok: false, message: explain(error) };
   }

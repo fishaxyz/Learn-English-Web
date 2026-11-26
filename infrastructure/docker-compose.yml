@@ -128,6 +128,7 @@ services:
       # Vocabulary suggestions: the language model served by llama.cpp on this Mac (ADR 0007). Set it empty to
       # suggest from word frequency only (the end-to-end tests do).
       LLM_BASE_URL: ${LLM_BASE_URL-http://host.docker.internal:8400/v1}
+      TRANSLATION_PROVIDER: ${TRANSLATION_PROVIDER:-}
       LLM_MODEL: ${LLM_MODEL:-qwen3-14b}
     extra_hosts:
       - "host.docker.internal:host-gateway"

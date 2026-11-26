@@ -220,7 +220,7 @@ export function ReadingExperience({
   /** The exercises, rendered by the page (they grade on the server). */
   questions?: ReactNode;
   questionCount?: number;
-  /** Approved sentence translations (none yet: their source is still to be decided). */
+  /** Approved sentence translations, by language and sentence place (`blockId:start`). */
   translations?: Translations;
   /** Shows marked stand-ins where translations will go, to review the layout. */
   previewTranslations?: boolean;

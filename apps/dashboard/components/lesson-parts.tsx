@@ -17,6 +17,8 @@ import { RichTextEditor } from "./rich-text-editor";
 export const LEVELS: CefrLevel[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
 export const SECTION_IDS = ["script", "voice", "vocabulary", "questions"] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
+/** Every section that folds, the optional ones too (Translation isn't needed to publish). */
+const FOLDING_IDS = [...SECTION_IDS, "translation"] as const;
 export const TITLES = ["Script", "Voice-over", "Lexical vocabulary", "Questions & quizzes"];
 export const smallButton = "rounded-full border border-line px-3 py-1 hover:border-ink";
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -307,10 +309,10 @@ export function SectionsToolbar() {
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
       <p className="text-muted">Open the part you&apos;re working on. The voice-over is on the right.</p>
       <div className="flex gap-2">
-        <button type="button" onClick={() => sections.setAll(SECTION_IDS, false)} className={smallButton}>
+        <button type="button" onClick={() => sections.setAll(FOLDING_IDS, false)} className={smallButton}>
           Collapse all
         </button>
-        <button type="button" onClick={() => sections.setAll(SECTION_IDS, true)} className={smallButton}>
+        <button type="button" onClick={() => sections.setAll(FOLDING_IDS, true)} className={smallButton}>
           Expand all
         </button>
       </div>
