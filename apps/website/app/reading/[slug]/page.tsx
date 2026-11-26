@@ -2,6 +2,7 @@ import { ReadingLessonDocument } from "@english/graphql";
 import { ExerciseRenderer, LessonLayout, minutes } from "@english/ui";
 import { ReadingExperience } from "../../../components/reading-experience";
 import { ReadingSettings } from "../../../components/reading-settings";
+import { VoiceTags } from "../../../components/voice-tags";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -39,6 +40,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function ReadingLessonPage({ params }: { params: Params }) {
   const lesson = await getLesson((await params).slug);
   if (!lesson) notFound();
+  const tracks = lesson.audioTracks.filter((t) => t.url);
 
   // Truthful structured data: only what the page really shows (AGENTS.md §7).
   const jsonLd = {
@@ -79,6 +81,11 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
                 {l.name}
               </span>
             ))}
+            {tracks.length === 1 && tracks[0] ? (
+              <span className="ml-auto">
+                <VoiceTags label={tracks[0].label} />
+              </span>
+            ) : null}
           </>
         }
         aside={<ReadingSettings />}
@@ -87,7 +94,7 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
           body={lesson.body}
           items={lesson.vocabularyItems}
           lesson={{ slug: lesson.slug, title: lesson.title }}
-          tracks={lesson.audioTracks.filter((t) => t.url)}
+          tracks={tracks}
           speakers={lesson.speakerNames}
           questionCount={lesson.exerciseSets.reduce((n, set) => n + set.questions.length, 0)}
           questions={lesson.exerciseSets.map((set) => (
