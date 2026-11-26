@@ -2,6 +2,7 @@
 
 import type { ReadingLessonQuery } from "@english/graphql";
 import { rangeForSpan } from "../lib/text-spans";
+import { VoiceTags } from "./voice-tags";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type RefObject } from "react";
 
 type Lesson = Extract<NonNullable<ReadingLessonQuery["resourceBySlug"]>, { __typename: "ReadingResource" }>;
@@ -12,7 +13,8 @@ export type PlayerHandle = {
   playSpan(blockId: string, start: number, end: number): boolean;
 };
 
-const SPEEDS = [0.75, 1, 1.25] as const;
+const SPEEDS = [0.75, 1] as const;
+const SPEED_LABEL: Record<(typeof SPEEDS)[number], string> = { 0.75: "Slower Speed", 1: "Natural Speed" };
 const HIGHLIGHT = "read-along";
 
 const clock = (ms: number) => {
@@ -27,7 +29,7 @@ const highlights = (): HighlightRegistry | null =>
     : null;
 
 /**
- * The lesson's voice-overs: play, seek, replay, speed, and a choice of voice ("Woman · UK"). While it plays, the
+ * The lesson's voice-overs: play, seek, speed, and a choice of voice ("Woman · UK"). While it plays, the
  * word being spoken is highlighted in the text (read-along), using the browser's highlight API so the text itself
  * isn't re-rendered. No autoplay; nothing loads until the learner presses play (AGENTS.md §9).
  */
@@ -137,13 +139,6 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
           >
             {playing ? "❚❚ Pause" : "▶ Listen"}
           </button>
-          <button
-            type="button"
-            className={button}
-            onClick={() => audio.current && (audio.current.currentTime = Math.max(0, audio.current.currentTime - 5))}
-          >
-            ↺ 5 s
-          </button>
           <div role="group" aria-label="Speed" className="flex gap-1">
             {SPEEDS.map((s) => (
               <button
@@ -156,7 +151,7 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
                 }}
                 className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
               >
-                {s}×
+                {SPEED_LABEL[s]}
               </button>
             ))}
           </div>
@@ -174,12 +169,14 @@ export const AudioPlayer = forwardRef<PlayerHandle, { tracks: Track[]; text: Ref
                   }}
                   className={`${button} aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent`}
                 >
-                  🎧 {t.label}
+                  <VoiceTags label={t.label} />
                 </button>
               ))}
             </div>
           ) : (
-            <span className="text-sm text-muted">🎧 {track.label}</span>
+            <span className="flex items-center gap-1.5 text-sm">
+              <VoiceTags label={track.label} />
+            </span>
           )}
         </div>
         <div className="flex items-center gap-3">

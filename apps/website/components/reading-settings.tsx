@@ -1,4 +1,4 @@
-/** The reading page's left panel: settings for the reading view. Empty for now; controls come later. */
+/** The reading page's right panel: settings for the reading view. Empty for now; controls come later. */
 export function ReadingSettings() {
   return (
     <section

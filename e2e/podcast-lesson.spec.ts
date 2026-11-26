@@ -42,5 +42,5 @@ test("an editor makes a two-host podcast lesson and learners see and hear the ho
   await expect(turn).toContainText("Hi Max, how was your");
   await expect(page.locator("p.turn-host-2")).toContainText("Max");
   await expect(page.getByText("HOST1:")).toBeHidden();
-  await expect(page.getByText("🎧 Conversation · Kate & Max")).toBeVisible();
+  await expect(page.getByLabel("Voice: Conversation · Kate & Max")).toBeVisible();
 });

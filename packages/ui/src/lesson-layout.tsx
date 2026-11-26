@@ -20,7 +20,7 @@ export const minutes = (seconds: number) => `${Math.max(1, Math.round(seconds / 
 
 /**
  * A lesson page's frame, shared by the website and the dashboard's preview: the title block, the text, then
- * whatever follows (vocabulary, exercises). With an `aside`, a side panel sits on the left on wide screens.
+ * whatever follows (vocabulary, exercises). With an `aside`, a side panel sits on the right on wide screens.
  */
 export function LessonLayout({
   kind,
@@ -39,7 +39,7 @@ export function LessonLayout({
   meta?: ReactNode;
   children: ReactNode;
   after?: ReactNode;
-  /** A panel on the left (wide screens only), e.g. the reading settings. */
+  /** A panel on the right (wide screens only), e.g. the reading settings. */
   aside?: ReactNode;
 }) {
   const article = (
@@ -59,11 +59,11 @@ export function LessonLayout({
   );
   if (!aside) return article;
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div className="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_15rem]">
+      {article}
       <aside className="hidden lg:block">
         <div className="sticky top-6">{aside}</div>
       </aside>
-      {article}
     </div>
   );
 }

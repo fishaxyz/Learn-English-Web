@@ -15,6 +15,11 @@
   --color-good-soft: #e1f2e5;
   --color-bad: #9b2c22;
   --color-bad-soft: #f8e4e1;
+  /* Small labels (a voice: "Man", "UK"). */
+  --color-tag-blue: #1f4e8c;
+  --color-tag-blue-soft: #e3ecfa;
+  --color-tag-amber: #7a4a0a;
+  --color-tag-amber-soft: #fbeed6;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-literata), Georgia, "Times New Roman", serif;
@@ -36,6 +41,10 @@
     --color-good-soft: #1b3324;
     --color-bad: #f0a097;
     --color-bad-soft: #3b201d;
+    --color-tag-blue: #a9c6f2;
+    --color-tag-blue-soft: #1c2a40;
+    --color-tag-amber: #f1c886;
+    --color-tag-amber-soft: #3a2c14;
     color-scheme: dark;
   }
 }

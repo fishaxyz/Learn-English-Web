@@ -65,7 +65,6 @@ export default async function ReadingLessonPage({ params }: { params: Params }) 
         kind="READING"
         level={lesson.cefrLevel}
         title={lesson.title}
-        summary={lesson.summary}
         meta={
           <>
             <span>{minutes(lesson.estimatedReadingSeconds)}</span>
