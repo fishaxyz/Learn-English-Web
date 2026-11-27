@@ -28,6 +28,7 @@
   - Published voice-overs are frozen, like the rest of a published revision.
 - **Media storage sits behind a small interface** (`uploadUrl`, `downloadUrl`).
   - Today's driver stores files in a folder (`MEDIA_DIR`) and serves HMAC-signed, expiring URLs from the API, with byte ranges so players can seek.
+  - Published audio (added 2026-11-27) gets a lasting link instead, `/media/published/<track>.<ext>` (`publishedUrl`). Lesson pages are cached, and a cached page once handed learners a signed link that had expired (403). The API checks on every request that the track belongs to the lesson's current published version and that the lesson isn't archived. Drafts keep the signed, 6-hour links. On R2, published files would move to a public bucket address in the same way.
   - An S3-compatible driver (Bunny, Backblaze B2, R2) can replace it in production. The host and its costs will be chosen later.
 - **Tests never call ElevenLabs.** Without a key, the API offers four test voices and the worker makes silent audio, so the flow can be tried at no cost.
 
