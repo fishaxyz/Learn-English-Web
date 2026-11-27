@@ -114,8 +114,16 @@ export const audioResolvers: Resolvers = {
     },
     url: async (t, _, ctx) => {
       if (!t.assetId) return null;
-      const asset = await ctx.loaders.mediaAsset.load(t.assetId);
-      return asset ? ctx.storage.downloadUrl(asset.objectKey, URL_TTL_SECONDS) : null;
+      const [asset, revision] = await Promise.all([
+        ctx.loaders.mediaAsset.load(t.assetId),
+        ctx.loaders.revision.load(t.revisionId),
+      ]);
+      if (!asset) return null;
+      // Published audio gets a lasting link (pages that show it are cached); drafts keep private, short-lived ones.
+      const ext = asset.objectKey.split(".").pop() ?? "mp3";
+      return revision?.status === "PUBLISHED"
+        ? ctx.storage.publishedUrl(t.id, ext)
+        : ctx.storage.downloadUrl(asset.objectKey, URL_TTL_SECONDS);
     },
     wordTimings: (t) =>
       (Array.isArray(t.wordTimings) ? (t.wordTimings as AudioTrackModel["wordTimings"] & unknown[]) : []) as never,

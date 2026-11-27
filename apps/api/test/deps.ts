@@ -6,6 +6,7 @@ import { createRateLimiter } from "../src/modules/rate-limit";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { publishedTrackLookup } from "../src/modules/media/published";
 import { createLocalStorage } from "../src/modules/media/storage";
 import { createRevalidator } from "../src/modules/revalidate";
 import { fakeCatalog } from "../src/modules/tts/voices";
@@ -20,6 +21,7 @@ export function testDeps(overrides: Partial<ApiDependencies> & { db: Database })
     dir: mkdtempSync(join(tmpdir(), "media-test-")),
     publicBaseUrl: "http://media.test",
     secret: "test-media-signing-secret-0123456789",
+    publishedTrack: publishedTrackLookup(overrides.db),
   });
   return {
     log,

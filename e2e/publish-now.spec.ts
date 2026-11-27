@@ -55,6 +55,8 @@ test("an admin publishes an essay with Publish now", async ({ page }) => {
   const audio = page.locator("audio");
   const time = () => audio.evaluate((a: HTMLAudioElement) => a.currentTime);
   const paused = () => audio.evaluate((a: HTMLAudioElement) => a.paused);
+  // Published audio has a lasting link, so a cached page never holds an expired one.
+  await expect(audio).toHaveAttribute("src", /\/media\/published\/[0-9a-f-]{36}\.(mp3|wav)$/);
 
   // The first sentence plays, then stops before the second one starts (the test voice speaks 60 ms per character:
   // "Others" starts about 2.8 s in).

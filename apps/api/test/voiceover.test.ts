@@ -71,6 +71,8 @@ describe.skipIf(!testDatabaseUrl)("voice-overs", () => {
   let origin: string;
   let resourceId: string;
   let localizationId: string;
+  /** The published voice-over's lasting link, from the publish test. */
+  let publishedUrl: string;
 
   beforeAll(async () => {
     h = await createHarness();
@@ -231,12 +233,20 @@ describe.skipIf(!testDatabaseUrl)("voice-overs", () => {
       wordTimings: [{ blockId: "para-1", startMs: 200 }],
     });
 
+    // Published audio has a lasting link (cached pages never hold an expired one), named by the track.
+    expect(track!.url).toBe(`http://media.test/media/published/${ready!.id}.wav`);
+    publishedUrl = track!.url;
     const ranged = await fetch(local(track!.url), { headers: { range: "bytes=100-199" } });
     expect(ranged.status).toBe(206);
     expect(ranged.headers.get("content-range")).toBe("bytes 100-199/4000");
+    expect(ranged.headers.get("cache-control")).toBe("public, max-age=300");
     expect((await ranged.arrayBuffer()).byteLength).toBe(100);
-    const forged = track!.url.replace(/sig=[^&]+/, "sig=forged");
-    expect((await fetch(local(forged))).status).toBe(403);
+    // Only published tracks: another id, or the wrong file type, finds nothing.
+    expect((await fetch(local(track!.url.replace(ready!.id, crypto.randomUUID())))).status).toBe(404);
+    expect((await fetch(local(track!.url.replace(".wav", ".mp3")))).status).toBe(404);
+    // The file's own address still needs a valid signature.
+    const [asset] = await h.t.db.select().from(schema.mediaAssets).where(eq(schema.mediaAssets.id, ready!.assetId!));
+    expect((await fetch(`${origin}/media/${asset!.objectKey}?exp=9999999999&sig=forged`)).status).toBe(403);
   });
 
   it("makes a conversation voice-over: both hosts' voices, their names for learners, turns for the worker", async () => {
@@ -339,5 +349,23 @@ describe.skipIf(!testDatabaseUrl)("voice-overs", () => {
       { token: h.people.ownerA.token }
     );
     expect(codeOf(pub)).toBe("CONFLICT");
+  });
+
+  it("keeps the published link working while a new draft is made, and ends it when the lesson is archived", async () => {
+    // The draft's copy of the track has a private, expiring link; the live lesson's link is unchanged.
+    const tracks = await h.gql(TRACKS, { id: resourceId }, { token: h.people.ownerA.token });
+    const draftUrl = (
+      tracks.data?.editorialResource as { localizations: { draft: { audioTracks: { url: string | null }[] } }[] }
+    ).localizations[0]!.draft.audioTracks[0]!.url;
+    expect(draftUrl).toMatch(/^http:\/\/media\.test\/media\/.+\.wav\?exp=\d+&sig=/);
+    expect((await fetch(local(publishedUrl), { method: "HEAD" })).status).toBe(200);
+
+    const archived = await h.gql(
+      `mutation($id: ID!) { archiveResource(resourceId: $id) { id } }`,
+      { id: resourceId },
+      { token: h.people.ownerA.token }
+    );
+    expect(archived.errors).toBeUndefined();
+    expect((await fetch(local(publishedUrl))).status).toBe(404);
   });
 });

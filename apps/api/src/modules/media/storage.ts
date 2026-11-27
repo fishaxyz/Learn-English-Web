@@ -14,21 +14,38 @@ import { pipeline } from "node:stream/promises";
 export type MediaStorage = {
   uploadUrl(key: string, contentType: string, ttlSeconds: number): string;
   downloadUrl(key: string, ttlSeconds: number): string;
+  /**
+   * A lasting link for a published track's audio: no expiry, so cached lesson pages never hold a dead link. It
+   * works only while the track belongs to a published lesson version (checked on every request).
+   */
+  publishedUrl(trackId: string, ext: string): string;
 };
+
+/** Finds the file of a track that's in a currently published lesson version, or null. */
+export type PublishedTrackLookup = (trackId: string) => Promise<string | null>;
+
+const PUBLISHED_PATH = /^published\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(mp3|wav)$/;
 
 /** Object keys we create: site/kind/name.ext, lowercase, no dots or slashes elsewhere. */
 export const OBJECT_KEY = /^[a-z0-9-]+\/[a-z]+\/[a-z0-9-]+\.(mp3|wav)$/;
 const TYPES: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav" };
 export const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
 
-export function createLocalStorage(options: { dir: string; publicBaseUrl: string; secret: string }) {
+export function createLocalStorage(options: {
+  dir: string;
+  publicBaseUrl: string;
+  secret: string;
+  /** Serves /media/published/<track>.<ext>; without it those links are 404. */
+  publishedTrack?: PublishedTrackLookup;
+}) {
   const root = resolve(options.dir);
   const sign = (method: string, key: string, exp: number, type = "") =>
     createHmac("sha256", options.secret).update(`${method}\n${key}\n${exp}\n${type}`).digest("base64url");
+  const base = options.publicBaseUrl.replace(/\/$/, "");
   const url = (method: string, key: string, ttlSeconds: number, type = "") => {
     const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
     const q = new URLSearchParams({ exp: String(exp), sig: sign(method, key, exp, type), ...(type ? { type } : {}) });
-    return `${options.publicBaseUrl.replace(/\/$/, "")}/media/${key}?${q}`;
+    return `${base}/media/${key}?${q}`;
   };
 
   function check(method: string, key: string, params: URLSearchParams): boolean {
@@ -48,6 +65,18 @@ export function createLocalStorage(options: { dir: string; publicBaseUrl: string
 
   async function serve(req: IncomingMessage, res: ServerResponse, key: string, params: URLSearchParams) {
     if (!check("GET", key, params)) return void res.writeHead(403).end();
+    await send(req, res, key, "private, max-age=3600");
+  }
+
+  /** A published track's file, by track id: public, and only while its lesson version is published. */
+  async function servePublished(req: IncomingMessage, res: ServerResponse, trackId: string, ext: string) {
+    const key = await options.publishedTrack?.(trackId).catch(() => null);
+    if (!key || !OBJECT_KEY.test(key) || !key.endsWith(`.${ext}`)) return void res.writeHead(404).end();
+    // Short browser caching: a new version or unpublishing takes effect within minutes.
+    await send(req, res, key, "public, max-age=300");
+  }
+
+  async function send(req: IncomingMessage, res: ServerResponse, key: string, cacheControl: string) {
     let size: number;
     try {
       size = (await stat(fileFor(key))).size;
@@ -57,7 +86,7 @@ export function createLocalStorage(options: { dir: string; publicBaseUrl: string
     const headers: Record<string, string | number> = {
       "content-type": TYPES[key.split(".").pop() ?? ""] ?? "application/octet-stream",
       "accept-ranges": "bytes",
-      "cache-control": "private, max-age=3600",
+      "cache-control": cacheControl,
       "access-control-allow-origin": "*",
     };
     // Byte ranges, so players can seek without downloading everything (AGENTS.md §9).
@@ -111,6 +140,7 @@ export function createLocalStorage(options: { dir: string; publicBaseUrl: string
   const storage: MediaStorage = {
     uploadUrl: (key, contentType, ttl) => url("PUT", key, ttl, contentType),
     downloadUrl: (key, ttl) => url("GET", key, ttl),
+    publishedUrl: (trackId, ext) => `${base}/media/published/${trackId}.${ext}`,
   };
 
   /** Handles /media/<key> for this driver; returns false for other paths. */
@@ -118,6 +148,12 @@ export function createLocalStorage(options: { dir: string; publicBaseUrl: string
     const u = new URL(req.url ?? "/", "http://local");
     if (!u.pathname.startsWith("/media/")) return false;
     const key = decodeURIComponent(u.pathname.slice("/media/".length));
+    const [, trackId, ext] = PUBLISHED_PATH.exec(key) ?? [];
+    if (trackId && ext) {
+      if (req.method === "GET" || req.method === "HEAD") void servePublished(req, res, trackId, ext);
+      else res.writeHead(405).end();
+      return true;
+    }
     if (req.method === "GET" || req.method === "HEAD") void serve(req, res, key, u.searchParams);
     else if (req.method === "PUT") void receive(req, res, key, u.searchParams);
     else res.writeHead(405).end();

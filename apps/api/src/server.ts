@@ -5,6 +5,7 @@ import { createApp } from "./app";
 import { loadEnv } from "./env";
 import { createLogger } from "./logger";
 import { createRateLimiter } from "./modules/rate-limit";
+import { publishedTrackLookup } from "./modules/media/published";
 import { createLocalStorage } from "./modules/media/storage";
 import { createRevalidator } from "./modules/revalidate";
 import { elevenLabsCatalog, fakeCatalog } from "./modules/tts/voices";
@@ -16,6 +17,7 @@ const media = createLocalStorage({
   dir: env.MEDIA_DIR,
   publicBaseUrl: env.MEDIA_PUBLIC_BASE_URL,
   secret: env.MEDIA_SIGNING_SECRET,
+  publishedTrack: publishedTrackLookup(database.db),
 });
 const { handler } = createApp(
   {
