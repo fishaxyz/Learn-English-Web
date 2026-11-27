@@ -285,7 +285,7 @@ export function ReadingExperience({
   useEffect(() => () => highlightRegistry()?.delete(SENTENCE_HIGHLIGHT), []);
 
   function onTextClick(e: MouseEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest("button")) return; // a prepared word: its card opens
+    if ((e.target as HTMLElement).closest("button, [data-term]")) return; // a marked word: its card opens
     if (window.getSelection()?.toString()) return; // they're selecting text, not tapping
     if ((e.target as HTMLElement).closest("[data-extra]")) return; // a translation, not the lesson text
     const tapped = sentenceUnder(e.clientX, e.clientY);
@@ -307,7 +307,7 @@ export function ReadingExperience({
     }
     // Tapping a word nobody prepared yet: say so, without interrupting the reading.
     const word = wordAt(e.clientX, e.clientY);
-    setNotice(word ? `“${word}” isn’t in our word list yet. Highlighted words and phrases can be added.` : null);
+    setNotice(word ? `“${word}” isn’t in our word list yet. Marked words and phrases have meanings to add.` : null);
   }
 
   // Translations, placed by the display mode: after a tapped sentence, after every sentence or paragraph, or beside.
@@ -432,9 +432,11 @@ export function ReadingExperience({
         <TranslationToolbar available={hasTranslations} preview={previewTranslations} />
 
         <p className="font-sans text-sm text-muted">
-          {`Read the text. Tap a word or phrase you want to learn, then add it to your list.${
-            canHearSentences ? " Tap any sentence to hear it." : ""
-          }`}
+          {`${
+            prefs.showWords
+              ? "Tap a marked word to see its meaning and add it to your list."
+              : "Read the text. Tap a word or phrase you want to learn, then add it to your list."
+          }${canHearSentences ? " Tap any sentence to hear it." : ""}`}
         </p>
 
         <div
@@ -454,21 +456,42 @@ export function ReadingExperience({
               const item = byRevision.get(senseRevisionId);
               if (!item) return children;
               const chosen = words.has(senseRevisionId);
-              const style = chosen ? "underline decoration-accent/60 decoration-1 underline-offset-4" : "";
+              // Marked words open their card; any other tap plays the sentence. Amber, so a marked word still
+              // stands out inside the lit sentence while listening; key words bold with a solid line, as in admin.
+              const marked = prefs.showWords
+                ? `rounded-sm bg-tag-amber-soft underline decoration-2 underline-offset-4 decoration-tag-amber ${
+                    item.isKey ? "font-semibold decoration-solid" : "decoration-dotted"
+                  }`
+                : chosen
+                  ? "underline decoration-accent/60 decoration-1 underline-offset-4"
+                  : "";
+              // A ✓ after words in My list: drawn by CSS, so it adds no characters to the text's offsets.
+              const tick =
+                chosen && prefs.showWords ? "after:ml-0.5 after:text-[0.75em] after:text-good after:content-['✓']" : "";
+              const style = `${marked} ${tick}`;
+              const show = (anchor: HTMLElement) => {
+                setNotice(null);
+                setOpen({ item, anchor });
+              };
+              // An inline element (not a <button>), so a long phrase wraps with the line like the rest of the text.
               return (
-                <button
+                <span
                   key={key}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   aria-haspopup="dialog"
-                  onClick={(e) => {
-                    setNotice(null);
-                    setOpen({ item, anchor: e.currentTarget });
+                  data-term=""
+                  onClick={(e) => show(e.currentTarget)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    show(e.currentTarget);
                   }}
-                  className={`cursor-pointer text-inherit hover:bg-accent-soft/60 focus-visible:outline-2 focus-visible:outline-accent ${style}`}
+                  className={`cursor-pointer box-decoration-clone hover:bg-accent-soft/60 focus-visible:outline-2 focus-visible:outline-accent ${style}`}
                 >
                   {children}
                   {chosen ? <span className="sr-only"> (in your list)</span> : null}
-                </button>
+                </span>
               );
             }}
           />

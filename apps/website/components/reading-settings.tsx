@@ -74,6 +74,8 @@ export function ReadingSettingsControls() {
   const languageId = useId();
   return (
     <div className="flex flex-col gap-5">
+      <Switch label="Show dictionary words" on={prefs.showWords} onChange={(showWords) => update({ showWords })} />
+      <hr className="border-line" />
       <div className="flex flex-col gap-2">
         <label htmlFor={languageId} className={heading}>
           Translation language

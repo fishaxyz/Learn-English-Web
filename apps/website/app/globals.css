@@ -4,13 +4,14 @@
 @source "../../../packages/ui/src";
 
 /* The sentence under the pointer, when it can be heard (a click plays it). */
+/* See-through tints, so marked dictionary words keep their amber underneath. */
 ::highlight(sentence-hover) {
-  background-color: color-mix(in srgb, var(--color-accent-soft) 70%, transparent);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
 /* Read-along (set by the audio player through CSS.highlights): the word being said, its sentence, or both. */
 ::highlight(read-along-sentence) {
-  background-color: var(--color-accent-soft);
+  background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
   color: var(--color-ink);
 }
 ::highlight(read-along) {

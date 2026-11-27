@@ -51,12 +51,26 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   // A learner reads it, taps the word, adds it to their list, studies it, and answers.
   await page.goto(`${WEBSITE}/reading/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-  await page.getByRole("button", { name: "commute", exact: true }).click();
+  // Words with a dictionary card are marked (a tinted background), so learners can tell them from plain text.
+  const word = page.getByRole("button", { name: "commute", exact: true });
+  const background = () => word.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await background()).not.toBe("rgba(0, 0, 0, 0)");
+  await word.click();
   const card = page.getByRole("dialog", { name: "About “commute”" });
   await expect(card.getByText("Her commute is long.")).toBeVisible(); // the sentence from this text
   await card.getByRole("button", { name: "＋ Add to my list" }).click();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "commute (in your list)" })).toBeVisible();
+  const listed = page.getByRole("button", { name: "commute (in your list)" });
+  await expect(listed).toBeVisible();
+  // A ✓ follows words in the list (drawn by CSS, so the text itself is unchanged).
+  expect(await listed.evaluate((el) => getComputedStyle(el, "::after").content)).toContain("✓");
+  // Learners who prefer plain text can turn the marks off; the word still opens its card.
+  await page.getByRole("switch", { name: "Show dictionary words" }).first().click();
+  expect(await listed.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  await listed.click();
+  await expect(card).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("switch", { name: "Show dictionary words" }).first().click();
   await page.getByRole("tab", { name: /^Vocabulary/ }).click();
   await expect(page.getByRole("heading", { name: "Words in this text" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove “commute” from my list" })).toBeVisible();
