@@ -2,6 +2,7 @@ import { schema, type Database } from "@english/database";
 import { and, eq, sql } from "drizzle-orm";
 import { conflict } from "../../errors";
 import { ttsTextOf } from "../audio/service";
+import { approvedLexicalCount } from "../lexical-items/service";
 import type { RichTextDocument } from "../rich-text";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -17,7 +18,7 @@ export type Checklist = Record<LessonPart, boolean>;
 const LABEL: Record<LessonPart, string> = {
   SCRIPT: "script",
   VOICEOVER: "an approved voice-over",
-  VOCABULARY: "linked vocabulary",
+  VOCABULARY: "lexical vocabulary",
   QUESTIONS: "questions",
 };
 
@@ -27,6 +28,8 @@ export function checklistFrom(p: {
   richText: unknown;
   tracks: { status: string; textHash: string }[];
   linkedSenses: number;
+  /** Approved items of the lesson's own lexical vocabulary (ADR 0010). */
+  lexicalItems?: number;
   questions: number;
 }): Checklist {
   const hash = ttsTextOf(p.richText as RichTextDocument).hash;
@@ -34,7 +37,8 @@ export function checklistFrom(p: {
     SCRIPT: p.plainText.trim().length > 0,
     // Approved and still reading the current text.
     VOICEOVER: p.tracks.some((t) => t.status === "APPROVED" && t.textHash === hash),
-    VOCABULARY: p.linkedSenses > 0,
+    // The lesson's lexical vocabulary, or (older lessons) words linked in the text.
+    VOCABULARY: (p.lexicalItems ?? 0) > 0 || p.linkedSenses > 0,
     QUESTIONS: p.questions > 0,
   };
 }
@@ -43,7 +47,7 @@ export async function checklistOf(
   tx: Tx | Database,
   revision: { id: string; plainText: string; richText: unknown }
 ): Promise<Checklist> {
-  const [tracks, [annotations], [questions]] = await Promise.all([
+  const [tracks, [annotations], [questions], lexicalItems] = await Promise.all([
     tx
       .select({ status: schema.audioTracks.status, textHash: schema.audioTracks.textHash })
       .from(schema.audioTracks)
@@ -57,12 +61,14 @@ export async function checklistOf(
       .from(schema.questions)
       .innerJoin(schema.exerciseSets, eq(schema.questions.exerciseSetId, schema.exerciseSets.id))
       .where(and(eq(schema.exerciseSets.revisionId, revision.id))),
+    approvedLexicalCount(tx, revision.id),
   ]);
   return checklistFrom({
     plainText: revision.plainText,
     richText: revision.richText,
     tracks,
     linkedSenses: annotations?.n ?? 0,
+    lexicalItems,
     questions: questions?.n ?? 0,
   });
 }

@@ -499,3 +499,55 @@ mutation TranslateDraft($localizationId: ID!, $locale: String!, $redoDrafts: Boo
 mutation ApproveTranslations($localizationId: ID!, $items: [TranslationApproval!]!) {
   approveTranslations(localizationId: $localizationId, items: $items)
 }
+
+fragment DraftLexicalItemsFields on DraftLexicalItems {
+  state
+  usedLanguageModel
+  items {
+    id
+    text
+    note
+    kind
+    quote
+    meaning
+    synonyms
+    example
+    ieltsTip
+    status
+    inText
+  }
+}
+
+query DraftLexicalItems($id: ID!) {
+  editorialResource(id: $id) {
+    id
+    localizations {
+      id
+      draft {
+        id
+        lexicalItems {
+          ...DraftLexicalItemsFields
+        }
+      }
+    }
+  }
+}
+
+mutation AddLexicalList($localizationId: ID!, $list: String!) {
+  addLexicalList(localizationId: $localizationId, list: $list) {
+    added
+    skipped
+  }
+}
+
+mutation ExplainLexicalItems($localizationId: ID!, $redoDrafts: Boolean) {
+  explainLexicalItems(localizationId: $localizationId, redoDrafts: $redoDrafts)
+}
+
+mutation ApproveLexicalItems($localizationId: ID!, $items: [LexicalItemApproval!]!) {
+  approveLexicalItems(localizationId: $localizationId, items: $items)
+}
+
+mutation DeleteLexicalItems($localizationId: ID!, $ids: [ID!]!) {
+  deleteLexicalItems(localizationId: $localizationId, ids: $ids)
+}

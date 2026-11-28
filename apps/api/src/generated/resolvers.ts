@@ -155,6 +155,15 @@ export type CreateResourceInput = {
   topicSlugs?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
+export type DraftLexicalItems = {
+  __typename?: 'DraftLexicalItems';
+  items: Array<LexicalItem>;
+  /** The latest explaining job: same states as vocabulary suggestions. */
+  state: VocabularySuggestionsState;
+  /** False when the language model wasn't reachable (nothing can be explained without it). */
+  usedLanguageModel?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type DraftTranslations = {
   __typename?: 'DraftTranslations';
   /** vi, fr or de. */
@@ -345,6 +354,59 @@ export type LexicalExampleInput = {
   sentence: Scalars['String']['input'];
 };
 
+export type LexicalItem = {
+  __typename?: 'LexicalItem';
+  example?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  ieltsTip?: Maybe<Scalars['String']['output']>;
+  /** The script's sentence with the item, found in the current script; null when it isn't there. */
+  inText?: Maybe<Scalars['String']['output']>;
+  kind?: Maybe<LexicalItemKind>;
+  meaning?: Maybe<Scalars['String']['output']>;
+  /** The editor's note from the list, if any. */
+  note?: Maybe<Scalars['String']['output']>;
+  /** The item's words as the script has them (… where they're split apart). */
+  quote?: Maybe<Scalars['String']['output']>;
+  status: LexicalItemStatus;
+  synonyms: Array<Scalars['String']['output']>;
+  /** The item as the editor listed it. */
+  text: Scalars['String']['output'];
+};
+
+export type LexicalItemApproval = {
+  example?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  ieltsTip?: InputMaybe<Scalars['String']['input']>;
+  kind: LexicalItemKind;
+  meaning: Scalars['String']['input'];
+  synonyms: Array<Scalars['String']['input']>;
+};
+
+export type LexicalItemKind =
+  | 'COLLOCATION'
+  | 'IDIOM'
+  | 'KEYWORD'
+  /** A paraphrase: other words for the same idea, as IELTS questions reword the passage. */
+  | 'PARAPHRASE'
+  | 'PHRASAL_VERB'
+  /** A sentence structure or grammar pattern. */
+  | 'STRUCTURE';
+
+export type LexicalItemStatus =
+  /** Checked by an editor: learners see it once the lesson is published. */
+  | 'APPROVED'
+  /** Explained by the model, waiting for an editor. */
+  | 'DRAFT'
+  /** Waiting for the local language model to explain it. */
+  | 'PENDING';
+
+export type LexicalListAdded = {
+  __typename?: 'LexicalListAdded';
+  added: Scalars['Int']['output'];
+  /** Items already in the lesson's list (or repeated in this one). */
+  skipped: Scalars['Int']['output'];
+};
+
 /** One meaning of a headword, as one exact revision. */
 export type LexicalSense = {
   __typename?: 'LexicalSense';
@@ -473,8 +535,12 @@ export type MultipleChoiceQuestion = Question & {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  /** Editors: add items from a list (one per line; a note may follow a spaced dash). The local AI explains them. */
+  addLexicalList: LexicalListAdded;
   /** Editors: keep a finished voice-over; only approved ones go live. */
   approveAudioTrack: AudioTrack;
+  /** Editors: approve items, with their edits. Returns how many were approved. */
+  approveLexicalItems: Scalars['Int']['output'];
   /** Editors: add the chosen drafted questions to the draft's exercises (one set per question type). */
   approveQuestionSuggestions: EditorialResource;
   /** Editors: approve translations, with their edits. Returns how many were approved. */
@@ -489,6 +555,10 @@ export type Mutation = {
   /** Editors: a new resource with its first draft. */
   createResource: EditorialResource;
   deleteAudioTrack: Scalars['Boolean']['output'];
+  /** Editors: remove items from the lesson's list. Returns how many were removed. */
+  deleteLexicalItems: Scalars['Int']['output'];
+  /** Editors: explain items still waiting (redoDrafts: unapproved ones too). In the background. */
+  explainLexicalItems: Scalars['Boolean']['output'];
   failJob: Scalars['Boolean']['output'];
   /** Grades answers on the server. Nothing is stored: practice is anonymous in the MVP. */
   gradePractice: PracticeResult;
@@ -526,8 +596,20 @@ export type Mutation = {
 };
 
 
+export type MutationAddLexicalListArgs = {
+  list: Scalars['String']['input'];
+  localizationId: Scalars['ID']['input'];
+};
+
+
 export type MutationApproveAudioTrackArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationApproveLexicalItemsArgs = {
+  items: Array<LexicalItemApproval>;
+  localizationId: Scalars['ID']['input'];
 };
 
 
@@ -582,6 +664,18 @@ export type MutationCreateResourceArgs = {
 
 export type MutationDeleteAudioTrackArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteLexicalItemsArgs = {
+  ids: Array<Scalars['ID']['input']>;
+  localizationId: Scalars['ID']['input'];
+};
+
+
+export type MutationExplainLexicalItemsArgs = {
+  localizationId: Scalars['ID']['input'];
+  redoDrafts?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
@@ -735,6 +829,19 @@ export type Pronunciation = {
 export type PronunciationInput = {
   accent: Scalars['String']['input'];
   ipa: Scalars['String']['input'];
+};
+
+/** An approved item of a published lesson, for the learner's Lexical Vocabulary tab. */
+export type PublicLexicalItem = {
+  __typename?: 'PublicLexicalItem';
+  example?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  ieltsTip?: Maybe<Scalars['String']['output']>;
+  inText?: Maybe<Scalars['String']['output']>;
+  kind: LexicalItemKind;
+  meaning: Scalars['String']['output'];
+  synonyms: Array<Scalars['String']['output']>;
+  text: Scalars['String']['output'];
 };
 
 /** An approved translation of one sentence of a published lesson. */
@@ -909,6 +1016,8 @@ export type ReadingResource = Resource & {
   exerciseSets: Array<ExerciseSet>;
   id: Scalars['ID']['output'];
   kind: ResourceKind;
+  /** Approved lexical vocabulary, in list order. */
+  lexicalItems: Array<PublicLexicalItem>;
   locale: Scalars['String']['output'];
   publishedAt: Scalars['DateTime']['output'];
   revisionNo: Scalars['Int']['output'];
@@ -978,6 +1087,8 @@ export type Revision = {
   /** The exercises, answer keys included, in the shape saveExerciseSets takes. Editors only. */
   exercises: Scalars['ExercisePayload']['output'];
   id: Scalars['ID']['output'];
+  /** Editorial: the lesson's lexical vocabulary, in list order. */
+  lexicalItems: DraftLexicalItems;
   /** Pass this back when you change the revision; a mismatch means someone else changed it first. */
   lockVersion: Scalars['Int']['output'];
   publishedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1400,6 +1511,7 @@ export type ResolversTypes = {
   CorrectAnswer: ResolverTypeWrapper<ResolversUnionTypes<ResolversTypes>['CorrectAnswer']>;
   CreateResourceInput: CreateResourceInput;
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
+  DraftLexicalItems: ResolverTypeWrapper<DraftLexicalItems>;
   DraftTranslations: ResolverTypeWrapper<DraftTranslations>;
   EditorialLocalization: ResolverTypeWrapper<EditorialLocalizationModel>;
   EditorialResource: ResolverTypeWrapper<EditorialResourceModel>;
@@ -1428,6 +1540,11 @@ export type ResolversTypes = {
   LexicalEntryKind: LexicalEntryKind;
   LexicalExample: ResolverTypeWrapper<LexicalExample>;
   LexicalExampleInput: LexicalExampleInput;
+  LexicalItem: ResolverTypeWrapper<LexicalItem>;
+  LexicalItemApproval: LexicalItemApproval;
+  LexicalItemKind: LexicalItemKind;
+  LexicalItemStatus: LexicalItemStatus;
+  LexicalListAdded: ResolverTypeWrapper<LexicalListAdded>;
   LexicalSense: ResolverTypeWrapper<LexicalSenseModel>;
   ListeningResource: ResolverTypeWrapper<PublishedResourceModel>;
   ManageLexicalSenseInput: ManageLexicalSenseInput;
@@ -1446,6 +1563,7 @@ export type ResolversTypes = {
   PracticeResult: ResolverTypeWrapper<Omit<PracticeResult, 'questions'> & { questions: Array<ResolversTypes['QuestionResult']> }>;
   Pronunciation: ResolverTypeWrapper<Pronunciation>;
   PronunciationInput: PronunciationInput;
+  PublicLexicalItem: ResolverTypeWrapper<PublicLexicalItem>;
   PublicTranslation: ResolverTypeWrapper<PublicTranslation>;
   Query: ResolverTypeWrapper<Record<PropertyKey, never>>;
   Question: ResolverTypeWrapper<QuestionModel>;
@@ -1514,6 +1632,7 @@ export type ResolversParentTypes = {
   CorrectAnswer: ResolversUnionTypes<ResolversParentTypes>['CorrectAnswer'];
   CreateResourceInput: CreateResourceInput;
   DateTime: Scalars['DateTime']['output'];
+  DraftLexicalItems: DraftLexicalItems;
   DraftTranslations: DraftTranslations;
   EditorialLocalization: EditorialLocalizationModel;
   EditorialResource: EditorialResourceModel;
@@ -1538,6 +1657,9 @@ export type ResolversParentTypes = {
   LexicalEntry: LexicalEntryModel;
   LexicalExample: LexicalExample;
   LexicalExampleInput: LexicalExampleInput;
+  LexicalItem: LexicalItem;
+  LexicalItemApproval: LexicalItemApproval;
+  LexicalListAdded: LexicalListAdded;
   LexicalSense: LexicalSenseModel;
   ListeningResource: PublishedResourceModel;
   ManageLexicalSenseInput: ManageLexicalSenseInput;
@@ -1555,6 +1677,7 @@ export type ResolversParentTypes = {
   PracticeResult: Omit<PracticeResult, 'questions'> & { questions: Array<ResolversParentTypes['QuestionResult']> };
   Pronunciation: Pronunciation;
   PronunciationInput: PronunciationInput;
+  PublicLexicalItem: PublicLexicalItem;
   PublicTranslation: PublicTranslation;
   Query: Record<PropertyKey, never>;
   Question: QuestionModel;
@@ -1671,6 +1794,12 @@ export type CorrectAnswerResolvers<ContextType = GraphQLContext, ParentType exte
 export interface DateTimeScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['DateTime'], any> {
   name: 'DateTime';
 }
+
+export type DraftLexicalItemsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DraftLexicalItems'] = ResolversParentTypes['DraftLexicalItems']> = {
+  items?: Resolver<Array<ResolversTypes['LexicalItem']>, ParentType, ContextType>;
+  state?: Resolver<ResolversTypes['VocabularySuggestionsState'], ParentType, ContextType>;
+  usedLanguageModel?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+};
 
 export type DraftTranslationsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DraftTranslations'] = ResolversParentTypes['DraftTranslations']> = {
   locale?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -1804,6 +1933,25 @@ export type LexicalExampleResolvers<ContextType = GraphQLContext, ParentType ext
   sentence?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 };
 
+export type LexicalItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['LexicalItem'] = ResolversParentTypes['LexicalItem']> = {
+  example?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  ieltsTip?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  inText?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  kind?: Resolver<Maybe<ResolversTypes['LexicalItemKind']>, ParentType, ContextType>;
+  meaning?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  note?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  quote?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['LexicalItemStatus'], ParentType, ContextType>;
+  synonyms?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
+  text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+};
+
+export type LexicalListAddedResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['LexicalListAdded'] = ResolversParentTypes['LexicalListAdded']> = {
+  added?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  skipped?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+};
+
 export type LexicalSenseResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['LexicalSense'] = ResolversParentTypes['LexicalSense']> = {
   cefrLevel?: Resolver<Maybe<ResolversTypes['CefrLevel']>, ParentType, ContextType>;
   definition?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -1885,7 +2033,9 @@ export type MultipleChoiceQuestionResolvers<ContextType = GraphQLContext, Parent
 };
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
+  addLexicalList?: Resolver<ResolversTypes['LexicalListAdded'], ParentType, ContextType, RequireFields<MutationAddLexicalListArgs, 'list' | 'localizationId'>>;
   approveAudioTrack?: Resolver<ResolversTypes['AudioTrack'], ParentType, ContextType, RequireFields<MutationApproveAudioTrackArgs, 'id'>>;
+  approveLexicalItems?: Resolver<ResolversTypes['Int'], ParentType, ContextType, RequireFields<MutationApproveLexicalItemsArgs, 'items' | 'localizationId'>>;
   approveQuestionSuggestions?: Resolver<ResolversTypes['EditorialResource'], ParentType, ContextType, RequireFields<MutationApproveQuestionSuggestionsArgs, 'ids' | 'localizationId' | 'lockVersion'>>;
   approveTranslations?: Resolver<ResolversTypes['Int'], ParentType, ContextType, RequireFields<MutationApproveTranslationsArgs, 'items' | 'localizationId'>>;
   approveVocabularySuggestions?: Resolver<ResolversTypes['EditorialResource'], ParentType, ContextType, RequireFields<MutationApproveVocabularySuggestionsArgs, 'ids' | 'localizationId' | 'lockVersion'>>;
@@ -1895,6 +2045,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createJobUpload?: Resolver<ResolversTypes['MediaUpload'], ParentType, ContextType, RequireFields<MutationCreateJobUploadArgs, 'claimToken' | 'contentType' | 'jobId'>>;
   createResource?: Resolver<ResolversTypes['EditorialResource'], ParentType, ContextType, RequireFields<MutationCreateResourceArgs, 'input'>>;
   deleteAudioTrack?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteAudioTrackArgs, 'id'>>;
+  deleteLexicalItems?: Resolver<ResolversTypes['Int'], ParentType, ContextType, RequireFields<MutationDeleteLexicalItemsArgs, 'ids' | 'localizationId'>>;
+  explainLexicalItems?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationExplainLexicalItemsArgs, 'localizationId' | 'redoDrafts'>>;
   failJob?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationFailJobArgs, 'claimToken' | 'error' | 'jobId' | 'retryable'>>;
   gradePractice?: Resolver<ResolversTypes['PracticeResult'], ParentType, ContextType, RequireFields<MutationGradePracticeArgs, 'input'>>;
   manageLexicalSense?: Resolver<ResolversTypes['EditorialSense'], ParentType, ContextType, RequireFields<MutationManageLexicalSenseArgs, 'input'>>;
@@ -1931,6 +2083,17 @@ export type PracticeResultResolvers<ContextType = GraphQLContext, ParentType ext
 export type PronunciationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Pronunciation'] = ResolversParentTypes['Pronunciation']> = {
   accent?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   ipa?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+};
+
+export type PublicLexicalItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PublicLexicalItem'] = ResolversParentTypes['PublicLexicalItem']> = {
+  example?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  ieltsTip?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  inText?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  kind?: Resolver<ResolversTypes['LexicalItemKind'], ParentType, ContextType>;
+  meaning?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  synonyms?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
+  text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 };
 
 export type PublicTranslationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PublicTranslation'] = ResolversParentTypes['PublicTranslation']> = {
@@ -1998,6 +2161,7 @@ export type ReadingResourceResolvers<ContextType = GraphQLContext, ParentType ex
   exerciseSets?: Resolver<Array<ResolversTypes['ExerciseSet']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   kind?: Resolver<ResolversTypes['ResourceKind'], ParentType, ContextType>;
+  lexicalItems?: Resolver<Array<ResolversTypes['PublicLexicalItem']>, ParentType, ContextType>;
   locale?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   publishedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   revisionNo?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -2030,6 +2194,7 @@ export type RevisionResolvers<ContextType = GraphQLContext, ParentType extends R
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   exercises?: Resolver<ResolversTypes['ExercisePayload'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  lexicalItems?: Resolver<ResolversTypes['DraftLexicalItems'], ParentType, ContextType>;
   lockVersion?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   publishedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   questionSuggestions?: Resolver<ResolversTypes['QuestionSuggestions'], ParentType, ContextType>;
@@ -2236,6 +2401,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   CompletionQuestion?: CompletionQuestionResolvers<ContextType>;
   CorrectAnswer?: CorrectAnswerResolvers<ContextType>;
   DateTime?: GraphQLScalarType;
+  DraftLexicalItems?: DraftLexicalItemsResolvers<ContextType>;
   DraftTranslations?: DraftTranslationsResolvers<ContextType>;
   EditorialLocalization?: EditorialLocalizationResolvers<ContextType>;
   EditorialResource?: EditorialResourceResolvers<ContextType>;
@@ -2255,6 +2421,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   LexicalCollectionResource?: LexicalCollectionResourceResolvers<ContextType>;
   LexicalEntry?: LexicalEntryResolvers<ContextType>;
   LexicalExample?: LexicalExampleResolvers<ContextType>;
+  LexicalItem?: LexicalItemResolvers<ContextType>;
+  LexicalListAdded?: LexicalListAddedResolvers<ContextType>;
   LexicalSense?: LexicalSenseResolvers<ContextType>;
   ListeningResource?: ListeningResourceResolvers<ContextType>;
   MatchAnswer?: MatchAnswerResolvers<ContextType>;
@@ -2268,6 +2436,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PageInfo?: PageInfoResolvers<ContextType>;
   PracticeResult?: PracticeResultResolvers<ContextType>;
   Pronunciation?: PronunciationResolvers<ContextType>;
+  PublicLexicalItem?: PublicLexicalItemResolvers<ContextType>;
   PublicTranslation?: PublicTranslationResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   Question?: QuestionResolvers<ContextType>;

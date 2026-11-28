@@ -8,3 +8,4 @@ export * from "./assessment";
 export * from "./audit";
 export * from "./jobs";
 export * from "./translations";
+export * from "./lexical-items";

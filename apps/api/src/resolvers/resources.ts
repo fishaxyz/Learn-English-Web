@@ -1,6 +1,7 @@
 import * as questionDrafts from "../modules/assessment/suggestions";
 import * as suggestions from "../modules/lexicon/suggestions";
 import * as translations from "../modules/translations/service";
+import * as lexicalItems from "../modules/lexical-items/service";
 import { checklistFrom, missingParts } from "../modules/resources/checklist";
 import { schema } from "@english/database";
 import { asc, eq } from "drizzle-orm";
@@ -205,6 +206,22 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return translations.approveTranslations(ctx.db, userId, localizationId, items);
     },
+    addLexicalList: async (_, { localizationId, list }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return lexicalItems.addLexicalList(ctx.db, userId, localizationId, list);
+    },
+    explainLexicalItems: async (_, { localizationId, redoDrafts }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return lexicalItems.explainLexicalItems(ctx.db, userId, localizationId, redoDrafts ?? false);
+    },
+    approveLexicalItems: async (_, { localizationId, items }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return lexicalItems.approveLexicalItems(ctx.db, userId, localizationId, items);
+    },
+    deleteLexicalItems: async (_, { localizationId, ids }, ctx) => {
+      const userId = await onLocalization(ctx, localizationId, "content.write");
+      return lexicalItems.deleteLexicalItems(ctx.db, userId, localizationId, ids);
+    },
     suggestVocabulary: async (_, { localizationId }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return suggestions.suggestAgain(ctx.db, userId, localizationId);
@@ -224,6 +241,7 @@ export const resourceResolvers: Resolvers = {
     vocabularyItems: (p, _, ctx) => vocabularyItems(ctx, p.revision),
     speakerNames: (p) => speakerNames(p.revision.speakerNames),
     translations: (p, _, ctx) => translations.approvedTranslations(ctx.db, p.revision.id),
+    lexicalItems: (p, _, ctx) => lexicalItems.approvedLexicalItems(ctx.db, p.revision),
     audioTracks: (p, _, ctx) => publicTracks(ctx, p.revision),
     wordCount: (p) => wordCount(p.revision.plainText),
     estimatedReadingSeconds: (p) => readingSeconds(wordCount(p.revision.plainText)),
@@ -245,6 +263,7 @@ export const resourceResolvers: Resolvers = {
   },
   Revision: {
     body: (r) => r.richText,
+    lexicalItems: (r, _, ctx) => lexicalItems.lexicalItemsFor(ctx.db, r),
     translations: async (r, { locale }, ctx) => {
       const found = await translations.translationsFor(ctx.db, r, locale);
       return {

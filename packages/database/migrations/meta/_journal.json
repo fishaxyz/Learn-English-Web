@@ -92,6 +92,20 @@
       "when": 1795714601704,
       "tag": "0012_sentence_translations",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795849977007,
+      "tag": "0013_lexical_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795849977624,
+      "tag": "0014_lexical_items_frozen",
+      "breakpoints": true
     }
   ]
 }

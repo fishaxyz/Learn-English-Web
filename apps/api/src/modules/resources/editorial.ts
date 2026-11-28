@@ -10,6 +10,7 @@ import { dropStaleQuestionSuggestions } from "../assessment/suggestions";
 import { publishLinkedDrafts } from "../lexicon/service";
 import { dropStaleSuggestions } from "../lexicon/suggestions";
 import { copyTranslations, syncTranslations } from "../translations/service";
+import { copyLexicalItems } from "../lexical-items/service";
 import { assertComplete, type LessonPart } from "./checklist";
 import { replaceExerciseSets } from "../assessment/service";
 import type { ExerciseSetInput } from "../assessment/schemas";
@@ -237,6 +238,7 @@ export async function startDraft(db: Database, actorUserId: string | null, local
       await copyExerciseSets(tx, p.siteId, p.id, d.id);
       await copyTracks(tx, p.id, d.id);
       await copyTranslations(tx, p.id, d.id);
+      await copyLexicalItems(tx, p.id, d.id);
       await tx.update(loc).set({ draftRevisionId: d.id }).where(eq(loc.id, l.id));
       await audit(tx, {
         siteId: l.siteId,

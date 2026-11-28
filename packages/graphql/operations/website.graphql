@@ -46,11 +46,15 @@ query ReadingLesson($slug: String!) {
     }
     ... on ReadingResource {
       wordCount
-      vocabulary {
-        ...SenseCard
-      }
-      vocabularyItems {
-        ...VocabularyItemView
+      lexicalItems {
+        id
+        text
+        kind
+        meaning
+        synonyms
+        example
+        ieltsTip
+        inText
       }
       translations {
         locale
