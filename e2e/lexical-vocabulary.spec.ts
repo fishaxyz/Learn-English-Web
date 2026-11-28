@@ -130,7 +130,15 @@ test("an editor adds vocabulary sheets in two languages and learners study them 
   await page.getByRole("tab", { name: /^Lexical Vocabulary/ }).click();
   const tab = page.getByRole("tabpanel", { name: /Lexical Vocabulary/ });
   const rely = tab.getByRole("article", { name: "rely on" });
+  // Cards start closed: the words and the meaning; a tap opens one, "Open all" opens them all.
   await expect(rely.getByText("dựa vào", { exact: true })).toBeVisible();
+  await expect(rely.getByText("Nông dân có rất ít thứ để dựa vào.")).toBeHidden();
+  await rely.getByRole("button", { expanded: false }).click();
+  await expect(rely.getByText("Nông dân có rất ít thứ để dựa vào.")).toBeVisible();
+  await rely.getByRole("button", { expanded: true }).click();
+  await expect(rely.getByText("Nông dân có rất ít thứ để dựa vào.")).toBeHidden();
+  await tab.getByRole("button", { name: "Open all" }).click();
+  await expect(tab.getByRole("button", { name: "Close all" })).toBeVisible();
   await expect(rely.getByText("Nông dân có rất ít thứ để dựa vào.")).toBeVisible();
   await expect(rely.getByText("(phụ thuộc vào)")).toBeVisible();
   await expect(
