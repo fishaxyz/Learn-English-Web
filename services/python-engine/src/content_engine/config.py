@@ -20,8 +20,9 @@ class Settings(BaseSettings):
 
     # Translations: the local language model, or "fake" (marked copies of each sentence; browser tests only).
     translation_provider: Literal["llm", "fake"] | None = None
+    lexical_provider: Literal["llm", "fake"] | None = None
 
-    @field_validator("tts_provider", "llm_base_url", "translation_provider", mode="before")
+    @field_validator("tts_provider", "llm_base_url", "translation_provider", "lexical_provider", mode="before")
     @classmethod
     def _unset_when_empty(cls, value: object) -> object:
         # Docker Compose passes "" for a setting that's turned off: TTS_PROVIDER="" means "choose by the key",

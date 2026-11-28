@@ -129,6 +129,7 @@ services:
       # suggest from word frequency only (the end-to-end tests do).
       LLM_BASE_URL: ${LLM_BASE_URL-http://host.docker.internal:8400/v1}
       TRANSLATION_PROVIDER: ${TRANSLATION_PROVIDER:-}
+      LEXICAL_PROVIDER: ${LEXICAL_PROVIDER:-}
       LLM_MODEL: ${LLM_MODEL:-qwen3-14b}
     extra_hosts:
       - "host.docker.internal:host-gateway"

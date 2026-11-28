@@ -112,6 +112,7 @@ def main() -> int:
                 upload_origin=origin,
                 language_model=model,
                 fake_translations=settings.translation_provider == "fake",
+                fake_lexical=settings.lexical_provider == "fake",
             )
         worker = Worker(client, settings, log, jobs)
 
