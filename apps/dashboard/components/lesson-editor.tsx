@@ -26,6 +26,7 @@ import {
 } from "./lesson-parts";
 import { QuestionSuggestions } from "./question-suggestions";
 import { emptyTranslations, translationSummary, TranslationsPanel } from "./translations-panel";
+import { emptyLexicalItems, lexicalCounts, LexicalItemsPanel } from "./lexical-items-panel";
 import { VocabularySuggestions } from "./vocabulary-suggestions";
 import { VoiceoverPanel } from "./voiceover-panel";
 
@@ -151,6 +152,7 @@ export function LessonEditor({
   );
   const [words, setWords] = useState(() => countWords(draft?.body as JSONContent | undefined));
   const [translations, setTranslations] = useState(() => emptyTranslations("vi"));
+  const [lexical, setLexical] = useState(emptyLexicalItems);
   const translationPart = translationSummary(translations);
   const sections = useCollapsed();
   const parts = sectionStates({
@@ -166,6 +168,7 @@ export function LessonEditor({
     keys,
     sets,
     exercisesDirty,
+    lexical: lexicalCounts(lexical),
   });
   // Review and publishing wait for every part (the API checks too); saving never does.
   const unfinished = SECTION_IDS.filter((id) => parts[id].state !== "done");
@@ -265,6 +268,21 @@ export function LessonEditor({
             tint="bg-sun"
           >
             <div className="flex flex-col gap-5">
+              <LexicalItemsPanel
+                resourceId={lesson.id}
+                localizationId={localization.id}
+                lockVersion={lockVersion}
+                editable={editable}
+                saved={!dirty}
+                hasScript={words > 0}
+                ensureSaved={ensureSaved}
+                data={lexical}
+                onData={setLexical}
+              />
+              <h3 className="mt-2 border-t border-line pt-4 font-semibold">
+                Words linked in the text{" "}
+                <span className="text-sm font-normal text-muted">(AI suggestions; not shown to learners for now)</span>
+              </h3>
               <VocabularySuggestions
                 resourceId={lesson.id}
                 localizationId={localization.id}

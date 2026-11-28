@@ -1,6 +1,13 @@
 "use server";
 
 import {
+  AddLexicalListDocument,
+  ApproveLexicalItemsDocument,
+  DeleteLexicalItemsDocument,
+  DraftLexicalItemsDocument,
+  ExplainLexicalItemsDocument,
+  type DraftLexicalItemsFieldsFragment,
+  type LexicalItemApproval,
   ApproveAudioTrackDocument,
   ApproveVocabularySuggestionsDocument,
   ApproveQuestionSuggestionsDocument,
@@ -300,6 +307,67 @@ export async function approveTranslations(
   try {
     const r = await editorMutation(ApproveTranslationsDocument, { localizationId, items });
     return { ok: true, count: r.approveTranslations };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function draftLexicalItems(
+  resourceId: string
+): Promise<{ ok: true; items: DraftLexicalItemsFieldsFragment } | { ok: false; message: string }> {
+  try {
+    const r = await editorQuery(DraftLexicalItemsDocument, { id: resourceId });
+    const draft = r.editorialResource?.localizations[0]?.draft;
+    if (!draft) return { ok: false, message: "There's no draft." };
+    return { ok: true, items: draft.lexicalItems };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function addLexicalList(
+  localizationId: string,
+  list: string
+): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }> {
+  try {
+    const r = await editorMutation(AddLexicalListDocument, { localizationId, list });
+    return { ok: true, ...r.addLexicalList };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function explainLexicalItems(
+  localizationId: string,
+  redoDrafts: boolean
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await editorMutation(ExplainLexicalItemsDocument, { localizationId, redoDrafts });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function approveLexicalItems(
+  localizationId: string,
+  items: LexicalItemApproval[]
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  try {
+    const r = await editorMutation(ApproveLexicalItemsDocument, { localizationId, items });
+    return { ok: true, count: r.approveLexicalItems };
+  } catch (error) {
+    return { ok: false, message: explain(error) };
+  }
+}
+
+export async function deleteLexicalItems(
+  localizationId: string,
+  ids: string[]
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  try {
+    const r = await editorMutation(DeleteLexicalItemsDocument, { localizationId, ids });
+    return { ok: true, count: r.deleteLexicalItems };
   } catch (error) {
     return { ok: false, message: explain(error) };
   }

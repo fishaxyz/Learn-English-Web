@@ -41,6 +41,8 @@ export function sectionStates(p: {
   questionsToCheck?: number;
   /** The worker is drafting questions right now. */
   findingQuestions?: boolean;
+  /** The lesson's own lexical vocabulary (ADR 0010). */
+  lexical?: { approved: number; toCheck: number; waiting: number; working: boolean };
   /** New lessons: what will be made when the lesson is created ("Podcast · Lauren & Roger"). */
   voicePlan?: string | null;
 }): Record<SectionId, { summary: string; state: SectionState }> {
@@ -68,22 +70,36 @@ export function sectionStates(p: {
               ? "working"
               : "todo",
     },
-    vocabulary: {
-      summary: p.findingWords
-        ? "Finding words, phrases and idioms…"
-        : p.vocabulary.length
-          ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key${p.toCheck ? ` · ${p.toCheck} suggested to check` : ""}`
-          : p.toCheck
-            ? `${p.toCheck} suggested to check`
-            : "No words linked yet",
-      state: p.findingWords
-        ? "busy"
-        : p.textDirty && p.vocabulary.length
-          ? "unsaved"
-          : p.vocabulary.length
-            ? "done"
-            : "todo",
-    },
+    vocabulary:
+      p.lexical && (p.lexical.approved || p.lexical.toCheck || p.lexical.waiting || p.lexical.working)
+        ? {
+            summary: p.lexical.working
+              ? "Explaining the list…"
+              : [
+                  `${plural(p.lexical.approved, "item")} approved`,
+                  p.lexical.toCheck ? `${p.lexical.toCheck} to check` : "",
+                  p.lexical.waiting ? `${p.lexical.waiting} waiting` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+            state: p.lexical.working ? "busy" : p.lexical.approved ? "done" : "working",
+          }
+        : {
+            summary: p.findingWords
+              ? "Finding words, phrases and idioms…"
+              : p.vocabulary.length
+                ? `${plural(p.vocabulary.length, "item")} linked · ${p.keys.size} key${p.toCheck ? ` · ${p.toCheck} suggested to check` : ""}`
+                : p.toCheck
+                  ? `${p.toCheck} suggested to check`
+                  : "No words linked yet",
+            state: p.findingWords
+              ? "busy"
+              : p.textDirty && p.vocabulary.length
+                ? "unsaved"
+                : p.vocabulary.length
+                  ? "done"
+                  : "todo",
+          },
     questions: {
       summary: p.findingQuestions
         ? "Writing IELTS-style questions…"
