@@ -11,7 +11,7 @@ import {
   type FollowAlong,
   type RepeatMode,
 } from "../lib/reading-prefs";
-import { languageName } from "./word-card";
+import { languageName } from "../lib/languages";
 
 const heading = "text-xs font-semibold uppercase tracking-wider text-muted";
 
@@ -74,8 +74,6 @@ export function ReadingSettingsControls() {
   const languageId = useId();
   return (
     <div className="flex flex-col gap-5">
-      <Switch label="Show dictionary words" on={prefs.showWords} onChange={(showWords) => update({ showWords })} />
-      <hr className="border-line" />
       <div className="flex flex-col gap-2">
         <label htmlFor={languageId} className={heading}>
           Translation language

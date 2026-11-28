@@ -43,11 +43,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   Reading
                 </Link>
               </li>
-              <li>
-                <Link href="/my-words" className="hover:text-accent">
-                  My words
-                </Link>
-              </li>
               <li className="flex items-center gap-1" aria-label="Levels">
                 {LEVELS.map((level) => (
                   <Link

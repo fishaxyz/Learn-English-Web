@@ -49,9 +49,13 @@ function listedLines(list: string): { text: string; note: string | null }[] {
   });
 }
 
-/** The sentence of the script that has these words ("…" for words split apart), or null. */
+/**
+ * The sentence of the script that has these words ("…" for words split apart; a pattern's "+ verb" part is left
+ * out), or null.
+ */
 export function sentenceWith(doc: RichTextDocument, words: string | null): string | null {
   const parts = (words ?? "")
+    .replace(/\s*\+.*$/, "")
     .toLowerCase()
     .split(/\s*(?:…|\.\.\.)\s*/)
     .map(tidy)

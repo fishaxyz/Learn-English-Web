@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Phase 2's acceptance test (AGENTS.md §13): an editor signs in, writes a reading lesson with a vocabulary
-// link and an exercise, it's reviewed and published, and a learner reads it, opens the word and is graded.
+// link and an exercise, it's reviewed and published, and a learner reads the clean text and is graded.
 import { addQuestion, EDITOR, linkWord, makeTestVoiceover, signIn, WEBSITE, saveAndEdit } from "./helpers";
 
 test("an editor publishes a reading lesson and a learner uses it", async ({ page }) => {
@@ -48,42 +48,14 @@ test("an editor publishes a reading lesson and a learner uses it", async ({ page
   // The page refreshes into its published state (the draft is gone; revision 1 is live).
   await expect(page.getByText(/Published as revision 1\./)).toBeVisible();
 
-  // A learner reads it, taps the word, adds it to their list, studies it, and answers.
+  // A learner reads the clean text (no marked words, no My words) and answers.
   await page.goto(`${WEBSITE}/reading/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-  // Words with a dictionary card are marked (a tinted background), so learners can tell them from plain text.
-  const word = page.getByRole("button", { name: "commute", exact: true });
-  const background = () => word.evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(await background()).not.toBe("rgba(0, 0, 0, 0)");
-  await word.click();
-  const card = page.getByRole("dialog", { name: "About “commute”" });
-  await expect(card.getByText("Her commute is long.")).toBeVisible(); // the sentence from this text
-  await card.getByRole("button", { name: "＋ Add to my list" }).click();
-  await page.keyboard.press("Escape");
-  const listed = page.getByRole("button", { name: "commute (in your list)" });
-  await expect(listed).toBeVisible();
-  // A ✓ follows words in the list (drawn by CSS, so the text itself is unchanged).
-  expect(await listed.evaluate((el) => getComputedStyle(el, "::after").content)).toContain("✓");
-  // Learners who prefer plain text can turn the marks off; the word still opens its card.
-  await page.getByRole("switch", { name: "Show dictionary words" }).first().click();
-  expect(await listed.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-  await listed.click();
-  await expect(card).toBeVisible();
-  await page.keyboard.press("Escape");
-  await page.getByRole("switch", { name: "Show dictionary words" }).first().click();
-  await page.getByRole("tab", { name: /^Vocabulary/ }).click();
-  await expect(page.getByRole("heading", { name: "Words in this text" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Remove “commute” from my list" })).toBeVisible();
+  await expect(page.getByText("Her commute is long.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "commute", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /My words/ })).toHaveCount(0);
   await page.getByRole("tab", { name: /^Questions/ }).click();
   await page.getByRole("radio", { name: "False" }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(page.getByText("You scored 1 out of 1.")).toBeVisible();
-
-  // The word is waiting in "My words", with the sentence it came from.
-  await page
-    .getByRole("link", { name: /^My words/ })
-    .first()
-    .click();
-  await expect(page.getByRole("heading", { name: "My words" })).toBeVisible();
-  await expect(page.getByText("“Her commute is long.”")).toBeVisible();
 });

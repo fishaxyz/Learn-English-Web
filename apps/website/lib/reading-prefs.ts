@@ -17,8 +17,6 @@ export type ReadingPrefs = {
   language: string;
   display: DisplayMode;
   autoScroll: boolean;
-  /** Mark words that have a dictionary card (off: plain text; taps still work). */
-  showWords: boolean;
 };
 
 /** Translation languages offered (BCP 47 codes). */
@@ -49,7 +47,6 @@ const DEFAULTS: ReadingPrefs = {
   language: "vi",
   display: "sentence",
   autoScroll: true,
-  showWords: true,
 };
 const listeners = new Set<() => void>();
 let cache: ReadingPrefs | null = null;
@@ -71,7 +68,6 @@ function read(): ReadingPrefs {
         : DEFAULTS.language,
       display: oneOf(stored?.display, DISPLAY_LABEL, DEFAULTS.display),
       autoScroll: typeof stored?.autoScroll === "boolean" ? stored.autoScroll : DEFAULTS.autoScroll,
-      showWords: typeof stored?.showWords === "boolean" ? stored.showWords : DEFAULTS.showWords,
     };
   } catch {
     cache = DEFAULTS; // storage blocked (private mode) or corrupt: the defaults, never a crash

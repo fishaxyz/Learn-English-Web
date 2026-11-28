@@ -49,6 +49,7 @@ describe("the editor's list", () => {
     const d = doc("Farmers watched the sky. They passed their observations on to their children.");
     expect(sentenceWith(d, "passed … on")).toBe("They passed their observations on to their children.");
     expect(sentenceWith(d, "WATCHED THE SKY")).toBe("Farmers watched the sky.");
+    expect(sentenceWith(d, "watched + noun")).toBe("Farmers watched the sky.");
     expect(sentenceWith(d, "barometer")).toBeNull();
   });
 });

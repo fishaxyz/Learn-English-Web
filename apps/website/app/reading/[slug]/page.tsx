@@ -101,8 +101,7 @@ export default async function ReadingLessonPage({
       >
         <ReadingExperience
           body={lesson.body}
-          items={lesson.vocabularyItems}
-          lesson={{ slug: lesson.slug, title: lesson.title }}
+          lexicalItems={lesson.lexicalItems}
           tracks={tracks}
           speakers={lesson.speakerNames}
           previewTranslations={previewTranslations}
