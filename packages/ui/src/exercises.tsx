@@ -70,7 +70,7 @@ export function AnswerFeedback({ question, result }: { question: Question; resul
           ? "Correct"
           : `${result.awardedPoints ? `${result.awardedPoints} of ${result.maxPoints} marks. ` : "Not quite. "}The answer is: ${correctText ?? "see below"}`}
       </p>
-      {result.explanation ? <p className="mt-1 text-ink/80">{result.explanation}</p> : null}
+      {result.explanation ? <p className="mt-1 whitespace-pre-line text-ink/80">{result.explanation}</p> : null}
     </div>
   );
 }
@@ -185,13 +185,16 @@ function QuestionField({
     return (
       <fieldset className="flex flex-col gap-3" disabled={disabled}>
         <legend className="mb-1 font-medium text-ink">{number}. Match each item to an option.</legend>
-        <ol className="flex flex-col gap-1 rounded-lg bg-accent-soft/30 p-3 text-sm">
-          {question.options.map((o, i) => (
-            <li key={o.id}>
-              <span className="font-semibold">{mark(i)}</span> {o.content}
-            </li>
-          ))}
-        </ol>
+        {/* Options that are only their own letter (paragraphs A–G) need no list: the letters are in the menus. */}
+        {question.options.every((o, i) => o.content.trim() === mark(i)) ? null : (
+          <ol className="flex flex-col gap-1 rounded-lg bg-accent-soft/30 p-3 text-sm">
+            {question.options.map((o, i) => (
+              <li key={o.id}>
+                <span className="font-semibold">{mark(i)}</span> {o.content}
+              </li>
+            ))}
+          </ol>
+        )}
         {question.items.map((item) => (
           <label key={item.itemId} className="flex flex-wrap items-center gap-2">
             <span className="flex-1">{item.text}</span>

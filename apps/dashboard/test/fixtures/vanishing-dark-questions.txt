@@ -1,0 +1,89 @@
+THE VANISHING DARK – QUESTIONS
+Questions 1–13 are based on the Reading Passage 'The Vanishing Dark'.
+
+Questions 1–4
+The Reading Passage has seven paragraphs, A–G.
+Which paragraph contains the following information?
+Write the correct letter, A–G, next to questions 1–4.
+NB You may use any letter more than once.
+
+1  an example of an energy-saving measure that had an unintended negative result
+2  a reference to the difficulty of identifying the exact cause of a health problem
+3  an estimate of the proportion of people affected by artificial light
+4  details of a study showing that reducing street lighting did not lead to more crime
+
+Questions 5–9
+Do the following statements agree with the information given in the Reading Passage?
+Write
+   TRUE if the statement agrees with the information
+   FALSE if the statement contradicts the information
+   NOT GIVEN if there is no information on this
+
+5  Ecologists have been concerned about light pollution for longer than astronomers.
+6  Marsh found that most insects attracted to the street lamps survived until morning.
+7  The songbirds found dead at the office tower in 2017 all belonged to one species.
+8  Blackbirds living near street lamps laid more eggs than those in darker woodland.
+9  Whitby believes that light pollution is less harmful to wildlife than pesticides.
+
+Questions 10–13
+Complete the summary below.
+Choose NO MORE THAN TWO WORDS from the passage for each answer.
+
+Reducing light pollution
+Several solutions to light pollution are already available. Towns can turn off lights that are not needed late at night, as some places in northern France have done. Lamps can be fitted with shields so that light is directed (10) ………… instead of escaping into the sky. Changing the (11) ………… of light can also help, since amber lights attract fewer insects than white LEDs. However, because LEDs are cheap to (12) …………, they are sometimes left on for longer. The greatest barrier to change may be the public, as many people believe that bright streets increase their (13) ………….
+
+----------------------------------------
+
+ANSWER KEY
+
+1. F  (Paragraph F)
+   the switch to LEDs, intended as an environmentally friendly policy, has … made the problem worse ↔ an energy-saving measure that had an unintended negative result
+   → Chuyển sang LED để tiết kiệm năng lượng nhưng lại làm ô nhiễm ánh sáng tệ hơn.
+
+2. D  (Paragraph D)
+   it is difficult to separate the effects of outdoor lighting from those of phones and television screens ↔ the difficulty of identifying the exact cause of a health problem
+   → Khó biết giấc ngủ kém do đèn ngoài trời hay do điện thoại/tivi.
+
+3. A  (Paragraph A)
+   more than 80 per cent of the world's population lives under skies affected by artificial light ↔ an estimate of the proportion of people
+   → Khảo sát 2019 đưa ra con số ước tính hơn 80%.
+
+4. G  (Paragraph G)
+   no significant rise in crime … where lights were dimmed or switched off ↔ reducing street lighting did not lead to more crime
+   → Thử nghiệm 5 năm ở 62 thị trấn: tội phạm không tăng đáng kể.
+
+5. FALSE  (Paragraph A)
+   For astronomers … has long been a source of frustration. Only recently have ecologists begun… ↔ concerned for longer than astronomers
+   → Bài nói ngược lại: nhà thiên văn lo ngại từ lâu, nhà sinh thái học chỉ mới gần đây.
+
+6. TRUE  (Paragraph B)
+   roughly one in three of them died before dawn ↔ most insects … survived until morning
+   → 1/3 chết nghĩa là khoảng 2/3 – tức phần lớn – sống sót đến sáng.
+
+7. NOT GIVEN  (Paragraph C)
+   around 400 songbirds were found dead ↔ all belonged to one species
+   → Bài chỉ nói số lượng, không nói chúng thuộc một hay nhiều loài.
+
+8. NOT GIVEN  (Paragraph C)
+   laid their eggs nearly a month sooner ↔ laid more eggs
+   → Bài chỉ nói đẻ trứng sớm hơn, không nói số lượng trứng nhiều hơn – bẫy thường gặp.
+
+9. TRUE  (Paragraph E)
+   habitat loss, pesticide use and climate change remain far greater threats ↔ less harmful … than pesticides
+   → Whitby cho rằng thuốc trừ sâu là mối đe dọa lớn hơn nhiều so với ô nhiễm ánh sáng.
+
+10. downwards  (Paragraph F)
+   shielded lamps that direct light downwards rather than allowing it to spill into the sky ↔ directed ___ instead of escaping into the sky
+   → “spill into the sky” = “escaping into the sky”; chấp nhận cả “downward”.
+
+11. colour  (Paragraph F)
+   The colour of light also matters ↔ Changing the ___ of light can also help
+   → US spelling: color – thường vẫn được chấp nhận.
+
+12. run  (Paragraph F)
+   the lamps are cheaper to run … often left on for longer ↔ cheap to ___ … left on for longer
+   → “cheaper to run” = chi phí vận hành thấp hơn.
+
+13. safety  (Paragraph G)
+   Many people associate bright streets with safety ↔ believe that bright streets increase their ___
+   → “associate … with safety” được diễn đạt lại thành “increase their safety”.

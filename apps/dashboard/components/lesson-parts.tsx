@@ -2,9 +2,11 @@
 
 import type { CefrLevel, SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { searchSenses } from "../app/(editor)/lessons/[id]/actions";
 import type { EditorSet } from "../lib/exercises";
+import { ListFileError, readListFile } from "../lib/list-file";
+import { parseScriptFile, scriptDocument } from "../lib/script-file";
 import { useCollapsed, type SectionState } from "./editor-section";
 import { RichTextEditor } from "./rich-text-editor";
 
@@ -232,6 +234,44 @@ export function ScriptFields({
   footer?: ReactNode;
 }) {
   const set = (changes: Partial<ScriptValues>) => onChange({ ...values, ...changes });
+  // A script file replaces the text: the editor starts again with it.
+  const [body, setBody] = useState<{ doc: unknown; version: number }>({ doc: initialBody, version: 0 });
+  const [fileMessage, setFileMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
+  const fileId = useId();
+
+  async function pickScript(file: File | undefined) {
+    if (!file) return;
+    try {
+      const read = parseScriptFile(await readListFile(file));
+      if (!read.paragraphs.length) return setFileMessage({ tone: "bad", text: `“${file.name}” has no paragraphs.` });
+      if (!window.confirm(`Replace the lesson text with the ${read.paragraphs.length} paragraphs of “${file.name}”?`)) {
+        return;
+      }
+      const doc = scriptDocument(read.paragraphs);
+      setBody((now) => ({ doc, version: now.version + 1 }));
+      onBody(doc);
+      // Title and summary from the file only fill empty fields: what's written stays.
+      const filled = {
+        ...(read.title && !values.title.trim() ? { title: read.title } : {}),
+        ...(read.summary && !values.summary.trim() ? { summary: read.summary } : {}),
+      };
+      if (Object.keys(filled).length) set(filled);
+      setFileMessage({
+        tone: "good",
+        text: `Read ${read.paragraphs.length} paragraphs from “${file.name}”${
+          filled.title || filled.summary
+            ? ` (and the ${[filled.title && "title", filled.summary && "summary"].filter(Boolean).join(" and ")})`
+            : ""
+        }. Check the text, then save it.`,
+      });
+    } catch (error) {
+      setFileMessage({
+        tone: "bad",
+        text: error instanceof ListFileError ? error.message : "That file couldn't be read.",
+      });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <label htmlFor="title" className="flex flex-col gap-1.5 font-medium">
@@ -301,9 +341,37 @@ export function ScriptFields({
           ))}
         </fieldset>
       </div>
-      <p className="text-sm text-muted">For a podcast, start each line with HOST1: or HOST2:.</p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-sm text-muted">For a podcast, start each line with HOST1: or HOST2:.</p>
+        {editable ? (
+          <>
+            <label
+              htmlFor={fileId}
+              className="ml-auto cursor-pointer rounded-full border border-line bg-surface px-3 py-1 text-sm font-semibold hover:border-accent"
+            >
+              Choose a script file (.txt or .docx)
+            </label>
+            <input
+              id={fileId}
+              type="file"
+              accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              onChange={(e) => {
+                void pickScript(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </>
+        ) : null}
+      </div>
+      {fileMessage ? (
+        <p role="status" className={`text-sm ${fileMessage.tone === "bad" ? "text-bad" : "text-good"}`}>
+          {fileMessage.text}
+        </p>
+      ) : null}
       <RichTextEditor
-        initial={initialBody}
+        key={body.version}
+        initial={body.doc}
         editable={editable}
         onChange={onBody}
         searchSenses={(q) => searchSenses(site.domain, q)}

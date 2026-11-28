@@ -12,6 +12,9 @@ import {
   type MatchingVariant,
   type View,
 } from "../lib/exercises";
+import { useId, useState } from "react";
+import { ListFileError, readListFile } from "../lib/list-file";
+import { parseQuestionFile } from "../lib/question-file";
 
 const field =
   "w-full rounded-md border border-line bg-surface px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-accent disabled:bg-paper";
@@ -25,6 +28,7 @@ function TextField({
   onChange,
   placeholder,
   help,
+  rows,
 }: {
   id: string;
   label: string;
@@ -32,17 +36,30 @@ function TextField({
   onChange: (v: string) => void;
   placeholder?: string;
   help?: string;
+  /** Several lines (a textarea), for texts that keep their line breaks. */
+  rows?: number;
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={id}>
       {label}
-      <input
-        id={id}
-        className={field}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {rows ? (
+        <textarea
+          id={id}
+          className={field}
+          rows={rows}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <input
+          id={id}
+          className={field}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
       {help ? <span className="font-normal text-muted">{help}</span> : null}
     </label>
   );
@@ -456,6 +473,7 @@ function QuestionEditor({
       <TextField
         id={`${id}-explanation`}
         label="Explanation (shown after checking)"
+        rows={q.explanation.includes("\n") ? 4 : 1}
         value={q.explanation}
         onChange={(explanation) => onChange({ ...q, explanation })}
       />
@@ -477,8 +495,94 @@ export function ExercisesEditor({
   onChange: (sets: EditorSet[]) => void;
 }) {
   const update = (s: number, set: EditorSet) => onChange(sets.map((x, i) => (i === s ? set : x)));
+  const [fileMessage, setFileMessage] = useState<{ tone: "good" | "bad"; text: string; problems: string[] } | null>(
+    null
+  );
+  const fileId = useId();
+
+  /** A questions file (IELTS layout, with its answer key) replaces the sets; the editor checks, then saves. */
+  async function pickQuestions(file: File | undefined) {
+    if (!file) return;
+    try {
+      const read = parseQuestionFile(await readListFile(file));
+      if (!read.sets.length) {
+        return setFileMessage({ tone: "bad", text: `No questions found in “${file.name}”.`, problems: read.problems });
+      }
+      if (
+        sets.length &&
+        !window.confirm(`Replace the ${sets.length} exercise sets here with those of “${file.name}”?`)
+      ) {
+        return;
+      }
+      onChange(read.sets);
+      const count = read.sets.reduce(
+        (n, set) =>
+          n +
+          set.questions.reduce(
+            (m, q) =>
+              m +
+              (q.type === "MATCHING"
+                ? q.items.length
+                : q.type === "COMPLETION"
+                  ? (q.text.match(/\[/g) ?? []).length
+                  : 1),
+            0
+          ),
+        0
+      );
+      setFileMessage({
+        tone: read.problems.length ? "bad" : "good",
+        text: `Read ${count} questions in ${read.sets.length} sets from “${file.name}”. Check them, then save.`,
+        problems: read.problems,
+      });
+    } catch (error) {
+      setFileMessage({
+        tone: "bad",
+        text: error instanceof ListFileError ? error.message : "That file couldn't be read.",
+        problems: [],
+      });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      {!disabled ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor={fileId}
+              className="cursor-pointer rounded-full border border-line bg-surface px-3 py-1 text-sm font-semibold hover:border-accent"
+            >
+              Choose a questions file (.txt or .docx)
+            </label>
+            <input
+              id={fileId}
+              type="file"
+              accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              onChange={(e) => {
+                void pickQuestions(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <span className="text-sm text-muted">
+              IELTS layout: “Questions 1–4”, the questions, then the ANSWER KEY.
+            </span>
+          </div>
+          {fileMessage ? (
+            <div role="status" className={`text-sm ${fileMessage.tone === "bad" ? "text-bad" : "text-good"}`}>
+              <p>{fileMessage.text}</p>
+              {fileMessage.problems.length ? (
+                <ul className="list-disc pl-5">
+                  {fileMessage.problems.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {sets.map((set, s) => (
         <section
           key={s}
