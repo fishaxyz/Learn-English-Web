@@ -1,6 +1,10 @@
 "use client";
 
-import type { QuestionSuggestionsFieldsFragment, SuggestionsFieldsFragment } from "@english/graphql";
+import type {
+  LexicalItemFieldsFragment,
+  QuestionSuggestionsFieldsFragment,
+  SuggestionsFieldsFragment,
+} from "@english/graphql";
 import type { CefrLevel, EditorialLessonQuery, EditorialSummaryFragment, SenseCardFragment } from "@english/graphql";
 import type { JSONContent } from "@tiptap/core";
 import Link from "next/link";
@@ -26,7 +30,7 @@ import {
 } from "./lesson-parts";
 import { QuestionSuggestions } from "./question-suggestions";
 import { emptyTranslations, translationSummary, TranslationsPanel } from "./translations-panel";
-import { emptyLexicalItems, lexicalCounts, LexicalItemsPanel } from "./lexical-items-panel";
+import { lexicalCounts, LexicalItemsPanel } from "./lexical-items-panel";
 import { VocabularySuggestions } from "./vocabulary-suggestions";
 import { VoiceoverPanel } from "./voiceover-panel";
 
@@ -152,7 +156,7 @@ export function LessonEditor({
   );
   const [words, setWords] = useState(() => countWords(draft?.body as JSONContent | undefined));
   const [translations, setTranslations] = useState(() => emptyTranslations("vi"));
-  const [lexical, setLexical] = useState(emptyLexicalItems);
+  const [lexical, setLexical] = useState<LexicalItemFieldsFragment[]>([]);
   const translationPart = translationSummary(translations);
   const sections = useCollapsed();
   const parts = sectionStates({
@@ -273,11 +277,8 @@ export function LessonEditor({
                 localizationId={localization.id}
                 lockVersion={lockVersion}
                 editable={editable}
-                saved={!dirty}
-                hasScript={words > 0}
-                ensureSaved={ensureSaved}
-                data={lexical}
-                onData={setLexical}
+                items={lexical}
+                onItems={setLexical}
               />
               <h3 className="mt-2 border-t border-line pt-4 font-semibold">
                 Words linked in the text{" "}

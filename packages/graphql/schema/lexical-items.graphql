@@ -1,4 +1,4 @@
-# --- A lesson's own lexical vocabulary (ADR 0010): items from the editor's list, explained for IELTS learners.
+# --- A lesson's own lexical vocabulary (ADRs 0010, 0011): the items of the editor's vocabulary sheet, as written.
 
 enum LexicalItemKind {
   KEYWORD
@@ -12,84 +12,126 @@ enum LexicalItemKind {
 }
 
 enum LexicalItemStatus {
-  "Waiting for the local language model to explain it."
-  PENDING
-  "Explained by the model, waiting for an editor."
+  "Read from the sheet, waiting for an editor."
   DRAFT
   "Checked by an editor: learners see it once the lesson is published."
   APPROVED
 }
 
-type LexicalItem {
-  id: ID!
-  "The item as the editor listed it."
+"A text in one native language."
+type LexicalItemTranslation {
+  language: String!
   text: String!
-  "The editor's note from the list, if any."
+}
+
+type LexicalItemExample {
+  text: String!
+  "True when the sentence is in the lesson's script."
+  inText: Boolean!
+  translations: [LexicalItemTranslation!]!
+}
+
+type LexicalItemSynonym {
+  text: String!
+  "When to use it: register, nuance."
   note: String
-  kind: LexicalItemKind
-  "The item's words as the script has them (… where they're split apart)."
-  quote: String
+  translations: [LexicalItemTranslation!]!
+}
+
+type LexicalItemNote {
+  text: String!
+  translation: String
+}
+
+"What one native language's sheet adds to an item."
+type LexicalItemLanguage {
+  language: String!
   meaning: String
-  synonyms: [String!]!
-  example: String
-  ieltsTip: String
-  status: LexicalItemStatus!
-  "The script's sentence with the item, found in the current script; null when it isn't there."
-  inText: String
+  "The definition in this language."
+  definition: String
+  notes: [LexicalItemNote!]!
 }
 
-type DraftLexicalItems {
-  "The latest explaining job: same states as vocabulary suggestions."
-  state: VocabularySuggestionsState!
-  "False when the language model wasn't reachable (nothing can be explained without it)."
-  usedLanguageModel: Boolean
-  items: [LexicalItem!]!
-}
-
-extend type Revision {
-  "Editorial: the lesson's lexical vocabulary, in list order."
-  lexicalItems: DraftLexicalItems!
-}
-
-"An approved item of a published lesson, for the learner's Lexical Vocabulary tab."
-type PublicLexicalItem {
+interface LexicalItemContent {
   id: ID!
   text: String!
   kind: LexicalItemKind!
-  meaning: String!
-  synonyms: [String!]!
-  example: String
-  ieltsTip: String
-  inText: String
+  partOfSpeech: String
+  pronunciation: String
+  "The English definition (for a structure: when to use it)."
+  definition: String
+  usage: String
+  examples: [LexicalItemExample!]!
+  synonyms: [LexicalItemSynonym!]!
+  "A paraphrase's other side: the question's words."
+  pairedWith: String
+  "The question it belongs to, as the sheet labels it (\"Q2\")."
+  question: String
+  languages: [LexicalItemLanguage!]!
+}
+
+type LexicalItem implements LexicalItemContent {
+  id: ID!
+  text: String!
+  kind: LexicalItemKind!
+  partOfSpeech: String
+  pronunciation: String
+  definition: String
+  usage: String
+  examples: [LexicalItemExample!]!
+  synonyms: [LexicalItemSynonym!]!
+  pairedWith: String
+  question: String
+  languages: [LexicalItemLanguage!]!
+  status: LexicalItemStatus!
+}
+
+extend type Revision {
+  "Editorial: the lesson's lexical vocabulary, in sheet order."
+  lexicalItems: [LexicalItem!]!
+}
+
+"An approved item of a published lesson, for the learner's Lexical Vocabulary tab."
+type PublicLexicalItem implements LexicalItemContent {
+  id: ID!
+  text: String!
+  kind: LexicalItemKind!
+  partOfSpeech: String
+  pronunciation: String
+  definition: String
+  usage: String
+  examples: [LexicalItemExample!]!
+  synonyms: [LexicalItemSynonym!]!
+  pairedWith: String
+  question: String
+  languages: [LexicalItemLanguage!]!
 }
 
 extend type ReadingResource {
-  "Approved lexical vocabulary, in list order."
+  "Approved lexical vocabulary, in sheet order."
   lexicalItems: [PublicLexicalItem!]!
 }
 
-type LexicalListAdded {
+type LexicalSheetRead {
+  "New items."
   added: Int!
-  "Items already in the lesson's list (or repeated in this one)."
-  skipped: Int!
+  "Items already in the lesson: updated from the sheet, to be checked again."
+  updated: Int!
 }
 
 input LexicalItemApproval {
   id: ID!
   kind: LexicalItemKind!
-  meaning: String!
-  synonyms: [String!]!
-  example: String
-  ieltsTip: String
 }
 
 extend type Mutation {
-  "Editors: add items from a list (one per line; a note may follow a spaced dash). The local AI explains them."
-  addLexicalList(localizationId: ID!, list: String!): LexicalListAdded!
-  "Editors: explain items still waiting (redoDrafts: unapproved ones too). In the background."
-  explainLexicalItems(localizationId: ID!, redoDrafts: Boolean = false): Boolean!
-  "Editors: approve items, with their edits. Returns how many were approved."
+  """
+  Editors: read a vocabulary sheet into the lesson. `language` is the native language its meanings and translations
+  are written in (vi, fr, de). Items already there are updated and go back to draft.
+  """
+  addLexicalSheet(localizationId: ID!, sheet: String!, language: String!): LexicalSheetRead!
+  "Editors: approve items (with the kind chosen). Returns how many were approved."
   approveLexicalItems(localizationId: ID!, items: [LexicalItemApproval!]!): Int!
-  "Editors: remove items from the lesson's list. Returns how many were removed."
+  "Editors: remove items from the lesson. Returns how many were removed."
   deleteLexicalItems(localizationId: ID!, ids: [ID!]!): Int!
 }

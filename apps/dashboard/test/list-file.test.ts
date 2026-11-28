@@ -52,6 +52,34 @@ describe("reading a lexical list file", () => {
     }
   });
 
+  it("writes back Word's automatic numbering: sections, items, bullets, and a deeper list starting again", async () => {
+    const numbering = `<w:numbering>
+<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/></w:lvl>
+<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>
+<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="upperLetter"/></w:lvl></w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>`;
+    const p = (text: string, numId?: number, ilvl = 0) =>
+      `<w:p>${numId ? `<w:pPr><w:numPr><w:ilvl w:val="${ilvl}"/><w:numId w:val="${numId}"/></w:numPr></w:pPr>` : ""}<w:r><w:t>${text}</w:t></w:r></w:p>`;
+    const document = `<w:document><w:body>${[
+      p("Vocabulary", 2),
+      p("disrupt (v) – làm gián đoạn", 1),
+      p("Synonyms:"),
+      p("interrupt – neutral", 1, 1),
+      p("insignificant (adj)", 1),
+      p("Idioms", 2),
+    ].join("")}</w:body></w:document>`;
+    const text = await docxText(zip({ "word/document.xml": document, "word/numbering.xml": numbering }));
+    expect(text.split("\n")).toEqual([
+      "A. Vocabulary",
+      "1. disrupt (v) – làm gián đoạn",
+      "Synonyms:",
+      "- interrupt – neutral",
+      "2. insignificant (adj)",
+      "B. Idioms",
+    ]);
+  });
+
   it("reads plain text as it is, and refuses other files, other zips and big files", async () => {
     const file = (name: string, bytes: Uint8Array | string, size?: number) => ({
       name,

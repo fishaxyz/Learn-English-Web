@@ -50,11 +50,37 @@ query ReadingLesson($slug: String!) {
         id
         text
         kind
-        meaning
-        synonyms
-        example
-        ieltsTip
-        inText
+        partOfSpeech
+        pronunciation
+        definition
+        usage
+        examples {
+          text
+          inText
+          translations {
+            language
+            text
+          }
+        }
+        synonyms {
+          text
+          note
+          translations {
+            language
+            text
+          }
+        }
+        pairedWith
+        question
+        languages {
+          language
+          meaning
+          definition
+          notes {
+            text
+            translation
+          }
+        }
       }
       translations {
         locale

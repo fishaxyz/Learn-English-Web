@@ -14,12 +14,23 @@ export const LEXICAL_ITEM_KINDS = [
   "PARAPHRASE",
 ] as const;
 
+/** Translations by language ("vi" → "…"). */
+export type LexicalTranslations = Record<string, string>;
+export type LexicalExample = { text: string; translations: LexicalTranslations };
+export type LexicalSynonym = { text: string; note: string | null; translations: LexicalTranslations };
+/** The parts of an item written in one native language: its meaning, a translated definition, the notes. */
+export type LexicalLanguagePart = {
+  meaning: string | null;
+  definition: string | null;
+  notes: { text: string; translation: string | null }[];
+};
+
 /**
- * A lesson's own lexical vocabulary (ADR 0010): an item from the editor's list (uploaded or pasted) with an
- * IELTS-style explanation. Each revision has its own items; nothing is shared between lessons. The local language
- * model drafts the explanation (PENDING → DRAFT); an editor checks, edits and approves it (APPROVED). Learners see
- * approved items of the published revision. `quote` is the item's words as the script has them; the sentence it
- * comes from is found in the current script when shown, so script edits never leave it stale.
+ * A lesson's own lexical vocabulary (ADRs 0010, 0011): an item of the editor's vocabulary sheet, with the editor's
+ * own explanation kept as written. English parts (definition, usage, examples, synonyms) are shared by every learner;
+ * each native language's sheet adds its own parts (`languages`, and the translations of examples and synonyms).
+ * Each revision has its own items; nothing is shared between lessons. An editor checks and approves them; learners
+ * see approved items of the published revision.
  */
 export const lexicalItems = pgTable(
   "lexical_items",
@@ -34,16 +45,24 @@ export const lexicalItems = pgTable(
     text: text().notNull(),
     /** Lowercased, spaces tidied: one item per revision. */
     key: text().notNull(),
-    /** The editor's note from the list ("idiom", "Writing Task 2"…), for the model. */
-    note: text(),
-    kind: text(),
-    quote: text(),
-    meaning: text(),
-    synonyms: jsonb().$type<string[]>().notNull().default([]),
-    example: text(),
-    ieltsTip: text(),
-    /** PENDING (waiting for the model), DRAFT (waiting for an editor) or APPROVED. */
-    status: text().notNull().default("PENDING"),
+    kind: text().notNull(),
+    /** "v", "adj", "phr v"… as the sheet writes it. */
+    partOfSpeech: text(),
+    pronunciation: text(),
+    /** The English definition (for a structure: when to use it). */
+    definition: text(),
+    /** How it's used: "disrupt + a cycle/routine/service". */
+    usage: text(),
+    examples: jsonb().$type<LexicalExample[]>().notNull().default([]),
+    synonyms: jsonb().$type<LexicalSynonym[]>().notNull().default([]),
+    /** A paraphrase's other side: the question's words for the text's words. */
+    pairedWith: text(),
+    /** The question it belongs to, as the sheet labels it ("Q2"). */
+    question: text(),
+    /** What each native language's sheet adds: meaning, translated definition, notes. */
+    languages: jsonb().$type<Record<string, LexicalLanguagePart>>().notNull().default({}),
+    /** DRAFT (waiting for an editor) or APPROVED. */
+    status: text().notNull().default("DRAFT"),
     decidedBy: uuid().references(() => users.id, { onDelete: "set null" }),
     decidedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
@@ -56,15 +75,11 @@ export const lexicalItems = pgTable(
     }).onDelete("cascade"),
     unique("lexical_items_key").on(t.revisionId, t.key),
     index("lexical_items_revision").on(t.revisionId, t.position),
-    check("lexical_items_status", sql`${t.status} in ('PENDING', 'DRAFT', 'APPROVED')`),
+    check("lexical_items_status", sql`${t.status} in ('DRAFT', 'APPROVED')`),
     check(
       "lexical_items_kind",
-      sql`${t.kind} is null or ${t.kind} in ('KEYWORD', 'COLLOCATION', 'IDIOM', 'PHRASAL_VERB', 'STRUCTURE', 'PARAPHRASE')`
+      sql`${t.kind} in ('KEYWORD', 'COLLOCATION', 'IDIOM', 'PHRASAL_VERB', 'STRUCTURE', 'PARAPHRASE')`
     ),
     check("lexical_items_text", sql`length(${t.text}) between 1 and 200`),
-    check(
-      "lexical_items_approved",
-      sql`${t.status} <> 'APPROVED' or (${t.kind} is not null and ${t.meaning} is not null)`
-    ),
   ]
 );

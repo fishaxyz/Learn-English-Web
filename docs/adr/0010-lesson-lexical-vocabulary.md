@@ -1,6 +1,6 @@
 # ADR 0010: Each lesson's own lexical vocabulary
 
-- Status: accepted
+- Status: accepted; the list and AI explaining are superseded by ADR 0011 (the editor's own vocabulary sheet)
 - Date: 2026-11-28
 
 ## Context

@@ -206,13 +206,9 @@ export const resourceResolvers: Resolvers = {
       const userId = await onLocalization(ctx, localizationId, "content.write");
       return translations.approveTranslations(ctx.db, userId, localizationId, items);
     },
-    addLexicalList: async (_, { localizationId, list }, ctx) => {
+    addLexicalSheet: async (_, { localizationId, sheet, language }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
-      return lexicalItems.addLexicalList(ctx.db, userId, localizationId, list);
-    },
-    explainLexicalItems: async (_, { localizationId, redoDrafts }, ctx) => {
-      const userId = await onLocalization(ctx, localizationId, "content.write");
-      return lexicalItems.explainLexicalItems(ctx.db, userId, localizationId, redoDrafts ?? false);
+      return lexicalItems.addLexicalSheet(ctx.db, userId, localizationId, sheet, language);
     },
     approveLexicalItems: async (_, { localizationId, items }, ctx) => {
       const userId = await onLocalization(ctx, localizationId, "content.write");
@@ -235,6 +231,7 @@ export const resourceResolvers: Resolvers = {
   },
 
   Resource: { __resolveType: (p) => TYPE_BY_KIND[p.resource.kind] },
+  LexicalItemContent: { __resolveType: (i) => ("status" in i ? "LexicalItem" : "PublicLexicalItem") },
   ReadingResource: {
     ...common,
     vocabulary: (p, _, ctx) => ctx.loaders.annotatedSensesByRevision.load(p.revision.id),

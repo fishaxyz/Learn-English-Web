@@ -41,8 +41,8 @@ export function sectionStates(p: {
   questionsToCheck?: number;
   /** The worker is drafting questions right now. */
   findingQuestions?: boolean;
-  /** The lesson's own lexical vocabulary (ADR 0010). */
-  lexical?: { approved: number; toCheck: number; waiting: number; working: boolean };
+  /** The lesson's own lexical vocabulary (ADRs 0010, 0011). */
+  lexical?: { approved: number; toCheck: number };
   /** New lessons: what will be made when the lesson is created ("Podcast · Lauren & Roger"). */
   voicePlan?: string | null;
 }): Record<SectionId, { summary: string; state: SectionState }> {
@@ -71,18 +71,15 @@ export function sectionStates(p: {
               : "todo",
     },
     vocabulary:
-      p.lexical && (p.lexical.approved || p.lexical.toCheck || p.lexical.waiting || p.lexical.working)
+      p.lexical && (p.lexical.approved || p.lexical.toCheck)
         ? {
-            summary: p.lexical.working
-              ? "Explaining the list…"
-              : [
-                  `${plural(p.lexical.approved, "item")} approved`,
-                  p.lexical.toCheck ? `${p.lexical.toCheck} to check` : "",
-                  p.lexical.waiting ? `${p.lexical.waiting} waiting` : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-            state: p.lexical.working ? "busy" : p.lexical.approved ? "done" : "working",
+            summary: [
+              `${plural(p.lexical.approved, "item")} approved`,
+              p.lexical.toCheck ? `${p.lexical.toCheck} to check` : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            state: p.lexical.approved ? "done" : "working",
           }
         : {
             summary: p.findingWords

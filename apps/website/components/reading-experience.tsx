@@ -330,7 +330,7 @@ export function ReadingExperience({
         hidden={tab !== "vocabulary"}
         className="font-sans"
       >
-        <LexicalPanel items={lexicalItems} />
+        <LexicalPanel items={lexicalItems} language={prefs.language} />
       </div>
     </div>
   );

@@ -10,7 +10,6 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from .graphql_client import GraphQLResponseError, GraphQLTransportError
-from .lexical.explain import explain, fake_explain
 from .questions.draft import draft_questions
 from .translations.translate import fake_translate, translate
 from .tts.alignment import Block, WordTiming, turn_timings, word_timings
@@ -28,7 +27,7 @@ FAIL = """mutation Fail($job: ID!, $token: String!, $error: String!, $retryable:
 
 RENEW = """mutation Renew($job: ID!, $token: String!) { renewJobLease(jobId: $job, claimToken: $token) }"""
 
-JOB_TYPES = ["tts.generate", "vocab.suggest", "questions.suggest", "translations.translate", "lexicon.explain"]
+JOB_TYPES = ["tts.generate", "vocab.suggest", "questions.suggest", "translations.translate"]
 
 
 class Executor(Protocol):
@@ -106,26 +105,6 @@ class TranslatePayload(BaseModel):
     paragraphs: list[Paragraph] = Field(max_length=500)
 
 
-class LexicalItem(BaseModel):
-    id: str
-    text: str = Field(min_length=1, max_length=200)
-    note: str | None = Field(default=None, max_length=300)
-
-
-class TextBlock(BaseModel):
-    blockId: str = Field(min_length=1, max_length=200)
-    text: str = Field(max_length=100_000)
-
-
-class ExplainPayload(BaseModel):
-    """A lesson's lexical items to explain, with its text for context."""
-
-    revisionId: str
-    level: str | None = None
-    paragraphs: list[TextBlock] = Field(max_length=2000)
-    items: list[LexicalItem] = Field(max_length=200)
-
-
 class Claimed(BaseModel):
     id: str
     type: str
@@ -144,10 +123,8 @@ class JobRunner:
         upload_transport: httpx.BaseTransport | None = None,
         language_model: LanguageModel | None = None,
         fake_translations: bool = False,
-        fake_lexical: bool = False,
     ) -> None:
         self._fake_translations = fake_translations
-        self._fake_lexical = fake_lexical
         self._client = client
         self._provider = provider
         self._model = language_model
@@ -170,8 +147,6 @@ class JobRunner:
                 self._questions(job)
             elif job.type == "translations.translate":
                 self._translate(job)
-            elif job.type == "lexicon.explain":
-                self._explain(job)
             elif job.type == "tts.generate":
                 self._tts(job)
             else:
@@ -228,20 +203,6 @@ class JobRunner:
             self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
             return
         result = translate(paragraphs, payload.locale, self._model, self._log, keep_alive=renew)
-        self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
-
-    def _explain(self, job: Claimed) -> None:
-        payload = ExplainPayload.model_validate(job.payload)
-
-        def renew() -> None:
-            self._client.execute(RENEW, {"job": job.id, "token": job.claimToken})
-
-        items = [i.model_dump() for i in payload.items]
-        if self._fake_lexical:
-            result = fake_explain(items)
-        else:
-            paragraphs = [p.model_dump() for p in payload.paragraphs]
-            result = explain(items, paragraphs, payload.level, self._model, self._log, keep_alive=renew)
         self._client.execute(COMPLETE, {"job": job.id, "token": job.claimToken, "result": result})
 
     def _tts(self, job: Claimed) -> None:

@@ -1,12 +1,11 @@
 "use server";
 
 import {
-  AddLexicalListDocument,
+  AddLexicalSheetDocument,
   ApproveLexicalItemsDocument,
   DeleteLexicalItemsDocument,
   DraftLexicalItemsDocument,
-  ExplainLexicalItemsDocument,
-  type DraftLexicalItemsFieldsFragment,
+  type LexicalItemFieldsFragment,
   type LexicalItemApproval,
   ApproveAudioTrackDocument,
   ApproveVocabularySuggestionsDocument,
@@ -314,7 +313,7 @@ export async function approveTranslations(
 
 export async function draftLexicalItems(
   resourceId: string
-): Promise<{ ok: true; items: DraftLexicalItemsFieldsFragment } | { ok: false; message: string }> {
+): Promise<{ ok: true; items: LexicalItemFieldsFragment[] } | { ok: false; message: string }> {
   try {
     const r = await editorQuery(DraftLexicalItemsDocument, { id: resourceId });
     const draft = r.editorialResource?.localizations[0]?.draft;
@@ -325,25 +324,14 @@ export async function draftLexicalItems(
   }
 }
 
-export async function addLexicalList(
+export async function addLexicalSheet(
   localizationId: string,
-  list: string
-): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }> {
+  sheet: string,
+  language: string
+): Promise<{ ok: true; added: number; updated: number } | { ok: false; message: string }> {
   try {
-    const r = await editorMutation(AddLexicalListDocument, { localizationId, list });
-    return { ok: true, ...r.addLexicalList };
-  } catch (error) {
-    return { ok: false, message: explain(error) };
-  }
-}
-
-export async function explainLexicalItems(
-  localizationId: string,
-  redoDrafts: boolean
-): Promise<{ ok: boolean; message?: string }> {
-  try {
-    await editorMutation(ExplainLexicalItemsDocument, { localizationId, redoDrafts });
-    return { ok: true };
+    const r = await editorMutation(AddLexicalSheetDocument, { localizationId, sheet, language });
+    return { ok: true, ...r.addLexicalSheet };
   } catch (error) {
     return { ok: false, message: explain(error) };
   }

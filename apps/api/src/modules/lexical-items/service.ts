@@ -1,83 +1,29 @@
 import { schema, type Database } from "@english/database";
-import { and, asc, desc, eq, inArray, like, sql } from "drizzle-orm";
-import { z } from "zod";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { conflict, invalid, notFound } from "../../errors";
 import type { RevisionModel } from "../../models";
 import { one } from "../../rows";
 import { audit } from "../audit";
-import { enqueue, markSucceeded, type JobRow } from "../jobs/service";
-import { isLooking } from "../lexicon/suggestions";
 import { lockLocalization } from "../resources/editorial";
-import { blockTexts, sentencesOf, type RichTextDocument } from "../rich-text";
+import { blockTexts, type RichTextDocument } from "../rich-text";
+import { TRANSLATION_LOCALES } from "../translations/service";
+import { keyOf, parseSheet, type LexicalItemKind, type SheetItem } from "./sheet";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type Row = typeof rows.$inferSelect;
+type Translations = Record<string, string>;
 const { lexicalItems: rows } = schema;
+export type { LexicalItemKind };
 
 /**
- * A lesson's own lexical vocabulary (ADR 0010). An editor uploads or pastes a list of items (keywords, collocations,
- * idioms, structures…), one per line; a background job asks the local language model to explain each one for IELTS
- * learners (meaning, synonyms, an example, a tip) and to find its words in the script. Editors check, edit and
- * approve; learners see approved items in the Lexical Vocabulary tab. Each lesson keeps its own items.
+ * A lesson's own lexical vocabulary (ADRs 0010, 0011). The editor uploads or pastes a vocabulary sheet; its
+ * explanations are the editor's own, read into items as written (see ./sheet). A sheet's meanings and translations
+ * are in one native language, chosen when it's added: a sheet in another language adds that language to the same
+ * items. Editors check and approve; learners see approved items in the Lexical Vocabulary tab, in their language.
+ * Each lesson keeps its own items.
  */
-export const EXPLAIN_JOB = "lexicon.explain";
-const { LEXICAL_ITEM_KINDS } = schema;
-export type LexicalItemKind = (typeof LEXICAL_ITEM_KINDS)[number];
-const prefix = (revisionId: string) => `explain:${revisionId}:`;
 const MAX_ITEMS = 200;
-const LIMIT = { text: 200, note: 300, quote: 300, meaning: 600, synonym: 100, synonyms: 10, example: 600, tip: 600 };
-
-const tidy = (s: string) => s.replace(/\s+/g, " ").trim();
-const keyOf = (s: string) => tidy(s).toLowerCase();
-
-/**
- * The editor's list: one item per line. Bullets and numbering are dropped; a note may follow a spaced dash or a tab
- * ("a grain of truth — idiom"). Duplicates (ignoring case) count once.
- */
-export function parseLexicalList(list: string): { text: string; note: string | null }[] {
-  const seen = new Set<string>();
-  return listedLines(list).filter((item) => !seen.has(keyOf(item.text)) && seen.add(keyOf(item.text)));
-}
-
-/** Every item line of the list, repeats included. */
-function listedLines(list: string): { text: string; note: string | null }[] {
-  return list.split(/\r?\n/).flatMap((raw) => {
-    const line = raw.replace(/^\s*(?:[-*•·]|\d+[.)])\s+/, "").trim();
-    const [first = "", ...rest] = line.split(/\s+[—–-]\s+|\t+/);
-    const text = tidy(first).slice(0, LIMIT.text);
-    const note = tidy(rest.join(" — ")).slice(0, LIMIT.note);
-    return text ? [{ text, note: note || null }] : [];
-  });
-}
-
-/**
- * The sentence of the script that has these words ("…" for words split apart; a pattern's "+ verb" part is left
- * out), or null.
- */
-export function sentenceWith(doc: RichTextDocument, words: string | null): string | null {
-  const parts = (words ?? "")
-    .replace(/\s*\+.*$/, "")
-    .toLowerCase()
-    .split(/\s*(?:…|\.\.\.)\s*/)
-    .map(tidy)
-    .filter(Boolean);
-  if (!parts.length) return null;
-  for (const text of blockTexts(doc).values()) {
-    const chars = [...text];
-    for (const span of sentencesOf(text)) {
-      const sentence = chars.slice(span.start, span.end).join("");
-      const lower = sentence.toLowerCase();
-      let from = 0;
-      const found = parts.every((p) => {
-        const at = lower.indexOf(p, from);
-        if (at < 0) return false;
-        from = at + p.length;
-        return true;
-      });
-      if (found) return sentence;
-    }
-  }
-  return null;
-}
+const MAX_SHEET = 200_000;
 
 async function editableDraft(tx: Tx, localizationId: string) {
   const l = await lockLocalization(tx, localizationId);
@@ -89,201 +35,156 @@ async function editableDraft(tx: Tx, localizationId: string) {
   return draft;
 }
 
-/** Asks the worker to explain the items still waiting (PENDING), with the script for context. */
-async function queueExplain(tx: Tx, draft: RevisionModel, actorUserId: string | null) {
-  const pending = await tx
-    .select({ id: rows.id, text: rows.text, note: rows.note })
-    .from(rows)
-    .where(and(eq(rows.revisionId, draft.id), eq(rows.status, "PENDING")))
-    .orderBy(asc(rows.position));
-  if (!pending.length) return null;
-  const paragraphs = [...blockTexts(draft.richText as RichTextDocument)]
-    .filter(([, text]) => /\p{L}/u.test(text))
-    .map(([blockId, text]) => ({ blockId, text }));
-  return enqueue(tx, {
-    siteId: draft.siteId,
-    type: EXPLAIN_JOB,
-    idempotencyKey: `${prefix(draft.id)}${Date.now()}`,
-    createdBy: actorUserId,
-    maxAttempts: 2,
-    payload: { revisionId: draft.id, level: draft.cefrLevel, paragraphs, items: pending },
-  });
+/** This language's translation (if any) next to what other languages' sheets gave the same text. */
+function withTranslation(before: Translations | undefined, language: string, translation: string | null) {
+  const others = Object.entries(before ?? {}).filter(([l]) => l !== language);
+  return Object.fromEntries(translation ? [...others, [language, translation]] : others);
 }
 
-/** "Add the list": new items join the lesson's list (as PENDING) and the local AI is asked to explain them. */
-export async function addLexicalList(db: Database, actorUserId: string | null, localizationId: string, list: string) {
-  if (list.length > 50_000) throw invalid("The list is too long (50,000 characters at most)");
-  const parsed = parseLexicalList(list);
-  if (!parsed.length) throw invalid("The list has no items: write one item per line");
-  return db.transaction(async (tx) => {
-    const draft = await editableDraft(tx, localizationId);
-    if (await isLooking(tx, draft.siteId, prefix(draft.id))) {
-      throw conflict("The AI is still explaining the last list: wait until it's done");
-    }
-    const existing = await tx
-      .select({ key: rows.key, position: rows.position })
-      .from(rows)
-      .where(eq(rows.revisionId, draft.id));
-    const have = new Set(existing.map((e) => e.key));
-    const fresh = parsed.filter((p) => !have.has(keyOf(p.text)));
-    if (existing.length + fresh.length > MAX_ITEMS) throw invalid(`A lesson can have up to ${MAX_ITEMS} items`);
-    let position = existing.reduce((max, e) => Math.max(max, e.position), -1);
-    if (fresh.length) {
-      await tx.insert(rows).values(
-        fresh.map((p) => ({
-          siteId: draft.siteId,
-          revisionId: draft.id,
-          position: ++position,
-          text: p.text,
-          key: keyOf(p.text),
-          note: p.note,
-        }))
-      );
-      await queueExplain(tx, draft, actorUserId);
-    }
-    return { added: fresh.length, skipped: listedLines(list).length - fresh.length };
-  });
-}
-
-/** "Explain again": items still waiting, and with `redo` every unapproved one, are explained by the local AI. */
-export async function explainLexicalItems(
-  db: Database,
-  actorUserId: string | null,
-  localizationId: string,
-  redo: boolean
-) {
-  return db.transaction(async (tx) => {
-    const draft = await editableDraft(tx, localizationId);
-    if (await isLooking(tx, draft.siteId, prefix(draft.id))) throw conflict("The AI is already explaining this list");
-    if (redo) {
-      await tx
-        .update(rows)
-        .set({ status: "PENDING", kind: null, quote: null, meaning: null, synonyms: [], example: null, ieltsTip: null })
-        .where(and(eq(rows.revisionId, draft.id), eq(rows.status, "DRAFT")));
-    }
-    if (!(await queueExplain(tx, draft, actorUserId))) throw conflict("Every item already has an explanation");
-    return true;
-  });
-}
-
-const kind = z.enum(LEXICAL_ITEM_KINDS);
-const result = z.strictObject({
-  ai: z.boolean(),
-  items: z
-    .array(
-      z.strictObject({
-        id: z.string(),
-        kind: z.string(),
-        quote: z.string().nullable(),
-        meaning: z.string(),
-        synonyms: z.array(z.string()).max(50),
-        example: z.string().nullable(),
-        ieltsTip: z.string().nullable(),
-      })
-    )
-    .max(MAX_ITEMS),
-});
-
-const clip = (s: string | null | undefined, max: number) => {
-  const t = tidy(s ?? "");
-  return t ? t.slice(0, max) : null;
-};
-const cleanSynonyms = (list: string[]) =>
-  [...new Set(list.map(tidy).filter((s) => s && s.length <= LIMIT.synonym))].slice(0, LIMIT.synonyms);
-
-/** The worker's explanations: kept as drafts for items still waiting in this draft. */
-export async function completeExplainJob(tx: Tx, job: JobRow, raw: unknown) {
-  const parsed = result.safeParse(raw);
-  if (!parsed.success) throw invalid("The job's result isn't valid");
-  const payload = job.payloadJson as { revisionId: string; items: { id: string }[] };
-  const [revision] = await tx
-    .select()
-    .from(schema.resourceRevisions)
-    .where(eq(schema.resourceRevisions.id, payload.revisionId));
-  if (!revision || revision.status !== "DRAFT") {
-    await markSucceeded(tx, job, { stale: true, ai: parsed.data.ai });
-    return true;
-  }
-  const asked = new Set(payload.items.map((i) => i.id));
-  const doc = revision.richText as RichTextDocument;
-  let explained = 0;
-  for (const item of parsed.data.items) {
-    const meaning = clip(item.meaning, LIMIT.meaning);
-    if (!asked.has(item.id) || !meaning) continue;
-    const quote = clip(item.quote, LIMIT.quote);
-    const updated = await tx
-      .update(rows)
-      .set({
-        status: "DRAFT",
-        kind: kind.safeParse(item.kind).data ?? "KEYWORD",
-        // Only words really in the script: never an invented quote.
-        quote: quote && sentenceWith(doc, quote) ? quote : null,
-        meaning,
-        synonyms: cleanSynonyms(item.synonyms),
-        example: clip(item.example, LIMIT.example),
-        ieltsTip: clip(item.ieltsTip, LIMIT.tip),
-      })
-      .where(and(eq(rows.id, item.id), eq(rows.revisionId, revision.id), eq(rows.status, "PENDING")))
-      .returning({ id: rows.id });
-    explained += updated.length;
-  }
-  await markSucceeded(tx, job, { explained, ai: parsed.data.ai });
-  return true;
-}
-
-type Row = typeof rows.$inferSelect;
-const view = (r: Row, doc: RichTextDocument) => ({
-  id: r.id,
-  text: r.text,
-  note: r.note,
-  kind: r.kind as LexicalItemKind | null,
-  quote: r.quote,
-  meaning: r.meaning,
-  synonyms: r.synonyms,
-  example: r.example,
-  ieltsTip: r.ieltsTip,
-  status: r.status as "PENDING" | "DRAFT" | "APPROVED",
-  // Found in the current script each time, so script edits never leave it stale.
-  inText: sentenceWith(doc, r.quote) ?? sentenceWith(doc, r.text),
-});
-
-/** The draft's items, in list order, and where the explaining job stands. */
-export async function lexicalItemsFor(db: Database, revision: RevisionModel) {
-  const [job] = await db
-    .select()
-    .from(schema.jobs)
-    .where(and(eq(schema.jobs.siteId, revision.siteId), like(schema.jobs.idempotencyKey, `${prefix(revision.id)}%`)))
-    .orderBy(desc(schema.jobs.createdAt))
-    .limit(1);
-  const state = !job
-    ? ("IDLE" as const)
-    : job.status === "SUCCEEDED"
-      ? ("DONE" as const)
-      : job.status === "FAILED" || job.status === "CANCELLED"
-        ? ("FAILED" as const)
-        : ("WORKING" as const);
-  const items = await db.select().from(rows).where(eq(rows.revisionId, revision.id)).orderBy(asc(rows.position));
-  const doc = revision.richText as RichTextDocument;
+/** The item's columns from the sheet, keeping what other languages' sheets gave the same examples and synonyms. */
+function fromSheet(item: SheetItem, language: string, before?: Row) {
+  const oldExamples = new Map(before?.examples.map((e) => [keyOf(e.text), e.translations]));
+  const oldSynonyms = new Map(before?.synonyms.map((s) => [keyOf(s.text), s.translations]));
+  const otherLanguages = Object.fromEntries(Object.entries(before?.languages ?? {}).filter(([l]) => l !== language));
+  const part = item.language;
+  const hasPart = part.meaning || part.definition || part.notes.length;
   return {
-    state,
-    usedLanguageModel: ((job?.resultJson ?? {}) as { ai?: boolean }).ai ?? null,
-    items: items.map((r) => view(r, doc)),
+    text: item.text,
+    key: keyOf(item.text),
+    kind: item.kind,
+    partOfSpeech: item.partOfSpeech ?? before?.partOfSpeech ?? null,
+    pronunciation: item.pronunciation ?? before?.pronunciation ?? null,
+    definition: item.definition ?? before?.definition ?? null,
+    usage: item.usage ?? before?.usage ?? null,
+    examples: item.examples.length
+      ? item.examples.map((e) => ({
+          text: e.text,
+          translations: withTranslation(oldExamples.get(keyOf(e.text)), language, e.translation),
+        }))
+      : (before?.examples ?? []),
+    synonyms: item.synonyms.length
+      ? item.synonyms.map((s) => ({
+          text: s.text,
+          note: s.note,
+          translations: withTranslation(oldSynonyms.get(keyOf(s.text)), language, s.translation),
+        }))
+      : (before?.synonyms ?? []),
+    pairedWith: item.pairedWith ?? before?.pairedWith ?? null,
+    question: item.question ?? before?.question ?? null,
+    languages: hasPart ? { ...otherLanguages, [language]: part } : otherLanguages,
+    status: "DRAFT",
+    decidedBy: null,
+    decidedAt: null,
   };
 }
 
-/** What learners see: the approved items of a published revision, in list order. */
-export async function approvedLexicalItems(db: Database, revision: Pick<RevisionModel, "id" | "richText">) {
-  const items = await db
-    .select()
-    .from(rows)
-    .where(and(eq(rows.revisionId, revision.id), eq(rows.status, "APPROVED")))
-    .orderBy(asc(rows.position));
-  const doc = revision.richText as RichTextDocument;
-  return items.map((r) => {
-    const v = view(r, doc);
-    return { ...v, kind: v.kind ?? "KEYWORD", meaning: v.meaning ?? "" };
+/**
+ * "Add the sheet": its items join the lesson in sheet order. Items already there (same words) are updated from the
+ * sheet and go back to draft, so an editor checks them again.
+ */
+export async function addLexicalSheet(
+  db: Database,
+  actorUserId: string | null,
+  localizationId: string,
+  sheet: string,
+  language: string
+) {
+  if (!(TRANSLATION_LOCALES as readonly string[]).includes(language)) {
+    throw invalid(`A sheet's language is one of ${TRANSLATION_LOCALES.join(", ")}`);
+  }
+  if (sheet.length > MAX_SHEET) throw invalid("The sheet is too long (200,000 characters at most)");
+  const items = parseSheet(sheet);
+  if (!items.length) throw invalid("No items found: number each item (“1. disrupt (v) – …”) or write one per line");
+  return db.transaction(async (tx) => {
+    const draft = await editableDraft(tx, localizationId);
+    const existing = await tx.select().from(rows).where(eq(rows.revisionId, draft.id));
+    const byKey = new Map(existing.map((r) => [r.key, r]));
+    const fresh = items.filter((i) => !byKey.has(keyOf(i.text)));
+    if (existing.length + fresh.length > MAX_ITEMS) throw invalid(`A lesson can have up to ${MAX_ITEMS} items`);
+    let position = existing.reduce((max, r) => Math.max(max, r.position), -1);
+    for (const item of items) {
+      const before = byKey.get(keyOf(item.text));
+      if (before) {
+        await tx
+          .update(rows)
+          .set(fromSheet(item, language, before))
+          .where(eq(rows.id, before.id));
+      } else {
+        await tx
+          .insert(rows)
+          .values({ siteId: draft.siteId, revisionId: draft.id, position: ++position, ...fromSheet(item, language) });
+      }
+    }
+    const updated = items.length - fresh.length;
+    await audit(tx, {
+      siteId: draft.siteId,
+      actorUserId,
+      action: "lexical_items.sheet_added",
+      entityType: "revision",
+      entityId: draft.id,
+      data: { language, added: fresh.length, updated },
+    });
+    return { added: fresh.length, updated };
   });
 }
+
+/** Lowercase, plain quotes and spaces, no "…" or end mark: for finding an example sentence in the script. */
+const plain = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.…]+|[\s.…!?]+$/g, "")
+    .trim();
+
+/** Languages in a fixed order (the database doesn't keep the order they were added in). */
+const rank = (language: string) => {
+  const at = (TRANSLATION_LOCALES as readonly string[]).indexOf(language);
+  return at < 0 ? TRANSLATION_LOCALES.length : at;
+};
+const byLanguage = <T>(record: Record<string, T>) =>
+  Object.entries(record).sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
+const asList = (translations: Translations) => byLanguage(translations).map(([language, text]) => ({ language, text }));
+
+const view = (r: Row, script: string) => ({
+  id: r.id,
+  text: r.text,
+  kind: r.kind as LexicalItemKind,
+  partOfSpeech: r.partOfSpeech,
+  pronunciation: r.pronunciation,
+  definition: r.definition,
+  usage: r.usage,
+  // Checked against the current script each time, so script edits never leave it stale.
+  examples: r.examples.map((e) => ({
+    text: e.text,
+    inText: plain(e.text).length > 0 && script.includes(plain(e.text)),
+    translations: asList(e.translations),
+  })),
+  synonyms: r.synonyms.map((s) => ({ text: s.text, note: s.note, translations: asList(s.translations) })),
+  pairedWith: r.pairedWith,
+  question: r.question,
+  languages: byLanguage(r.languages).map(([language, part]) => ({ language, ...part })),
+  status: r.status as "DRAFT" | "APPROVED",
+});
+
+async function itemsOf(db: Database, revision: Pick<RevisionModel, "id" | "richText">, approvedOnly: boolean) {
+  const found = await db
+    .select()
+    .from(rows)
+    .where(and(eq(rows.revisionId, revision.id), approvedOnly ? eq(rows.status, "APPROVED") : undefined))
+    .orderBy(asc(rows.position));
+  const script = plain([...blockTexts(revision.richText as RichTextDocument).values()].join(" "));
+  return found.map((r) => view(r, script));
+}
+
+/** The draft's items, in sheet order. */
+export const lexicalItemsFor = (db: Database, revision: Pick<RevisionModel, "id" | "richText">) =>
+  itemsOf(db, revision, false);
+
+/** What learners see: the approved items of a published revision, in sheet order. */
+export const approvedLexicalItems = (db: Database, revision: Pick<RevisionModel, "id" | "richText">) =>
+  itemsOf(db, revision, true);
 
 /** How many approved items a revision has (the lesson checklist counts them as vocabulary). */
 export async function approvedLexicalCount(tx: Tx | Database, revisionId: string) {
@@ -302,16 +203,9 @@ export async function copyLexicalItems(tx: Tx, fromRevisionId: string, toRevisio
   }
 }
 
-export type LexicalItemApproval = {
-  id: string;
-  kind: LexicalItemKind;
-  meaning: string;
-  synonyms: string[];
-  example?: string | null;
-  ieltsTip?: string | null;
-};
+export type LexicalItemApproval = { id: string; kind: LexicalItemKind };
 
-/** Editors approve items, with their own edits. */
+/** Editors approve items, with the kind they chose. */
 export async function approveLexicalItems(
   db: Database,
   actorUserId: string | null,
@@ -319,53 +213,19 @@ export async function approveLexicalItems(
   items: LexicalItemApproval[]
 ) {
   if (!items.length || items.length > MAX_ITEMS) throw invalid(`Choose 1 to ${MAX_ITEMS} items`);
-  const clean = items.map((i) => ({
-    id: i.id,
-    kind: i.kind,
-    meaning: clip(i.meaning, LIMIT.meaning + 1),
-    synonyms: i.synonyms.map(tidy).filter(Boolean),
-    example: clip(i.example, LIMIT.example + 1),
-    ieltsTip: clip(i.ieltsTip, LIMIT.tip + 1),
-  }));
-  if (clean.some((i) => !i.meaning)) throw invalid("Every item needs a meaning");
-  if (clean.some((i) => (i.meaning?.length ?? 0) > LIMIT.meaning)) {
-    throw invalid(`A meaning can be up to ${LIMIT.meaning} characters`);
-  }
-  if (clean.some((i) => (i.example?.length ?? 0) > LIMIT.example || (i.ieltsTip?.length ?? 0) > LIMIT.tip)) {
-    throw invalid(`An example or tip can be up to ${LIMIT.example} characters`);
-  }
-  if (clean.some((i) => i.synonyms.length > LIMIT.synonyms || i.synonyms.some((s) => s.length > LIMIT.synonym))) {
-    throw invalid(`Up to ${LIMIT.synonyms} synonyms of ${LIMIT.synonym} characters each`);
-  }
+  const ids = [...new Set(items.map((i) => i.id))];
   return db.transaction(async (tx) => {
     const draft = await editableDraft(tx, localizationId);
     const found = await tx
-      .select({ id: rows.id, status: rows.status })
+      .select({ id: rows.id })
       .from(rows)
-      .where(
-        and(
-          eq(rows.revisionId, draft.id),
-          inArray(
-            rows.id,
-            clean.map((i) => i.id)
-          )
-        )
-      );
-    if (found.length !== clean.length) throw notFound("Lexical item");
+      .where(and(eq(rows.revisionId, draft.id), inArray(rows.id, ids)));
+    if (found.length !== ids.length) throw notFound("Lexical item");
     const now = new Date();
-    for (const item of clean) {
+    for (const item of items) {
       await tx
         .update(rows)
-        .set({
-          kind: item.kind,
-          meaning: item.meaning,
-          synonyms: [...new Set(item.synonyms)],
-          example: item.example,
-          ieltsTip: item.ieltsTip,
-          status: "APPROVED",
-          decidedBy: actorUserId,
-          decidedAt: now,
-        })
+        .set({ kind: item.kind, status: "APPROVED", decidedBy: actorUserId, decidedAt: now })
         .where(eq(rows.id, item.id));
     }
     await audit(tx, {
@@ -374,13 +234,13 @@ export async function approveLexicalItems(
       action: "lexical_items.approved",
       entityType: "revision",
       entityId: draft.id,
-      data: { items: clean.map((i) => i.id) },
+      data: { items: ids },
     });
-    return clean.length;
+    return ids.length;
   });
 }
 
-/** Editors remove items from the lesson's list. */
+/** Editors remove items from the lesson. */
 export async function deleteLexicalItems(
   db: Database,
   actorUserId: string | null,
